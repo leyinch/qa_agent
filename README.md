@@ -12,6 +12,7 @@ Before you begin, ensure you have:
 3.  **APIs Enabled**:
     -   Vertex AI API
     -   BigQuery API
+    -   Secret Manager API (for CI/CD)
 
 ---
 
@@ -131,14 +132,23 @@ gcloud run services update qa-agent \
 1.  **Connect Repo**:
     - Go to **[Cloud Build Triggers](https://console.cloud.google.com/cloud-build/triggers)**.
     - Click **Manage Repositories** > **Connect Repository**.
-    - Select **GitHub (Cloud Build GitHub App)** and authorize your repo.
+    - **Crucial Changes for GitHub**:
+        - Select **2nd gen** (Repository generation).
+        - Select **Region**: `us-central1` (or your project's region). Do **NOT** select Global.
+        - If prompted, click **Create Host Connection** to authorize the "Google Cloud Build" GitHub app.
+        - **Enable API**: You must enable the **Secret Manager API** if prompted.
+    - Select your repository (`qa_agent`) and connect.
 
 2.  **Create Trigger**:
     - Click **Create Trigger**.
     - **Name**: `deploy-qa-agent`.
+    - **Region**: `us-central1` (Must match your connection region).
     - **Event**: Push to a branch.
-    - **Source**: Your repository.
-    - **Branch**: `^main$` (or `.*` for all branches).
+    - **Source**: Select your connected **2nd gen** repository.
+    - **Branch**: 
+        - For production (main): `^main$`
+        - For all feature branches: `^feature/.*$`
+        - For all branches: `.*`
     - **Configuration**: Autodetected (`cloudbuild.yaml`).
 
 > [!TIP]
