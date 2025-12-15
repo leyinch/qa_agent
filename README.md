@@ -1,50 +1,146 @@
-# Data QA Agent
+# 🕵️ Data QA Agent
 
-This is a Next.js application for testing data quality using AI. It uses Google Cloud Vertex AI to generate test cases from an ER diagram and BigQuery schema, and executes them against BigQuery.
+A Next.js application powered by **Vertex AI** to automate data quality testing based on your ER diagrams and BigQuery schemas.
 
-## Prerequisites
+---
 
-- Google Cloud Project
-- BigQuery Dataset
-- Vertex AI API enabled
-- BigQuery API enabled
+## 📋 Prerequisites
 
-## Local Development
+Before you begin, ensure you have:
+1.  A **Google Cloud Project** with billing enabled.
+2.  A **BigQuery Dataset** (your target for testing).
+3.  **APIs Enabled**:
+    -   Vertex AI API
+    -   BigQuery API
 
-Note: Node.js is required for local development.
+---
 
-1. Install dependencies:
+## 💻 Local Development
+
+*Requires Node.js installed.*
+
+1.  **Install dependencies**:
+    ```bash
+    npm install
+    ```
+
+2.  **Start the local server**:
+    ```bash
+    npm run dev
+    ```
+
+3.  **Open the app**:
+    Visit [http://localhost:3000](http://localhost:3000) in your browser.
+
+---
+
+## 🚀 Deployment to Google Cloud Run
+
+**Recommended:** Use Google Cloud Shell for a hassle-free deployment.
+
+### Step 1: Open Cloud Shell
+Click [Activate Cloud Shell](https://console.cloud.google.com/home/dashboard?cloudshell=true&project=leyin-sandpit) to open a terminal in your browser.
+
+### Step 2: Get the Code
+Choose one method:
+
+**Option A: Git Clone (Fastest)**
+```bash
+git clone https://github.com/mirunasuresh23/qa_agent.git
+cd qa_agent
+```
+
+**Option B: Upload Zip**
+1. Zip your local `qa_agent` folder.
+2. In Cloud Shell, click `⋮` (More) > **Upload**.
+3. Select your zip file and unzip it:
    ```bash
-   npm install
+   unzip qa_agent.zip
+   cd qa_agent
    ```
 
-2. Run the development server:
-   ```bash
-   npm run dev
-   ```
+### Step 3: Run Deployment Script
+We've included a script to handle building and deploying for you.
 
-3. Open [http://localhost:3000](http://localhost:3000) with your browser.
+```bash
+chmod +x deploy.sh
+./deploy.sh
+```
 
-## Deployment to Google Cloud Run
+> [!IMPORTANT]
+> **Keep the script output visible!** You will need the **Service URL** (e.g., `https://qa-agent-xyz.run.app`) for the next step.
 
-1. Build the container image:
-   ```bash
-   gcloud builds submit --tag gcr.io/PROJECT_ID/test-case-generator
-   ```
+---
 
-2. Deploy to Cloud Run:
-   ```bash
-   gcloud run deploy test-case-generator \
-     --image gcr.io/PROJECT_ID/test-case-generator \
-     --platform managed \
-     --region us-central1 \
-     --allow-unauthenticated \
-     --set-env-vars GOOGLE_CLIENT_ID=your-client-id,GOOGLE_CLIENT_SECRET=your-client-secret,NEXTAUTH_SECRET=your-secret,NEXTAUTH_URL=https://your-service-url
-   ```
+## 🔐 Configuration: Google OAuth
 
-## Environment Variables
+To verify users, you must set up "Sign in with Google".
 
-- `GOOGLE_CLIENT_ID`: Google OAuth Client ID
-- `GOOGLE_CLIENT_SECRET`: Google OAuth Client Secret
-- `NEXTAUTH_SECRET`: Random string for session encryption
-- `NEXTAUTH_URL`: The canonical URL of your site
+### 1. Configure Consent Screen
+*skip this if you've already configured a Consent Screen for this project.*
+
+1.  Go to **[OAuth Consent Screen](https://console.cloud.google.com/apis/credentials/consent)**.
+2.  Select **External** (transmits to any Google account) or **Internal** (Workspace only).
+3.  Fill in the **App Name** (e.g., "QA Agent"), **Support Email**, and **Developer Contact**.
+4.  Click **Save and Continue** to finish.
+
+### 2. Create Credentials
+1.  Go to **[Credentials](https://console.cloud.google.com/apis/credentials)**.
+2.  Click **Create Credentials** > **OAuth client ID**.
+3.  **Application Type**: Select `Web application`.
+4.  **Name**: Enter `qa-agent` (for your reference).
+5.  **Authorized Redirect URIs** (Crucial Step):
+    *   Paste your **Service URL**.
+    *   Append exactly: `/api/auth/callback/google`
+    *   **Final Format Example**:
+        `https://qa-agent-xyz.run.app/api/auth/callback/google`
+6.  Click **Create**.
+7.  **Copy** the `Client ID` and `Client Secret`.
+
+### 3. Apply Credentials to App
+Update your running service with these secrets.
+
+**Option A: Using the CLI (Cloud Shell)**
+```bash
+gcloud run services update qa-agent \
+  --platform managed \
+  --region us-central1 \
+  --set-env-vars "GOOGLE_CLIENT_ID=PASTE_CLIENT_ID,GOOGLE_CLIENT_SECRET=PASTE_CLIENT_SECRET,NEXTAUTH_URL=PASTE_SERVICE_URL"
+```
+
+**Option B: Using Google Cloud Console**
+1. Go to **Cloud Run** > Select `qa-agent`.
+2. Click **Edit & Deploy New Revision**.
+3. Go to **Variables & Secrets** tab.
+4. Add the 3 environment variables listed below.
+
+#### Environment Variables Reference
+| Variable | Value |
+| :--- | :--- |
+| `GOOGLE_CLIENT_ID` | Your OAuth Client ID |
+| `GOOGLE_CLIENT_SECRET` | Your OAuth Client Secret |
+| `NEXTAUTH_URL` | Your Service URL (e.g., `https://...run.app`) |
+| `NEXTAUTH_SECRET` | A random string (auto-generated by deploy script usually) |
+
+---
+
+## 🔄 CI/CD (Automated Deployment)
+
+*Optional: Set this up to automatically update your app when you push code to GitHub.*
+
+1.  **Connect Repo**:
+    - Go to **[Cloud Build Triggers](https://console.cloud.google.com/cloud-build/triggers)**.
+    - Click **Manage Repositories** > **Connect Repository**.
+    - Select **GitHub (Cloud Build GitHub App)** and authorize your repo.
+
+2.  **Create Trigger**:
+    - Click **Create Trigger**.
+    - **Name**: `deploy-qa-agent`.
+    - **Event**: Push to a branch.
+    - **Source**: Your repository.
+    - **Branch**: `^main$` (or `.*` for all branches).
+    - **Configuration**: Autodetected (`cloudbuild.yaml`).
+
+> [!TIP]
+> **Deploying to a Staging Environment?**
+> You can create a second trigger for a different branch (e.g., `feature/*`) and override the `_SERVICE_NAME` variable in the Trigger settings to deploy to `qa-agent-staging` instead of replacing your main app.
