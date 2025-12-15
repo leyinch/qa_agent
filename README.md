@@ -154,3 +154,33 @@ gcloud run services update qa-agent \
 > [!TIP]
 > **Deploying to a Staging Environment?**
 > You can create a second trigger for a different branch (e.g., `feature/*`) and override the `_SERVICE_NAME` variable in the Trigger settings to deploy to `qa-agent-staging` instead of replacing your main app.
+
+### Special Case: Contributors Testing Feature Branches
+
+If you're a **contributor** (not the repo owner) and want to auto-deploy your feature branch:
+
+1. **Fork the Repository**:
+   - Go to the original repo on GitHub
+   - Click **Fork** → Uncheck "Copy the main branch only" → **Create fork**
+
+2. **Update Your Local Git**:
+   ```bash
+   git remote add upstream https://github.com/ORIGINAL_OWNER/qa_agent.git
+   git remote set-url origin https://github.com/YOUR_USERNAME/qa_agent.git
+   ```
+
+3. **Create Trigger on Your Fork**:
+   - Follow steps above, but select **your fork** as the repository
+   - Set branch to your feature branch (e.g., `^feature_your_name$`)
+
+4. **Push to Your Fork**:
+   ```bash
+   git push origin feature_your_name
+   ```
+   Cloud Build will auto-deploy from your fork.
+
+5. **Sync Back to Original** (optional):
+   ```bash
+   git push upstream feature_your_name
+   ```
+
