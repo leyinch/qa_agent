@@ -181,11 +181,11 @@ Generate SQL test cases to validate the data load from GCS to BigQuery. Focus on
 3. **Data Completeness**: Check for null values in mandatory fields
 4. **Data Quality**: Validate data ranges, formats, and constraints
 5. **Duplicate Detection**: Check for duplicate records
-6. **ID Column Handling**: For any column name containing "id" (case-insensitive), ALWAYS treat values as STRING/TEXT for comparison. Cast values if necessary to avoid type mismatches (e.g. `CAST(order_id AS STRING)`).
+6. **ID Column Handling**: For any column name containing "id" (case-insensitive), ALWAYS treat values as STRING/TEXT for comparison. Cast values if necessary to avoid type mismatches (e.g. CAST(order_id AS STRING)).
 
 For each test, return a SQL query that returns rows that FAIL the test. If the query returns 0 rows, the test passes.
 
-**CRITICAL**: All table references must use the full table name: \\\`${fullTableName}\\\`
+**CRITICAL**: All table references must use the full table name: ${fullTableName}
 
 Return output as a JSON array with this structure:
 [
@@ -362,7 +362,7 @@ ${tableList}
          - Invalid values (e.g., negative prices).
       3. **ID Column Handling**: For any column name containing "id" (case-insensitive), ALWAYS treat values as STRING/TEXT for comparison. Cast values if necessary to avoid type mismatches.
       4. CRITICAL: All table references in SQL queries MUST use the FULL table name from the "Available Tables" list above.
-         Example: SELECT * FROM \\\`${projectId}.${datasets[0]}.customers\\\` WHERE email IS NULL
+         Example: SELECT * FROM ${projectId}.${datasets[0]}.customers WHERE email IS NULL
          For cross-dataset joins, use appropriate full table names for each table.
       4. Return the output as a JSON array of test cases. Each test case should have:
          - "test_name": string
