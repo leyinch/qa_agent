@@ -28,6 +28,7 @@ substitutions:
     # by adding Substitution variables with different values.
     _SERVICE_NAME: qa-agent
     _REGION: us-central1
+    _PROJECT_ID: leyin-sandpit
 
 images:
   - 'gcr.io/$PROJECT_ID/$_SERVICE_NAME:$COMMIT_SHA'

@@ -60,7 +60,18 @@ cd qa_agent
    cd qa_agent
    ```
 
-### Step 3: Run Deployment Script
+### Step 3: Configure Deployment
+The deployment settings are centralized in `cloudbuild.yaml`.
+1. Open `cloudbuild.yaml`.
+2. Verify/Update the `substitutions` section:
+   ```yaml
+   substitutions:
+       _SERVICE_NAME: qa-agent
+       _REGION: us-central1
+       _PROJECT_ID: your-project-id  # Update this to match your project
+   ```
+
+### Step 4: Run Deployment Script
 We've included a script to handle building and deploying for you.
 
 ```bash

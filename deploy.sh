@@ -8,8 +8,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SERVICE_NAME=$(grep '_SERVICE_NAME:' "${SCRIPT_DIR}/cloudbuild.yaml" | awk '{print $2}')
 REGION=$(grep '_REGION:' "${SCRIPT_DIR}/cloudbuild.yaml" | awk '{print $2}')
 
-# PROJECT_ID="leyin-sandpit" # Commented out hardcoded ID
-PROJECT_ID=$(gcloud config get-value project)
+PROJECT_ID=$(grep '_PROJECT_ID:' "${SCRIPT_DIR}/cloudbuild.yaml" | awk '{print $2}')
 IMAGE_NAME="gcr.io/${PROJECT_ID}/${SERVICE_NAME}"
 
 echo "Starting deployment for ${SERVICE_NAME}..."
