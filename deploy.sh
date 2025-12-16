@@ -3,10 +3,13 @@
 # Deployment Script for QA Agent
 # Run this in Google Cloud Shell
 
+# Extract configuration from cloudbuild.yaml (single source of truth)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SERVICE_NAME=$(grep '_SERVICE_NAME:' "${SCRIPT_DIR}/cloudbuild.yaml" | awk '{print $2}')
+REGION=$(grep '_REGION:' "${SCRIPT_DIR}/cloudbuild.yaml" | awk '{print $2}')
+
 # PROJECT_ID="leyin-sandpit" # Commented out hardcoded ID
 PROJECT_ID=$(gcloud config get-value project)
-SERVICE_NAME="qa-agent"
-REGION="us-central1"
 IMAGE_NAME="gcr.io/${PROJECT_ID}/${SERVICE_NAME}"
 
 echo "Starting deployment for ${SERVICE_NAME}..."
