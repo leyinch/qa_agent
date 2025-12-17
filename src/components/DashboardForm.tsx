@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-type ComparisonMode = 'schema' | 'gcs';
+type ComparisonMode = 'schema' | 'gcs' | 'freshness';
 type FileFormat = 'csv' | 'json' | 'parquet' | 'avro';
 
 export default function DashboardForm() {
@@ -24,6 +24,11 @@ export default function DashboardForm() {
     const [fileFormat, setFileFormat] = useState<FileFormat>('csv');
     const [targetDataset, setTargetDataset] = useState("");
     const [targetTable, setTargetTable] = useState("");
+
+    // Freshness mode fields
+    const [freshnessDataset, setFreshnessDataset] = useState("");
+    const [freshnessThreshold, setFreshnessThreshold] = useState("24");
+    const [freshnessUnit, setFreshnessUnit] = useState<'hours' | 'minutes'>('hours');
 
     const handleDatasetChange = (index: number, value: string) => {
         const newDatasets = [...datasets];
@@ -83,7 +88,7 @@ export default function DashboardForm() {
             } finally {
                 setLoading(false);
             }
-        } else {
+        } else if (comparisonMode === 'gcs') {
             // GCS comparison mode
             if (!gcsBucket || !gcsFilePath || !targetDataset || !targetTable) {
                 alert("Please fill in all GCS comparison fields");
@@ -117,6 +122,43 @@ export default function DashboardForm() {
                 } else {
                     const errorData = await res.json();
                     alert(`Failed to generate tests: ${errorData.error || 'Unknown error'}`);
+                }
+            } catch (error) {
+                console.error(error);
+                alert("An error occurred");
+            } finally {
+                setLoading(false);
+            }
+        } else if (comparisonMode === 'freshness') {
+            // Freshness check mode
+            if (!freshnessDataset) {
+                alert("Please enter the dataset for freshness check");
+                return;
+            }
+
+            setLoading(true);
+
+            try {
+                const res = await fetch("/api/check-freshness", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        projectId,
+                        dataset: freshnessDataset,
+                        freshnessThreshold: freshnessThreshold,
+                        freshnessUnit: freshnessUnit
+                    }),
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    localStorage.setItem("testResults", JSON.stringify(data));
+                    router.push("/results");
+                } else {
+                    const errorData = await res.json();
+                    alert(`Failed to check freshness: ${errorData.error || 'Unknown error'}`);
                 }
             } catch (error) {
                 console.error(error);
@@ -176,6 +218,23 @@ export default function DashboardForm() {
                         }}
                     >
                         📁 GCS File Comparison
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setComparisonMode('freshness')}
+                        style={{
+                            flex: 1,
+                            padding: '1rem',
+                            background: comparisonMode === 'freshness' ? 'var(--gradient-primary)' : 'var(--secondary)',
+                            color: comparisonMode === 'freshness' ? 'white' : 'var(--foreground)',
+                            border: comparisonMode === 'freshness' ? 'none' : '2px solid var(--border)',
+                            borderRadius: 'var(--radius)',
+                            cursor: 'pointer',
+                            fontWeight: '600',
+                            transition: 'all 0.2s ease'
+                        }}
+                    >
+                        ⏱️ Data Freshness
                     </button>
                 </div>
             </div>
@@ -456,6 +515,66 @@ export default function DashboardForm() {
                 </>
             )}
 
+            {/* Freshness Check Mode Fields */}
+            {comparisonMode === 'freshness' && (
+                <>
+                    {/* Dataset */}
+                    <div style={{ marginBottom: '1.75rem' }}>
+                        <label className="label" htmlFor="freshnessDataset">
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                🎯 BigQuery Dataset
+                            </span>
+                        </label>
+                        <input
+                            id="freshnessDataset"
+                            type="text"
+                            className="input"
+                            value={freshnessDataset}
+                            onChange={(e) => setFreshnessDataset(e.target.value)}
+                            required
+                            placeholder="e.g., crown_test"
+                        />
+                        <p style={{ fontSize: '0.8125rem', color: 'var(--secondary-foreground)', marginTop: '0.5rem', fontStyle: 'italic' }}>
+                            💡 Checks all tables starting with "Store_" in this dataset
+                        </p>
+                    </div>
+
+                    {/* Freshness Threshold */}
+                    <div style={{ marginBottom: '1.75rem' }}>
+                        <label className="label" htmlFor="freshnessThreshold">
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                ⏱️ Freshness Threshold
+                            </span>
+                        </label>
+                        <div style={{ display: 'flex', gap: '1rem' }}>
+                            <input
+                                id="freshnessThreshold"
+                                type="number"
+                                className="input"
+                                value={freshnessThreshold}
+                                onChange={(e) => setFreshnessThreshold(e.target.value)}
+                                required
+                                min="1"
+                                placeholder="e.g., 24"
+                                style={{ flex: 2 }}
+                            />
+                            <select
+                                className="input"
+                                value={freshnessUnit}
+                                onChange={(e) => setFreshnessUnit(e.target.value as 'hours' | 'minutes')}
+                                style={{ flex: 1 }}
+                            >
+                                <option value="hours">Hours</option>
+                                <option value="minutes">Minutes</option>
+                            </select>
+                        </div>
+                        <p style={{ fontSize: '0.8125rem', color: 'var(--secondary-foreground)', marginTop: '0.5rem', fontStyle: 'italic' }}>
+                            💡 Data constitutes "fresh" if loaded within this time frame
+                        </p>
+                    </div>
+                </>
+            )}
+
             {/* Submit Button */}
             <button
                 type="submit"
@@ -466,12 +585,12 @@ export default function DashboardForm() {
                 {loading ? (
                     <span style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                         <span className="loading">⏳</span>
-                        {comparisonMode === 'gcs' ? 'Comparing GCS File...' : 'Generating Test Cases...'}
+                        {comparisonMode === 'gcs' ? 'Comparing GCS File...' : comparisonMode === 'freshness' ? 'Checking Freshness...' : 'Generating Test Cases...'}
                     </span>
                 ) : (
                     <span style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                         <span>🚀</span>
-                        {comparisonMode === 'gcs' ? 'Compare & Test' : 'Generate & Run Tests'}
+                        {comparisonMode === 'gcs' ? 'Compare & Test' : comparisonMode === 'freshness' ? 'Check Freshness' : 'Generate & Run Tests'}
                     </span>
                 )}
             </button>
