@@ -87,7 +87,7 @@ export async function POST(req: Request) {
 
         // Iterate through each configured layer
         for (const layer of config.layers) {
-            const layerTables = tables.filter(table => table.id.startsWith(layer.tablePrefix));
+            const layerTables = tables.filter(table => table.id?.startsWith(layer.tablePrefix));
 
             if (layerTables.length > 0) {
                 tablesFound = true;
