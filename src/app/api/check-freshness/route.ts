@@ -19,6 +19,7 @@ interface TestResult {
 interface FreshnessConfig {
     defaultThresholdMinutes: number;
     defaultUnit: 'minutes' | 'hours';
+    loadedAtField?: string;
     layers: {
         name: string;
         tablePrefix: string;
@@ -38,6 +39,7 @@ const loadConfig = (): FreshnessConfig => {
         return {
             defaultThresholdMinutes: 1440,
             defaultUnit: 'minutes',
+            loadedAtField: 'elt_load_time',
             layers: [
                 {
                     name: 'Store',
@@ -106,6 +108,7 @@ export async function POST(req: Request) {
 
                 console.log(`Checking freshness for layer '${layer.name}' (prefix: ${layer.tablePrefix}) with threshold ${layerThresholdMinutes} minutes`);
 
+                const loadedAtColumn = config.loadedAtField || 'elt_load_time';
                 for (const table of layerTables) {
                     const tableId = table.id;
                     const fullTableName = `\`${projectId}.${dataset}.${tableId}\``;
@@ -113,8 +116,8 @@ export async function POST(req: Request) {
                     try {
                         const query = `
                             SELECT 
-                                MAX(elt_load_time) as last_load_time,
-                                TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), MAX(elt_load_time), MINUTE) as minutes_since_load
+                                MAX(${loadedAtColumn}) as last_load_time,
+                                TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), MAX(${loadedAtColumn}), MINUTE) as minutes_since_load
                             FROM ${fullTableName}
                         `;
 
@@ -123,11 +126,11 @@ export async function POST(req: Request) {
                         if (rows.length === 0 || rows[0].last_load_time === null) {
                             results.push({
                                 test_name: `Data Freshness - ${tableId}`,
-                                description: `Check if ${tableId} has data and recent elt_load_time`,
+                                description: `Check if ${tableId} has data and recent ${loadedAtColumn}`,
                                 status: "FAIL",
                                 severity: "HIGH",
                                 sql_query: query,
-                                error_message: "Table is empty or elt_load_time is null"
+                                error_message: `Table is empty or ${loadedAtColumn} is null`
                             });
                             continue;
                         }
@@ -153,7 +156,7 @@ export async function POST(req: Request) {
                             description: `Check freshness for ${tableId}`,
                             status: "ERROR",
                             severity: "HIGH",
-                            sql_query: `SELECT MAX(elt_load_time) FROM ${fullTableName}`,
+                            sql_query: `SELECT MAX(${loadedAtColumn}) FROM ${fullTableName}`,
                             error_message: err.message
                         });
                     }

@@ -1,8 +1,12 @@
 # Default threshold in minutes (1440 minutes = 24 hours)
 defaultThresholdMinutes: 1440
 
+
 # Default unit for the API to assume if not provided
 defaultUnit: minutes
+
+# Field to use for freshness check (default: elt_load_time)
+loadedAtField: etl_load_time
 
 # Layer configurations
 layers:
