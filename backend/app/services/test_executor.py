@@ -210,11 +210,10 @@ class TestExecutor:
             if not mappings:
                 raise ValueError("No active mappings found in config table")
             
-            # Process each mapping
-            results = []
-            for mapping in mappings:
-                result = await self.process_mapping(project_id, mapping)
-                results.append(result)
+            # Process mappings in parallel
+            import asyncio
+            tasks = [self.process_mapping(project_id, mapping) for mapping in mappings]
+            results = await asyncio.gather(*tasks)
             
             # Calculate summary
             total_tests = sum(len(r.predefined_results) for r in results)

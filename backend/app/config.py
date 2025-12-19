@@ -16,11 +16,7 @@ class Settings(BaseSettings):
     vertex_ai_model: str = "gemini-2.5-flash"
     
     # CORS
-    cors_origins: list[str] = [
-        "http://localhost:3000",
-        "https://data-qa-agent-*.run.app",
-        "https://data-qa-agent-frontend-750147355601.us-central1.run.app"
-    ]
+    cors_origins: list[str] = ["*"]
     
     class Config:
         env_file = ".env"
