@@ -15,6 +15,7 @@ from app.models import (
     CustomTestRequest
 )
 from app.services.test_executor import test_executor
+from app.services.bigquery_service import bigquery_service
 
 # Configure logging
 logging.basicConfig(
@@ -65,6 +66,7 @@ async def generate_tests(request: GenerateTestsRequest):
     - schema: Validate BigQuery schema against ERD
     - gcs: Compare single GCS file to BigQuery table
     - gcs-config: Process multiple mappings from config table
+    - scd: Validate Slowly Changing Dimension (Type 1 or Type 2)
     """
     try:
         logger.info(f"Received test generation request: mode={request.comparison_mode}")
@@ -84,9 +86,7 @@ async def generate_tests(request: GenerateTestsRequest):
             )
             
             try:
-                from app.services.bigquery_service import bigquery_service
                 summary_data = result['summary']
-                
                 # Convert results objects to dicts for JSON serialization
                 results_by_mapping_dicts = [r.dict() for r in result['results_by_mapping']]
 
@@ -114,7 +114,6 @@ async def generate_tests(request: GenerateTestsRequest):
                 results_by_mapping=result['results_by_mapping']
             )
         
-
         # GCS Single File
         elif request.comparison_mode == 'gcs':
             if not all([request.gcs_bucket, request.gcs_file_path, 
@@ -156,7 +155,6 @@ async def generate_tests(request: GenerateTestsRequest):
 
             # Log execution
             try:
-                from app.services.bigquery_service import bigquery_service
                 await bigquery_service.log_execution(
                     project_id=request.project_id,
                     execution_data={
@@ -191,7 +189,6 @@ async def generate_tests(request: GenerateTestsRequest):
                 
                 # Log Schema Validation
                 try:
-                    from app.services.bigquery_service import bigquery_service
                     summary = result_data.get('summary', {})
                     issues = result_data.get('summary', {}).get('total_issues', 0)
                     
@@ -202,8 +199,8 @@ async def generate_tests(request: GenerateTestsRequest):
                             "source": "ERD Description",
                             "target": ",".join(request.datasets or []),
                             "status": "AT_RISK" if issues > 0 else "PASS",
-                            "total_tests": summary.get('total_tables', 0), # Using table count as simpler metric
-                            "passed_tests": summary.get('total_tables', 0) - (1 if issues > 0 else 0), # Simplified
+                            "total_tests": summary.get('total_tables', 0),
+                            "passed_tests": summary.get('total_tables', 0) - (1 if issues > 0 else 0),
                             "failed_tests": issues,
                             "details": result_data
                         }
@@ -239,10 +236,24 @@ async def generate_tests(request: GenerateTestsRequest):
                 try:
                     await bigquery_service.log_execution(
                         project_id=request.project_id,
-                        comparison_mode='scd',
-                        source_info=f"SCD: {request.target_table}",
-                        target_info=f"{request.target_dataset}.{request.target_table}",
-                        test_results=result.predefined_results
+                        execution_data={
+                            "comparison_mode": "scd",
+                            "source": f"SCD: {request.target_table}",
+                            "target": f"{request.target_dataset}.{request.target_table}",
+                            "status": "FAIL" if any(r.status in ['FAIL', 'ERROR'] for r in result.predefined_results) else "PASS",
+                            "total_tests": len(result.predefined_results),
+                            "passed_tests": len([t for t in result.predefined_results if t.status == 'PASS']),
+                            "failed_tests": len([t for t in result.predefined_results if t.status == 'FAIL']),
+                            "details": {
+                                "summary": {
+                                    "total_tests": len(result.predefined_results),
+                                    "passed": len([t for t in result.predefined_results if t.status == 'PASS']),
+                                    "failed": len([t for t in result.predefined_results if t.status == 'FAIL']),
+                                    "errors": len([t for t in result.predefined_results if t.status == 'ERROR'])
+                                },
+                                "predefined_results": [r.dict() for r in result.predefined_results]
+                            }
+                        }
                     )
                 except Exception as log_err:
                     logger.error(f"Failed to log scd execution: {log_err}")
@@ -265,9 +276,6 @@ async def generate_tests(request: GenerateTestsRequest):
                 status_code=400,
                 detail=f"Invalid comparison_mode: {request.comparison_mode}"
             )
-
-
-
             
     except HTTPException:
         raise

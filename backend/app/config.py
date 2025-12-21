@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     # Google Cloud
     google_cloud_project: str = "leyin-sandpit"
     vertex_ai_location: str = "us-central1"
-    vertex_ai_model: str = "gemini-2.5-flash"
+    vertex_ai_model: str = "gemini-1.5-flash"
     
     # CORS
     cors_origins: list[str] = ["*"]
