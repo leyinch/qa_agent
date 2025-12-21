@@ -175,6 +175,237 @@ PREDEFINED_TESTS = {
             LIMIT 100
             """ if config.get('outlier_columns') else None
         )
+    ),
+
+    # --- SCD1 Tests ---
+    'scd1_primary_key_null': TestTemplate(
+        test_id='scd1_primary_key_null',
+        name='SCD1 Natural Key NOT NULL',
+        category='completeness',
+        severity='HIGH',
+        description='Check composite natural key for NULLs',
+        is_global=False,
+        generate_sql=lambda config: (
+            f"""
+            SELECT * FROM `{config['full_table_name']}`
+            WHERE ({' || '.join([f"IFNULL(SAFE_CAST({col} AS STRING), '')" for col in config['natural_keys']])}) = ''
+            LIMIT 100
+            """ if config.get('natural_keys') else None
+        )
+    ),
+
+    'scd1_primary_key_unique': TestTemplate(
+        test_id='scd1_primary_key_unique',
+        name='SCD1 Natural Key Uniqueness',
+        category='integrity',
+        severity='HIGH',
+        description='Ensure composite natural key uniqueness',
+        is_global=False,
+        generate_sql=lambda config: (
+            f"""
+            SELECT {' , '.join(config['natural_keys'])}, COUNT(*) as duplicate_count
+            FROM `{config['full_table_name']}`
+            GROUP BY {' , '.join(config['natural_keys'])}
+            HAVING COUNT(*) > 1
+            """ if config.get('natural_keys') else None
+        )
+    ),
+
+    # --- SCD2 Canonical Tests ---
+    'scd2_begin_date_null': TestTemplate(
+        test_id='scd2_begin_date_null',
+        name='SCD2 Begin Date NOT NULL',
+        category='completeness',
+        severity='HIGH',
+        description='Check SCD2 begin date for NULL values',
+        is_global=False,
+        generate_sql=lambda config: f"SELECT * FROM `{config['full_table_name']}` WHERE {config['begin_date_column']} IS NULL"
+    ),
+
+    'scd2_end_date_null': TestTemplate(
+        test_id='scd2_end_date_null',
+        name='SCD2 End Date NOT NULL',
+        category='completeness',
+        severity='HIGH',
+        description='Check SCD2 end date for NULL values',
+        is_global=False,
+        generate_sql=lambda config: f"SELECT * FROM `{config['full_table_name']}` WHERE {config['end_date_column']} IS NULL"
+    ),
+
+    'scd2_flag_null': TestTemplate(
+        test_id='scd2_flag_null',
+        name='SCD2 Active Flag NOT NULL',
+        category='completeness',
+        severity='HIGH',
+        description='Check SCD2 active flag for NULL values',
+        is_global=False,
+        generate_sql=lambda config: f"SELECT * FROM `{config['full_table_name']}` WHERE {config['active_flag_column']} IS NULL"
+    ),
+
+    'scd2_one_current_row': TestTemplate(
+        test_id='scd2_one_current_row',
+        name='One Current Row per Natural Key',
+        category='integrity',
+        severity='HIGH',
+        description='Ensure exactly one active record per natural key',
+        is_global=False,
+        generate_sql=lambda config: (
+            f"""
+            SELECT {' , '.join(config['natural_keys'])}, COUNTIF({config['active_flag_column']} = TRUE OR {config['active_flag_column']} = 'Y' OR {config['active_flag_column']} = '1') as active_count
+            FROM `{config['full_table_name']}`
+            GROUP BY {' , '.join(config['natural_keys'])}
+            HAVING active_count <> 1
+            """
+        )
+    ),
+
+    'scd2_current_date_check': TestTemplate(
+        test_id='scd2_current_date_check',
+        name='Current Row Date Check',
+        category='validity',
+        severity='HIGH',
+        description='Ensure active rows have the high-watermark end date',
+        is_global=False,
+        generate_sql=lambda config: (
+            f"""
+            SELECT * FROM `{config['full_table_name']}`
+            WHERE ({config['active_flag_column']} = TRUE OR {config['active_flag_column']} = 'Y' OR {config['active_flag_column']} = '1')
+            AND CAST({config['end_date_column']} AS STRING) NOT LIKE '2099-12-31%'
+            """
+        )
+    ),
+
+    'scd2_invalid_flag_combination': TestTemplate(
+        test_id='scd2_invalid_flag_combination',
+        name='No Invalid Current-Row Combinations',
+        category='validity',
+        severity='HIGH',
+        description='No active flag for non-high-watermark end dates',
+        is_global=False,
+        generate_sql=lambda config: (
+            f"""
+            SELECT * FROM `{config['full_table_name']}`
+            WHERE ({config['active_flag_column']} = TRUE OR {config['active_flag_column']} = 'Y' OR {config['active_flag_column']} = '1')
+            AND CAST({config['end_date_column']} AS STRING) NOT LIKE '2099-12-31%'
+            """
+        )
+    ),
+
+    'scd2_date_order': TestTemplate(
+        test_id='scd2_date_order',
+        name='Date Order Validation',
+        category='validity',
+        severity='HIGH',
+        description='Ensure BeginEffDateTime < EndEffDateTime',
+        is_global=False,
+        generate_sql=lambda config: f"SELECT * FROM `{config['full_table_name']}` WHERE {config['begin_date_column']} >= {config['end_date_column']}"
+    ),
+
+    'scd2_unique_begin_date': TestTemplate(
+        test_id='scd2_unique_begin_date',
+        name='Unique Begin Date per Natural Key',
+        category='integrity',
+        severity='HIGH',
+        description='Ensure no natural key has multiple records starting at the same time',
+        is_global=False,
+        generate_sql=lambda config: (
+            f"""
+            SELECT {' , '.join(config['natural_keys'])}, {config['begin_date_column']}, COUNT(*)
+            FROM `{config['full_table_name']}`
+            GROUP BY {' , '.join(config['natural_keys'])}, {config['begin_date_column']}
+            HAVING COUNT(*) > 1
+            """
+        )
+    ),
+
+    'scd2_unique_end_date': TestTemplate(
+        test_id='scd2_unique_end_date',
+        name='Unique End Date per Natural Key',
+        category='integrity',
+        severity='HIGH',
+        description='Ensure no natural key has multiple records ending at the same time',
+        is_global=False,
+        generate_sql=lambda config: (
+            f"""
+            SELECT {' , '.join(config['natural_keys'])}, {config['end_date_column']}, COUNT(*)
+            FROM `{config['full_table_name']}`
+            GROUP BY {' , '.join(config['natural_keys'])}, {config['end_date_column']}
+            HAVING COUNT(*) > 1
+            """
+        )
+    ),
+
+    'scd2_continuity': TestTemplate(
+        test_id='scd2_continuity',
+        name='Continuous History Check',
+        category='validity',
+        severity='HIGH',
+        description='Check for gaps or overlaps in SCD history',
+        is_global=False,
+        generate_sql=lambda config: (
+            f"""
+            WITH ordered_history AS (
+                SELECT 
+                    *,
+                    LEAD({config['begin_date_column']}) OVER (PARTITION BY {' , '.join(config['natural_keys'])} ORDER BY {config['begin_date_column']}) as next_begin
+                FROM `{config['full_table_name']}`
+            )
+            SELECT * FROM ordered_history
+            WHERE next_begin IS NOT NULL 
+            AND {config['end_date_column']} <> next_begin
+            -- Note: depending on interval, might need DATE_ADD(..., INTERVAL 1 SECOND)
+            """
+        )
+    ),
+
+    'scd2_no_record_after_current': TestTemplate(
+        test_id='scd2_no_record_after_current',
+        name='No Record After Current',
+        category='validity',
+        severity='HIGH',
+        description='Ensure no record exists after the high-watermark current row',
+        is_global=False,
+        generate_sql=lambda config: (
+            f"""
+            WITH history AS (
+                SELECT 
+                    *,
+                    LEAD({config['begin_date_column']}) OVER (PARTITION BY {' , '.join(config['natural_keys'])} ORDER BY {config['begin_date_column']}) as next_begin
+                FROM `{config['full_table_name']}`
+            )
+            SELECT * FROM history
+            WHERE CAST({config['end_date_column']} AS STRING) LIKE '2099-12-31%'
+            AND next_begin IS NOT NULL
+            """
+        )
+    ),
+
+    # --- Structural Tests ---
+    'surrogate_key_null': TestTemplate(
+        test_id='surrogate_key_null',
+        name='Surrogate Key NOT NULL',
+        category='completeness',
+        severity='HIGH',
+        description='Check surrogate key for NULL values',
+        is_global=False,
+        generate_sql=lambda config: f"SELECT * FROM `{config['full_table_name']}` WHERE {config['surrogate_key']} IS NULL"
+    ),
+
+    'surrogate_key_unique': TestTemplate(
+        test_id='surrogate_key_unique',
+        name='Surrogate Key Uniqueness',
+        category='integrity',
+        severity='HIGH',
+        description='Ensure surrogate key uniqueness',
+        is_global=False,
+        generate_sql=lambda config: (
+            f"""
+            SELECT {config['surrogate_key']}, COUNT(*) as duplicate_count
+            FROM `{config['full_table_name']}`
+            GROUP BY {config['surrogate_key']}
+            HAVING COUNT(*) > 1
+            """
+        )
     )
 }
 

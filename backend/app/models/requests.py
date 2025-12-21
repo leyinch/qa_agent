@@ -23,6 +23,14 @@ class GenerateTestsRequest(BaseModel):
     config_dataset: Optional[str] = Field(None, description="Config table dataset")
     config_table: Optional[str] = Field(None, description="Config table name")
     
+    # SCD validation fields
+    scd_type: Optional[str] = Field(None, description="SCD type: 'scd1' or 'scd2'")
+    natural_keys: Optional[List[str]] = Field(None, description="Natural key columns")
+    surrogate_key: Optional[str] = Field(None, description="Surrogate key column")
+    begin_date_column: Optional[str] = Field(None, description="Effect beginning date column (SCD2)")
+    end_date_column: Optional[str] = Field(None, description="Effect ending date column (SCD2)")
+    active_flag_column: Optional[str] = Field(None, description="Active row flag column (SCD2)")
+    
     # Common optional fields
     enabled_test_ids: Optional[List[str]] = Field(None, description="List of test IDs to enable")
 

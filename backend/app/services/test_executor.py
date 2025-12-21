@@ -174,16 +174,111 @@ class TestExecutor:
                 predefined_results=predefined_results,
                 ai_suggestions=ai_suggestions
             )
+    
+    async def process_scd(
+        self,
+        project_id: str,
+        mapping: Dict[str, Any]
+    ) -> MappingResult:
+        """
+        Process SCD validation for a table.
+        
+        Args:
+            project_id: Google Cloud project ID
+            mapping: SCD configuration mapping
+            
+        Returns:
+            MappingResult with SCD test results
+        """
+        mapping_id = mapping.get('mapping_id', f"{mapping.get('target_table', 'unknown')}_scd")
+        
+        try:
+            target_dataset = mapping['target_dataset']
+            target_table = mapping['target_table']
+            scd_type = mapping.get('scd_type', 'scd2')
+            
+            full_table_name = f"{project_id}.{target_dataset}.{target_table}"
+            table_metadata = await bigquery_service.get_table_metadata(project_id, target_dataset, target_table)
+            
+            # Prepare test configuration
+            test_config = {
+                'full_table_name': full_table_name,
+                'natural_keys': mapping.get('natural_keys', []),
+                'surrogate_key': mapping.get('surrogate_key'),
+                'begin_date_column': mapping.get('begin_date_column', 'DWBeginEffDateTime'),
+                'end_date_column': mapping.get('end_date_column', 'DWEndEffDateTime'),
+                'active_flag_column': mapping.get('active_flag_column', 'DWCurrentRowFlag')
+            }
+            
+            # Auto-selection of tests if none provided
+            enabled_test_ids = mapping.get('enabled_test_ids', [])
+            if not enabled_test_ids:
+                # Basic structural tests
+                if test_config['surrogate_key']:
+                    enabled_test_ids.extend(['surrogate_key_null', 'surrogate_key_unique'])
+                
+                if scd_type == 'scd1':
+                    enabled_test_ids.extend(['scd1_primary_key_null', 'scd1_primary_key_unique'])
+                elif scd_type == 'scd2':
+                    enabled_test_ids.extend([
+                        'scd2_begin_date_null', 'scd2_end_date_null', 'scd2_flag_null',
+                        'scd2_one_current_row', 'scd2_current_date_check', 
+                        'scd2_invalid_flag_combination', 'scd2_date_order',
+                        'scd2_unique_begin_date', 'scd2_unique_end_date',
+                        'scd2_continuity', 'scd2_no_record_after_current'
+                    ])
+            
+            enabled_tests = get_enabled_tests(enabled_test_ids)
+            
+            predefined_results = []
+            for test in enabled_tests:
+                sql = test.generate_sql(test_config)
+                if not sql:
+                    continue
+                
+                try:
+                    rows = await bigquery_service.execute_query(sql)
+                    row_count = len(rows)
+                    
+                    predefined_results.append(TestResult(
+                        test_id=test.id,
+                        test_name=test.name,
+                        category=test.category,
+                        description=test.description,
+                        status='PASS' if row_count == 0 else 'FAIL',
+                        severity=test.severity,
+                        sql_query=sql,
+                        rows_affected=row_count,
+                        error_message=None
+                    ))
+                except Exception as e:
+                    predefined_results.append(TestResult(
+                        test_id=test.id,
+                        test_name=test.name,
+                        category=test.category,
+                        description=test.description,
+                        status='ERROR',
+                        severity=test.severity,
+                        sql_query=sql,
+                        rows_affected=0,
+                        error_message=str(e)
+                    ))
+            
+            return MappingResult(
+                mapping_id=mapping_id,
+                predefined_results=predefined_results,
+                ai_suggestions=[]
+            )
             
         except Exception as e:
-            logger.error(f"Error processing mapping {mapping_id}: {str(e)}")
+            logger.error(f"Error in process_scd for {mapping_id}: {str(e)}")
             return MappingResult(
                 mapping_id=mapping_id,
                 predefined_results=[],
                 ai_suggestions=[],
                 error=str(e)
             )
-    
+
     async def process_config_table(
         self,
         project_id: str,

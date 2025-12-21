@@ -216,6 +216,50 @@ async def generate_tests(request: GenerateTestsRequest):
                 logger.error(f"Error in schema validation: {str(e)}")
                 raise HTTPException(status_code=500, detail=str(e))
         
+        elif request.comparison_mode == 'scd':
+            if not request.target_dataset or not request.target_table:
+                raise HTTPException(status_code=400, detail="target_dataset and target_table are required for scd mode")
+            
+            mapping = {
+                'target_dataset': request.target_dataset,
+                'target_table': request.target_table,
+                'scd_type': request.scd_type or 'scd2',
+                'natural_keys': request.natural_keys or [],
+                'surrogate_key': request.surrogate_key,
+                'begin_date_column': request.begin_date_column,
+                'end_date_column': request.end_date_column,
+                'active_flag_column': request.active_flag_column,
+                'enabled_test_ids': request.enabled_test_ids
+            }
+            
+            try:
+                result = await test_executor.process_scd(request.project_id, mapping)
+                
+                # Log execution
+                try:
+                    await bigquery_service.log_execution(
+                        project_id=request.project_id,
+                        comparison_mode='scd',
+                        source_info=f"SCD: {request.target_table}",
+                        target_info=f"{request.target_dataset}.{request.target_table}",
+                        test_results=result.predefined_results
+                    )
+                except Exception as log_err:
+                    logger.error(f"Failed to log scd execution: {log_err}")
+                
+                return {
+                    'summary': {
+                        'total_tests': len(result.predefined_results),
+                        'passed': len([t for t in result.predefined_results if t.status == 'PASS']),
+                        'failed': len([t for t in result.predefined_results if t.status == 'FAIL']),
+                        'errors': len([t for t in result.predefined_results if t.status == 'ERROR'])
+                    },
+                    'results_by_mapping': [result]
+                }
+            except Exception as e:
+                logger.error(f"Error in scd validation: {str(e)}")
+                raise HTTPException(status_code=500, detail=str(e))
+
         else:
             raise HTTPException(
                 status_code=400,
