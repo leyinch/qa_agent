@@ -24,6 +24,14 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+logger.info("Initializing application imports...")
+try:
+    from app.config import settings
+    logger.info(f"Loaded config for: {settings.app_name}")
+except Exception as e:
+    logger.error(f"FATAL: Failed to load config: {e}")
+    raise
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
