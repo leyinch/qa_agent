@@ -122,6 +122,7 @@ class TestExecutor:
                         severity=test.severity,
                         sql_query=sql,
                         rows_affected=row_count,
+                        sample_data=rows[:10] if row_count > 0 else None,
                         error_message=None
                     ))
                 except Exception as e:
@@ -257,6 +258,7 @@ class TestExecutor:
                         severity=test.severity,
                         sql_query=sql,
                         rows_affected=row_count,
+                        sample_data=rows[:10] if row_count > 0 else None,
                         error_message=None
                     ))
                 except Exception as e:
@@ -460,6 +462,30 @@ class TestExecutor:
                         all_schemas[full_name] = metadata['schema']
                     except Exception as e:
                         logger.warning(f"Skipping table {table_id}: {str(e)}")
+                # 2. Verify with AI
+                ai_findings = await vertex_ai_service.validate_schema(erd_description, all_schemas)
+                
+                # 3. Convert to TestResult objects
+                results = []
+                for finding in ai_findings:
+                    results.append(TestResult(
+                        test_name=finding.get('test_name', 'Schema Check'),
+                        category=finding.get('test_category', 'schema_validation'),
+                        status=finding.get('status', 'INFO'),
+                        severity=finding.get('severity', 'MEDIUM'),
+                        description=finding.get('reasoning', ''),
+                        sql_query=finding.get('sql_query', ''),
+                        rows_affected=0
+                    ))
+                    
+                return {
+                    'summary': {
+                        'total_tables': len(all_schemas),
+                        'total_issues': len(results)
+                    },
+                    'predefined_results': results,
+                    'ai_suggestions': []
+                }
             except Exception as e:
                 logger.error(f"Error listing tables for {dataset_id}: {str(e)}")
         
@@ -470,31 +496,6 @@ class TestExecutor:
                 'predefined_results': [],
                 'ai_suggestions': []
             }
-
-        # 2. Verify with AI
-        ai_findings = await vertex_ai_service.validate_schema(erd_description, all_schemas)
-        
-        # 3. Convert to TestResult objects
-        results = []
-        for finding in ai_findings:
-            results.append(TestResult(
-                test_name=finding.get('test_name', 'Schema Check'),
-                category=finding.get('test_category', 'schema_validation'),
-                status=finding.get('status', 'INFO'),
-                severity=finding.get('severity', 'MEDIUM'),
-                description=finding.get('reasoning', ''),
-                sql_query=finding.get('sql_query', ''),
-                rows_affected=0
-            ))
-            
-        return {
-            'summary': {
-                'total_tables': len(all_schemas),
-                'total_issues': len(results)
-            },
-            'predefined_results': results,
-            'ai_suggestions': []
-        }
 
 
 # Singleton instance

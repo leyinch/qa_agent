@@ -45,6 +45,7 @@ class TestResult(BaseModel):
     severity: str  # HIGH, MEDIUM, LOW
     sql_query: str
     rows_affected: int = 0
+    sample_data: Optional[List[Dict[str, Any]]] = None
     error_message: Optional[str] = None
 
 

@@ -251,7 +251,7 @@ PREDEFINED_TESTS = {
         is_global=False,
         generate_sql=lambda config: (
             f"""
-            SELECT {' , '.join(config['natural_keys'])}, COUNTIF({config['active_flag_column']} = TRUE OR {config['active_flag_column']} = 'Y' OR {config['active_flag_column']} = '1') as active_count
+            SELECT {' , '.join(config['natural_keys'])}, COUNTIF(SAFE_CAST({config['active_flag_column']} AS STRING) IN ('true', 'TRUE', 'Y', '1')) as active_count
             FROM `{config['full_table_name']}`
             GROUP BY {' , '.join(config['natural_keys'])}
             HAVING active_count <> 1
@@ -269,7 +269,7 @@ PREDEFINED_TESTS = {
         generate_sql=lambda config: (
             f"""
             SELECT * FROM `{config['full_table_name']}`
-            WHERE ({config['active_flag_column']} = TRUE OR {config['active_flag_column']} = 'Y' OR {config['active_flag_column']} = '1')
+            WHERE SAFE_CAST({config['active_flag_column']} AS STRING) IN ('true', 'TRUE', 'Y', '1')
             AND CAST({config['end_date_column']} AS STRING) NOT LIKE '2099-12-31%'
             """
         )
@@ -285,7 +285,7 @@ PREDEFINED_TESTS = {
         generate_sql=lambda config: (
             f"""
             SELECT * FROM `{config['full_table_name']}`
-            WHERE ({config['active_flag_column']} = TRUE OR {config['active_flag_column']} = 'Y' OR {config['active_flag_column']} = '1')
+            WHERE SAFE_CAST({config['active_flag_column']} AS STRING) IN ('true', 'TRUE', 'Y', '1')
             AND CAST({config['end_date_column']} AS STRING) NOT LIKE '2099-12-31%'
             """
         )

@@ -40,6 +40,20 @@ The QA Agent now supports **SCD Type 1 and Type 2 Validation**. This feature val
 **File**: `src/app/page.tsx` & `src/app/dashboard/page.tsx`
 - Updated `ComparisonMode` type to include `'scd'`
 
+**File**: `src/components/ResultsView.tsx` (Major Update)
+- **Tabbed UI**: Batch results are now organized into selectable tabs by mapping ID
+- **Bad Data Preview**: Added "View Bad Data" button to display actual problematic rows from BigQuery
+- **SQL Transparency**: Added "Show SQL" button for every test to view the underlying BQ query
+- **AI Integration**: Added display and one-click saving for AI-suggested custom tests
+- **Comprehensive Typing**: Fully refactored with strict TypeScript interfaces for all data structures
+
+### Advanced Result Analysis
+The results page now provides deep insight into test failures:
+- **Status Badges**: Color-coded badges for PASS (Green), FAIL (Red), and ERROR (Amber)
+- **Summary Cards**: At-a-glance mapping counts and success rates
+- **Sample Data Grid**: Inline tables showing the specific values that triggered validation failures
+- **AI Recommendation Engine**: "🤖 AI Suggested Tests" section providing context-aware testing improvements
+
 ---
 
 ## 📋 Testing Instructions
@@ -130,6 +144,24 @@ The QA Agent now supports **SCD Type 1 and Type 2 Validation**. This feature val
    - Click "Generate & Run Tests" again.
    - Verify that your new `temp_test_config` is now included in the batch run results.
 
+### Step 5: Analyze Failures with Bad Data Preview
+1. **Find a Failed Test**:
+   - Locate a test with a ❌ **FAIL** status (e.g., `scd2_continuity`).
+2. **View Problematic Rows**:
+   - Click the **"View Bad Data"** button.
+   - A grid will appear showing the specific rows in BigQuery that caused the failure.
+3. **Compare with SQL**:
+   - Click **"Show SQL"** to see the exact query generated. You can copy this into the BigQuery console for further debugging.
+
+### Step 6: Expand Coverage with AI Suggestions
+1. **Scroll to AI Section**:
+   - At the bottom of each mapping's results, find the **"🤖 AI Suggested Tests"** section.
+2. **Review Reasoning**:
+   - Read the AI's logic for why it suggested specific tests like `outlier_value_check` or `cross_column_consistency`.
+3. **Save to Custom Tests**:
+   - Click **"+ Add to Custom"**.
+   - The test is now registered in your custom test suite and will run in future batch executions.
+
 ---
 
 ## 🔍 Understanding the Mock Data
@@ -192,6 +224,8 @@ Ensure the Cloud Run service account has these BigQuery permissions:
 
 ## 📄 Related Files
 - [DashboardForm.tsx](file:///c:/Users/LeyinChen/Documents/Client%20-%20Crown/Antigravity/qa_agent/src/components/DashboardForm.tsx) - Frontend form with SCD fields
+- [ResultsView.tsx](file:///c:/Users/LeyinChen/Documents/Client%20-%20Crown/Antigravity/qa_agent/src/components/ResultsView.tsx) - Advanced results dashboard with tabs, data previews, and AI
+- [env.d.ts](file:///c:/Users/LeyinChen/Documents/Client%20-%20Crown/Antigravity/qa_agent/src/types/env.d.ts) - Global environment and module declarations
 - [Sidebar.tsx](file:///c:/Users/LeyinChen/Documents/Client%20-%20Crown/Antigravity/qa_agent/src/components/Sidebar.tsx) - Navigation with SCD option
 - [test_executor.py](file:///c:/Users/LeyinChen/Documents/Client%20-%20Crown/Antigravity/qa_agent/backend/app/services/test_executor.py) - Backend SCD processing logic
 - [predefined_tests.py](file:///c:/Users/LeyinChen/Documents/Client%20-%20Crown/Antigravity/qa_agent/backend/app/tests/predefined_tests.py) - SCD test definitions
