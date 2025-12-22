@@ -222,10 +222,14 @@ class TestExecutor:
             # Auto-selection of tests if none provided
             enabled_test_ids = mapping.get('enabled_test_ids', [])
             if not enabled_test_ids:
-                # Basic structural tests
+                # 1. Table exists smoke test (Always run)
+                enabled_test_ids.append('table_exists')
+                
+                # 2 & 3. Basic structural tests
                 if test_config['surrogate_key']:
                     enabled_test_ids.extend(['surrogate_key_null', 'surrogate_key_unique'])
                 
+                # 4 & 5. SCD specific tests
                 if scd_type == 'scd1':
                     enabled_test_ids.extend(['scd1_primary_key_null', 'scd1_primary_key_unique'])
                 elif scd_type == 'scd2':

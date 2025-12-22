@@ -153,37 +153,23 @@ PREDEFINED_TESTS = {
         )
     ),
     
-    'outlier_detection': TestTemplate(
-        test_id='outlier_detection',
-        name='Statistical Outlier Detection',
-        category='statistical',
-        severity='LOW',
-        description='Detect statistical outliers using standard deviation',
+    'table_exists': TestTemplate(
+        test_id='table_exists',
+        name='Table Existence Smoke Test',
+        category='smoke',
+        severity='HIGH',
+        description='Verify the target table exists and is accessible',
         is_global=False,
-        generate_sql=lambda config: (
-            f"""
-            WITH stats AS (
-                SELECT 
-                    AVG({config['outlier_columns'][0]}) as mean,
-                    STDDEV({config['outlier_columns'][0]}) as stddev
-                FROM `{config['full_table_name']}`
-                WHERE {config['outlier_columns'][0]} IS NOT NULL
-            )
-            SELECT t.* 
-            FROM `{config['full_table_name']}` t, stats
-            WHERE ABS(t.{config['outlier_columns'][0]} - stats.mean) > 3 * stats.stddev
-            LIMIT 100
-            """ if config.get('outlier_columns') else None
-        )
+        generate_sql=lambda config: f"SELECT * FROM `{config['full_table_name']}` LIMIT 1"
     ),
 
     # --- SCD1 Tests ---
     'scd1_primary_key_null': TestTemplate(
         test_id='scd1_primary_key_null',
-        name='SCD1 Natural Key NOT NULL',
+        name='Composite Primary Key NOT NULL',
         category='completeness',
         severity='HIGH',
-        description='Check composite natural key for NULLs',
+        description='Check composite natural key for NULL values',
         is_global=False,
         generate_sql=lambda config: (
             f"""
@@ -196,17 +182,20 @@ PREDEFINED_TESTS = {
 
     'scd1_primary_key_unique': TestTemplate(
         test_id='scd1_primary_key_unique',
-        name='SCD1 Natural Key Uniqueness',
+        name='Composite Primary Key Uniqueness',
         category='integrity',
         severity='HIGH',
         description='Ensure composite natural key uniqueness',
         is_global=False,
         generate_sql=lambda config: (
             f"""
-            SELECT {' , '.join(config['natural_keys'])}, COUNT(*) as duplicate_count
+            SELECT 
+                ({' || '.join([f"IFNULL(SAFE_CAST({col} AS STRING), '')" for col in config['natural_keys']])}) as composite_key,
+                COUNT(*) as duplicate_count
             FROM `{config['full_table_name']}`
-            GROUP BY {' , '.join(config['natural_keys'])}
+            GROUP BY 1
             HAVING COUNT(*) > 1
+            LIMIT 100
             """ if config.get('natural_keys') else None
         )
     ),

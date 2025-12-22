@@ -20,10 +20,11 @@ The QA Agent now supports **SCD Type 1 and Type 2 Validation**. This feature val
 - Added `/api/scd-config` endpoint to support adding new configurations
 
 **File**: `backend/app/tests/predefined_tests.py`
-- Added 15 SCD-specific test templates:
-  - **SCD1 Tests**: `scd1_primary_key_null`, `scd1_primary_key_unique`
-  - **SCD2 Tests**: `scd2_begin_date_null`, `scd2_end_date_null`, `scd2_flag_null`, `scd2_one_current_row`, `scd2_current_date_check`, `scd2_continuity`, `scd2_invalid_flag_combination`, `scd2_date_order`, `scd2_unique_begin_date`, `scd2_unique_end_date`, `scd2_no_record_after_current`
+- Added 16 data quality test templates:
+  - **Structural/Smoke**: `table_exists` (Verify target table exists)
   - **Surrogate Key Tests**: `surrogate_key_null`, `surrogate_key_unique`
+  - **SCD1 Tests**: `scd1_primary_key_null` (Composite Key NOT NULL), `scd1_primary_key_unique` (Composite Key Uniqueness)
+  - **SCD2 Tests**: `scd2_begin_date_null`, `scd2_end_date_null`, `scd2_flag_null`, `scd2_one_current_row`, `scd2_current_date_check`, `scd2_continuity`, `scd2_invalid_flag_combination`, `scd2_date_order`, `scd2_unique_begin_date`, `scd2_unique_end_date`, `scd2_no_record_after_current`
 
 ### Frontend Changes
 **File**: `src/components/Sidebar.tsx`
@@ -94,7 +95,8 @@ The results page now provides deep insight into test failures:
 4. **Run Tests**:  
    Click "Generate & Run Tests"
 
-5. **Expected Results**:
+5. **Expected Results (5 Tests)**:
+   - ✅ **PASS**: `table_exists` (Smoke test)
    - ✅ **PASS**: `surrogate_key_null` (all rows have DWSeatID)
    - ✅ **PASS**: `surrogate_key_unique` (all DWSeatID values are unique)
    - ❌ **FAIL**: `scd1_primary_key_unique` - Should detect **1 duplicate** (TableId=101, PositionIDX=1 appears twice)
