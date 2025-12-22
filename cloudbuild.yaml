@@ -26,7 +26,7 @@ substitutions:
     # SINGLE SOURCE OF TRUTH: deploy.sh reads these values from this file
     # You can override these in the Cloud Build Trigger settings
     # by adding Substitution variables with different values.
-    _SERVICE_NAME: qa-agent
+    _SERVICE_NAME: data-qa-agent-frontend
     _REGION: us-central1
 
 images:
