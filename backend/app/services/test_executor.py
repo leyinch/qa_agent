@@ -293,7 +293,7 @@ class TestExecutor:
         config_dataset: str,
         config_table: str
     ) -> Dict[str, Any]:
-        ""``
+        """
         Process all SCD validations from a config table.
         
         Args:
@@ -303,7 +303,7 @@ class TestExecutor:
             
         Returns:
             Dictionary with summary and results by mapping
-        ""``
+        """
         try:
             # Read SCD config table
             scd_configs = await bigquery_service.read_scd_config_table(
