@@ -12,14 +12,18 @@ The QA Agent now supports **SCD Type 1 and Type 2 Validation**. This feature val
 - Added `process_scd()` method to handle SCD validation requests
 - Auto-selects appropriate tests based on SCD type (Type 1 or Type 2)
 
+**File**: `backend/app/services/bigquery_service.py`
+- Added `insert_scd_config()` method to insert new configurations into BigQuery
+
+**File**: `backend/app/main.py`
+- Added SCD mode handling in `/api/generate-tests` endpoint
+- Added `/api/scd-config` endpoint to support adding new configurations
+
 **File**: `backend/app/tests/predefined_tests.py`
 - Added 13 SCD-specific test templates:
   - **SCD1 Tests**: `scd1_primary_key_null`, `scd1_primary_key_unique`
   - **SCD2 Tests**: `scd2_begin_date_null`, `scd2_end_date_null`, `scd2_flag_null`, `scd2_one_current_row`, `scd2_overlapping_dates`, `scd2_continuity`, `scd2_invalid_flag_combination`, `scd2_date_order`, `scd2_unique_begin_date`, `scd2_unique_end_date`, `scd2_no_record_after_current`
   - **Surrogate Key Tests**: `surrogate_key_null`, `surrogate_key_unique`
-
-**File**: `backend/app/main.py`
-- Added SCD mode handling in `/api/generate-tests` endpoint
 
 ### Frontend Changes
 **File**: `src/components/Sidebar.tsx`
@@ -31,6 +35,7 @@ The QA Agent now supports **SCD Type 1 and Type 2 Validation**. This feature val
   - Natural Keys input (comma-separated)
   - Surrogate Key input (optional)
   - SCD2-specific fields: Begin Date Column, End Date Column, Active Flag Column
+  - **New Feature**: "Add New Configuration" toggle allows adding new SCD tables to the configuration table directly from the UI
 
 **File**: `src/app/page.tsx` & `src/app/dashboard/page.tsx`
 - Updated `ComparisonMode` type to include `'scd'`
@@ -105,6 +110,26 @@ The QA Agent now supports **SCD Type 1 and Type 2 Validation**. This feature val
    - ❌ **FAIL**: `scd2_date_order` - Should detect **UserId='U4'** (Begin Date > End Date)
    - ❌ **FAIL**: `scd2_continuity` - Should detect **UserId='U5'** (gap between 2023-03-01 and 2023-05-01)
 
+### Step 4: Add New Configuration (New Feature)
+
+1. **Toggle "Add New Configuration"**:
+   - In "Config Table" mode, flip the toggle switch to enable adding a new configuration.
+
+2. **Fill in details**:
+   - **Config ID**: `temp_test_config`
+   - **Target Dataset**: `crown_scd_mock`
+   - **Target Table**: `D_Seat_WD` (reusing for demo)
+   - **Natural Keys**: `TableId`
+   - **Description**: `Temporary test config added from UI`
+
+3. **Click "Add Configuration"**:
+   - Verify success message: "Configuration added successfully"
+
+4. **Run Config Tests**:
+   - Turn off the toggle.
+   - Click "Generate & Run Tests" again.
+   - Verify that your new `temp_test_config` is now included in the batch run results.
+
 ---
 
 ## 🔍 Understanding the Mock Data
@@ -161,6 +186,7 @@ The `transform_config.scd_validation_config` table can now be used for **batch v
 Ensure the Cloud Run service account has these BigQuery permissions:
 - `BigQuery Data Viewer`
 - `BigQuery Job User`
+- `BigQuery Data Editor` (Required for adding new configurations)
 
 ---
 
