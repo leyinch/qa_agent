@@ -165,10 +165,16 @@ gcloud run services update data-qa-agent-frontend \
 git clone https://github.com/mirunasuresh23/qa_agent.git
 cd qa_agent
 
-# 2. Run deployment (auto-detects first-time)
+# 2. Set gcloud project (IMPORTANT!)
+gcloud config set project leyin-sandpit
+
+# 3. Make scripts executable
+chmod +x deploy-all.sh sync-config.sh
+
+# 4. Run deployment (auto-detects first-time)
 ./deploy-all.sh
 
-# 3. Follow OAuth prompts for frontend
+# 5. Follow OAuth prompts for frontend
 ```
 
 **What happens:**
@@ -285,6 +291,21 @@ Cloud Build configuration for backend service.
 - ✅ Only update if credentials change or service URL changes
 
 ## Troubleshooting
+
+### Error: "The required property [project] is not currently set"
+
+**Problem**: When running `./deploy-all.sh`, you get an error about missing project property.
+
+**Solution**:
+```bash
+# Set your gcloud project
+gcloud config set project leyin-sandpit
+
+# Then run deployment again
+./deploy-all.sh
+```
+
+This happens when gcloud doesn't have a default project configured. Setting it once will persist for future commands.
 
 ### Check OAuth Configuration
 

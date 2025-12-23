@@ -308,7 +308,7 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
             <div style={{ marginBottom: '1.75rem' }}>
                 <label className="label" htmlFor="projectId">
                     <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        🔑 Google Cloud Project ID
+                        🔑 Google Cloud Project ID<span className="required">*</span>
                     </span>
                 </label>
                 <input
