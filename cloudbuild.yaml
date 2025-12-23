@@ -25,7 +25,7 @@ steps:
 substitutions:
     # These values are read from deploy.config or can be overridden in Cloud Build Trigger
     # To update: Edit deploy.config file
-    _SERVICE_NAME: data-qa-agent-frontend
+    _SERVICE_NAME: data-qa-agent-frontend2
     _REGION: us-central1
     _PROJECT_ID: leyin-sandpit
 
