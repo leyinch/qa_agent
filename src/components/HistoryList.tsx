@@ -28,6 +28,7 @@ export default function HistoryList({ projectId, onViewResult }: HistoryListProp
     const [error, setError] = useState("");
 
     const fetchHistory = async () => {
+        if (!projectId) return;
         setLoading(true);
         setError("");
         try {
@@ -96,6 +97,18 @@ export default function HistoryList({ projectId, onViewResult }: HistoryListProp
             </span>
         );
     };
+
+    if (!projectId) {
+        return (
+            <div style={{ textAlign: 'center', padding: '3rem', background: 'var(--secondary)', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
+                <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>🆔</div>
+                <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem' }}>Project ID Required</h3>
+                <p style={{ color: 'var(--secondary-foreground)', fontSize: '0.875rem' }}>
+                    Please enter a Google Cloud Project ID above to see execution history.
+                </p>
+            </div>
+        );
+    }
 
     if (loading && history.length === 0) {
         return <div style={{ textAlign: 'center', padding: '2rem' }}>Loading history...</div>;

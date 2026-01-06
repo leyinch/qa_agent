@@ -6,8 +6,8 @@ import LoginButton from "@/components/LoginButton";
 import Sidebar from "@/components/Sidebar";
 
 export default function Dashboard() {
-    // Mode state: 'schema' | 'gcs' | 'history'
-    const [comparisonMode, setComparisonMode] = useState<'schema' | 'gcs' | 'history'>('schema');
+    // Mode state: 'schema' | 'gcs' | 'history' | 'scd'
+    const [comparisonMode, setComparisonMode] = useState<'schema' | 'gcs' | 'history' | 'scd'>('schema');
 
     return (
         <main style={{ minHeight: '100vh', position: 'relative' }}>

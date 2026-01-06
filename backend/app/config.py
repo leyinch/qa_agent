@@ -11,16 +11,12 @@ class Settings(BaseSettings):
     debug: bool = False
     
     # Google Cloud
-    google_cloud_project: str = "miruna-sandpit"
+    google_cloud_project: str = "leyin-sandpit"
     vertex_ai_location: str = "us-central1"
-    vertex_ai_model: str = "gemini-2.5-flash"
+    vertex_ai_model: str = "gemini-1.5-flash"
     
     # CORS
-    cors_origins: list[str] = [
-        "http://localhost:3000",
-        "https://data-qa-agent-*.run.app",
-        "https://data-qa-agent-frontend-750147355601.us-central1.run.app"
-    ]
+    cors_origins: list[str] = ["*"]
     
     class Config:
         env_file = ".env"

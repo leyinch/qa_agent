@@ -164,6 +164,91 @@ class BigQueryService:
         """
         return await self.execute_query(query)
 
+    async def read_scd_config_table(
+        self, 
+        project_id: str, 
+        config_dataset: str, 
+        config_table: str
+    ) -> List[Dict[str, Any]]:
+        """
+        Read SCD validation configurations from config table.
+        
+        Args:
+            project_id: Google Cloud project ID
+            config_dataset: Config table dataset
+            config_table: Config table name
+            
+        Returns:
+            List of SCD validation configurations
+        """
+        query = f"""
+            SELECT 
+                config_id,
+                target_dataset,
+                target_table,
+                scd_type,
+                primary_keys,
+                surrogate_key,
+                begin_date_column,
+                end_date_column,
+                active_flag_column,
+                description,
+                custom_tests
+            FROM `{project_id}.{config_dataset}.{config_table}`
+        """
+        return await self.execute_query(query)
+
+    async def insert_scd_config(
+        self,
+        project_id: str,
+        config_dataset: str,
+        config_table: str,
+        config_data: Dict[str, Any]
+    ) -> bool:
+        """
+        Insert a new SCD validation configuration into the config table.
+        
+        Args:
+            project_id: Google Cloud project ID
+            config_dataset: Config table dataset
+            config_table: Config table name
+            config_data: Configuration data to insert
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            import datetime
+            
+            full_table_name = f"{project_id}.{config_dataset}.{config_table}"
+            
+            # Prepare row for insertion
+            row = {
+                "config_id": config_data.get("config_id"),
+                "target_dataset": config_data.get("target_dataset"),
+                "target_table": config_data.get("target_table"),
+                "scd_type": config_data.get("scd_type"),
+                "primary_keys": config_data.get("primary_keys", []),
+                "surrogate_key": config_data.get("surrogate_key"),
+                "begin_date_column": config_data.get("begin_date_column"),
+                "end_date_column": config_data.get("end_date_column"),
+                "active_flag_column": config_data.get("active_flag_column"),
+                "description": config_data.get("description", ""),
+                "custom_tests": config_data.get("custom_tests")
+            }
+            
+            # Insert into BigQuery
+            errors = self.client.insert_rows_json(full_table_name, [row])
+            
+            if errors:
+                print(f"Failed to insert SCD config: {errors}")
+                return False
+            
+            return True
+            
+        except Exception as e:
+            print(f"Error inserting SCD config: {str(e)}")
+            return False
 
 
     async def ensure_history_table(

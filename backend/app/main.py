@@ -12,9 +12,11 @@ from app.models import (
     HealthResponse,
     TestSummary,
     ConfigTableSummary,
-    CustomTestRequest
+    CustomTestRequest,
+    AddSCDConfigRequest
 )
 from app.services.test_executor import test_executor
+from app.services.bigquery_service import bigquery_service
 
 # Configure logging
 logging.basicConfig(
@@ -44,7 +46,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -53,6 +55,7 @@ app.add_middleware(
 @app.get("/health", response_model=HealthResponse)
 async def health_check():
     """Health check endpoint."""
+    logger.info("Health check probe received")
     return HealthResponse(status="healthy", version="1.0.0")
 
 
@@ -65,6 +68,7 @@ async def generate_tests(request: GenerateTestsRequest):
     - schema: Validate BigQuery schema against ERD
     - gcs: Compare single GCS file to BigQuery table
     - gcs-config: Process multiple mappings from config table
+    - scd: Validate Slowly Changing Dimension (Type 1 or Type 2)
     """
     try:
         logger.info(f"Received test generation request: mode={request.comparison_mode}")
@@ -84,9 +88,7 @@ async def generate_tests(request: GenerateTestsRequest):
             )
             
             try:
-                from app.services.bigquery_service import bigquery_service
                 summary_data = result['summary']
-                
                 # Convert results objects to dicts for JSON serialization
                 results_by_mapping_dicts = [r.dict() for r in result['results_by_mapping']]
 
@@ -114,7 +116,6 @@ async def generate_tests(request: GenerateTestsRequest):
                 results_by_mapping=result['results_by_mapping']
             )
         
-
         # GCS Single File
         elif request.comparison_mode == 'gcs':
             if not all([request.gcs_bucket, request.gcs_file_path, 
@@ -156,7 +157,6 @@ async def generate_tests(request: GenerateTestsRequest):
 
             # Log execution
             try:
-                from app.services.bigquery_service import bigquery_service
                 await bigquery_service.log_execution(
                     project_id=request.project_id,
                     execution_data={
@@ -191,7 +191,6 @@ async def generate_tests(request: GenerateTestsRequest):
                 
                 # Log Schema Validation
                 try:
-                    from app.services.bigquery_service import bigquery_service
                     summary = result_data.get('summary', {})
                     issues = result_data.get('summary', {}).get('total_issues', 0)
                     
@@ -202,8 +201,8 @@ async def generate_tests(request: GenerateTestsRequest):
                             "source": "ERD Description",
                             "target": ",".join(request.datasets or []),
                             "status": "AT_RISK" if issues > 0 else "PASS",
-                            "total_tests": summary.get('total_tables', 0), # Using table count as simpler metric
-                            "passed_tests": summary.get('total_tables', 0) - (1 if issues > 0 else 0), # Simplified
+                            "total_tests": summary.get('total_tables', 0),
+                            "passed_tests": summary.get('total_tables', 0) - (1 if issues > 0 else 0),
                             "failed_tests": issues,
                             "details": result_data
                         }
@@ -216,14 +215,112 @@ async def generate_tests(request: GenerateTestsRequest):
                 logger.error(f"Error in schema validation: {str(e)}")
                 raise HTTPException(status_code=500, detail=str(e))
         
+        # SCD Config Table mode
+        elif request.comparison_mode == 'scd-config':
+            if not request.config_dataset or not request.config_table:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Missing required fields: config_dataset, config_table for scd-config mode"
+                )
+            
+            result = await test_executor.process_scd_config_table(
+                project_id=request.project_id,
+                config_dataset=request.config_dataset,
+                config_table=request.config_table
+            )
+            
+            try:
+                summary_data = result['summary']
+                # Convert results objects to dicts for JSON serialization
+                results_by_mapping_dicts = [r.dict() for r in result['results_by_mapping']]
+
+                await bigquery_service.log_execution(
+                    project_id=request.project_id,
+                    execution_data={
+                        "comparison_mode": "scd_config_table",
+                        "source": f"{request.config_dataset}.{request.config_table}",
+                        "target": "Multiple SCD Tables",
+                        "status": "AT_RISK" if summary_data['failed'] > 0 else "PASS",
+                        "total_tests": summary_data['total_tests'],
+                        "passed_tests": summary_data['passed'],
+                        "failed_tests": summary_data['failed'],
+                        "details": {
+                            "summary": summary_data,
+                            "results_by_mapping": results_by_mapping_dicts
+                        }
+                    }
+                )
+            except Exception as e:
+                logger.error(f"Failed to log scd config execution: {e}")
+
+            return ConfigTableResponse(
+                summary=ConfigTableSummary(**result['summary']),
+                results_by_mapping=result['results_by_mapping']
+            )
+        
+        elif request.comparison_mode == 'scd':
+            if not request.target_dataset or not request.target_table:
+                raise HTTPException(status_code=400, detail="target_dataset and target_table are required for scd mode")
+            
+            mapping = {
+                'target_dataset': request.target_dataset,
+                'target_table': request.target_table,
+                'scd_type': request.scd_type or 'scd2',
+                'primary_keys': request.primary_keys or [],
+                'surrogate_key': request.surrogate_key,
+                'begin_date_column': request.begin_date_column,
+                'end_date_column': request.end_date_column,
+                'active_flag_column': request.active_flag_column,
+                'enabled_test_ids': request.enabled_test_ids
+            }
+            
+            try:
+                result = await test_executor.process_scd(request.project_id, mapping)
+                
+                # Log execution
+                try:
+                    await bigquery_service.log_execution(
+                        project_id=request.project_id,
+                        execution_data={
+                            "comparison_mode": "scd",
+                            "source": f"SCD: {request.target_table}",
+                            "target": f"{request.target_dataset}.{request.target_table}",
+                            "status": "FAIL" if any(r.status in ['FAIL', 'ERROR'] for r in result.predefined_results) else "PASS",
+                            "total_tests": len(result.predefined_results),
+                            "passed_tests": len([t for t in result.predefined_results if t.status == 'PASS']),
+                            "failed_tests": len([t for t in result.predefined_results if t.status == 'FAIL']),
+                            "details": {
+                                "summary": {
+                                    "total_tests": len(result.predefined_results),
+                                    "passed": len([t for t in result.predefined_results if t.status == 'PASS']),
+                                    "failed": len([t for t in result.predefined_results if t.status == 'FAIL']),
+                                    "errors": len([t for t in result.predefined_results if t.status == 'ERROR'])
+                                },
+                                "predefined_results": [r.dict() for r in result.predefined_results]
+                            }
+                        }
+                    )
+                except Exception as log_err:
+                    logger.error(f"Failed to log scd execution: {log_err}")
+                
+                return {
+                    'summary': {
+                        'total_tests': len(result.predefined_results),
+                        'passed': len([t for t in result.predefined_results if t.status == 'PASS']),
+                        'failed': len([t for t in result.predefined_results if t.status == 'FAIL']),
+                        'errors': len([t for t in result.predefined_results if t.status == 'ERROR'])
+                    },
+                    'results_by_mapping': [result]
+                }
+            except Exception as e:
+                logger.error(f"Error in scd validation: {str(e)}")
+                raise HTTPException(status_code=500, detail=str(e))
+
         else:
             raise HTTPException(
                 status_code=400,
                 detail=f"Invalid comparison_mode: {request.comparison_mode}"
             )
-
-
-
             
     except HTTPException:
         raise
@@ -242,6 +339,52 @@ async def get_test_history(project_id: str = settings.google_cloud_project, limi
     except Exception as e:
         logger.error(f"Error fetching history: {e}")
         return []
+
+
+@app.post("/api/scd-config")
+async def add_scd_config(request: AddSCDConfigRequest):
+    """Add a new SCD validation configuration to the config table."""
+    try:
+        # Prepare config data
+        config_data = {
+            "config_id": request.config_id,
+            "target_dataset": request.target_dataset,
+            "target_table": request.target_table,
+            "scd_type": request.scd_type,
+            "primary_keys": request.primary_keys,
+            "surrogate_key": request.surrogate_key,
+            "begin_date_column": request.begin_date_column,
+            "end_date_column": request.end_date_column,
+            "active_flag_column": request.active_flag_column,
+            "description": request.description
+        }
+        
+        # Insert into config table
+        success = await bigquery_service.insert_scd_config(
+            project_id=request.project_id,
+            config_dataset=request.config_dataset,
+            config_table=request.config_table,
+            config_data=config_data
+        )
+        
+        if not success:
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to insert SCD configuration into config table"
+            )
+        
+        return {
+            "success": True,
+            "message": "SCD configuration added successfully",
+            "config_id": request.config_id
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error adding SCD config: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 
 @app.get("/api/predefined-tests")

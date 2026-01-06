@@ -5,7 +5,7 @@ import LoginButton from "@/components/LoginButton";
 import DashboardForm from "@/components/DashboardForm";
 import Sidebar from "@/components/Sidebar";
 
-type ComparisonMode = 'schema' | 'gcs' | 'history';
+type ComparisonMode = 'schema' | 'gcs' | 'history' | 'scd';
 
 export default function Home() {
     const [comparisonMode, setComparisonMode] = useState<ComparisonMode>('schema');

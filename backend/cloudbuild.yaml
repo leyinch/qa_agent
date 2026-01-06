@@ -20,12 +20,12 @@ steps:
       - '$_REGION'
       - '--platform'
       - 'managed'
-      - '--allow-unauthenticated' # Ensure public access is maintained if that was the intent, consistent with typical web apps.
+      - '--allow-unauthenticated'
 
 substitutions:
     # These values are read from deploy.config or can be overridden in Cloud Build Trigger
     # To update: Edit deploy.config file
-    _SERVICE_NAME: data-qa-agent-frontend
+    _SERVICE_NAME: data-qa-agent-backend
     _REGION: us-central1
     _PROJECT_ID: leyin-sandpit
 
@@ -34,4 +34,3 @@ images:
 
 options:
   logging: CLOUD_LOGGING_ONLY
-

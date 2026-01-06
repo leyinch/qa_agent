@@ -5,7 +5,8 @@ from .requests import (
     MappingInfo,
     AISuggestion,
     MappingResult,
-    CustomTestRequest
+    CustomTestRequest,
+    AddSCDConfigRequest
 )
 from .responses import (
     TestSummary,
@@ -22,6 +23,7 @@ __all__ = [
     "AISuggestion",
     "MappingResult",
     "CustomTestRequest",
+    "AddSCDConfigRequest",
     "TestSummary",
     "ConfigTableSummary",
     "GenerateTestsResponse",
