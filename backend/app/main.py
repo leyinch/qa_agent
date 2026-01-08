@@ -13,7 +13,9 @@ from app.models import (
     TestSummary,
     ConfigTableSummary,
     CustomTestRequest,
-    AddSCDConfigRequest
+    CustomTestRequest,
+    AddSCDConfigRequest,
+    TableMetadataResponse
 )
 from app.services.test_executor import test_executor
 from app.services.bigquery_service import bigquery_service
@@ -419,6 +421,32 @@ async def save_custom_test(request: CustomTestRequest):
         return {"status": "success", "message": "Custom test saved"}
     except Exception as e:
         logger.error(f"Error saving custom test: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/table-metadata", response_model=TableMetadataResponse)
+async def get_table_metadata(
+    project_id: str = settings.google_cloud_project,
+    dataset_id: str = ...,
+    table_id: str = ...
+):
+    """Get metadata for a specific BigQuery table."""
+    try:
+        from app.services.bigquery_service import bigquery_service
+        metadata = await bigquery_service.get_table_metadata(project_id, dataset_id, table_id)
+        
+        # Extract just column names for easier frontend usage
+        columns = [field['name'] for field in metadata.get('schema', {}).get('fields', [])]
+        
+        return TableMetadataResponse(
+            full_table_name=metadata['full_table_name'],
+            columns=columns,
+            schema_info=metadata
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error fetching table metadata: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

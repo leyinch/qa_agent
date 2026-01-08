@@ -59,6 +59,60 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
     const [activeFlagColumn, setActiveFlagColumn] = useState("DWCurrentRowFlag");
     const [customTests, setCustomTests] = useState<CustomTest[]>([]);
 
+    // Column fetching state
+    const [availableColumns, setAvailableColumns] = useState<string[]>([]);
+    const [scdTargetDataset, setScdTargetDataset] = useState(""); // Track for fetching
+    const [scdTargetTable, setScdTargetTable] = useState("");     // Track for fetching
+
+    // Fetch columns when target changes
+    useEffect(() => {
+        const fetchColumns = async () => {
+            if (!projectId || !scdTargetDataset || !scdTargetTable) {
+                setAvailableColumns([]);
+                return;
+            }
+
+            try {
+                const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://data-qa-agent-backend-1037417342779.us-central1.run.app';
+                const endpoint = `${backendUrl}/api/table-metadata?project_id=${projectId}&dataset_id=${scdTargetDataset}&table_id=${scdTargetTable}`;
+
+                const response = await fetch(endpoint);
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.columns) {
+                        setAvailableColumns(data.columns);
+                    }
+                } else {
+                    console.warn("Failed to fetch columns");
+                    setAvailableColumns([]);
+                }
+            } catch (err) {
+                console.error("Error fetching columns:", err);
+                setAvailableColumns([]);
+            }
+        };
+
+        const timeoutId = setTimeout(fetchColumns, 1000); // Debounce
+        return () => clearTimeout(timeoutId);
+    }, [projectId, scdTargetDataset, scdTargetTable]);
+
+    const handleInsertColumn = (index: number, columnName: string, isNewConfig: boolean) => {
+        if (!columnName) return;
+
+        if (isNewConfig) {
+            const updated = [...newCustomTests];
+            const currentSql = updated[index].sql || "";
+            updated[index] = { ...updated[index], sql: currentSql + columnName + " " };
+            setNewCustomTests(updated);
+        } else {
+            const updated = [...customTests];
+            const currentSql = updated[index].sql || "";
+            updated[index] = { ...updated[index], sql: currentSql + columnName + " " };
+            setCustomTests(updated);
+        }
+    };
+
+
     // New config form state
     const [showAddConfig, setShowAddConfig] = useState(false);
     const [newConfigId, setNewConfigId] = useState("");
@@ -811,7 +865,12 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
                                                         type="text"
                                                         className="input"
                                                         value={newTargetDataset}
-                                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewTargetDataset(e.target.value)}
+                                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                                                            setNewTargetDataset(e.target.value);
+                                                        }}
+                                                        onBlur={() => {
+                                                            setScdTargetDataset(newTargetDataset); // Reuse fetching logic
+                                                        }}
                                                         placeholder="e.g., DW_Dimensions"
                                                     />
                                                 </div>
@@ -822,7 +881,13 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
                                                         type="text"
                                                         className="input"
                                                         value={newTargetTable}
-                                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewTargetTable(e.target.value)}
+                                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                                                            setNewTargetTable(e.target.value);
+                                                            setScdTargetTable(e.target.value);
+                                                        }}
+                                                        onBlur={() => {
+                                                            setScdTargetTable(newTargetTable); // Trigger fetch
+                                                        }}
                                                         placeholder="e.g., D_MyTable_WD"
                                                     />
                                                 </div>
@@ -1027,6 +1092,24 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
                                                                     rows={3}
                                                                     style={{ marginBottom: 0, resize: 'vertical', fontFamily: 'monospace' }}
                                                                 />
+                                                                {availableColumns.length > 0 && (
+                                                                    <div style={{ marginTop: '0.5rem' }}>
+                                                                        <label className="label" style={{ fontSize: '0.75rem' }}>Insert Column:</label>
+                                                                        <select
+                                                                            className="input"
+                                                                            style={{ padding: '0.25rem', fontSize: '0.8rem', width: 'auto' }}
+                                                                            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+                                                                                handleInsertColumn(index, e.target.value, true);
+                                                                                e.target.value = "";
+                                                                            }}
+                                                                        >
+                                                                            <option value="">-- Select Column --</option>
+                                                                            {availableColumns.map(col => (
+                                                                                <option key={col} value={col}>{col}</option>
+                                                                            ))}
+                                                                        </select>
+                                                                    </div>
+                                                                )}
                                                             </div>
                                                         </div>
                                                     ))}
@@ -1087,9 +1170,6 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
                                                 id="targetDatasetScd"
                                                 type="text"
                                                 className="input"
-                                                value={targetDataset}
-                                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTargetDataset(e.target.value)}
-                                                required
                                                 placeholder="e.g., DW_Dimensions"
                                             />
                                         </div>
@@ -1104,7 +1184,14 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
                                                 type="text"
                                                 className="input"
                                                 value={targetTable}
-                                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTargetTable(e.target.value)}
+                                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                                                    setTargetTable(e.target.value);
+                                                    setScdTargetTable(e.target.value);
+                                                }}
+                                                onBlur={() => {
+                                                    setScdTargetDataset(targetDataset);
+                                                    setScdTargetTable(targetTable);
+                                                }}
                                                 required
                                                 placeholder="e.g., D_Employee_WD"
                                             />
@@ -1318,6 +1405,24 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
                                                             rows={3}
                                                             style={{ marginBottom: 0, resize: 'vertical', fontFamily: 'monospace' }}
                                                         />
+                                                        {availableColumns.length > 0 && (
+                                                            <div style={{ marginTop: '0.5rem' }}>
+                                                                <label className="label" style={{ fontSize: '0.75rem' }}>Insert Column:</label>
+                                                                <select
+                                                                    className="input"
+                                                                    style={{ padding: '0.25rem', fontSize: '0.8rem', width: 'auto' }}
+                                                                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+                                                                        handleInsertColumn(index, e.target.value, false);
+                                                                        e.target.value = ""; // Reset dropdown
+                                                                    }}
+                                                                >
+                                                                    <option value="">-- Select Column --</option>
+                                                                    {availableColumns.map(col => (
+                                                                        <option key={col} value={col}>{col}</option>
+                                                                    ))}
+                                                                </select>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
                                             ))}
