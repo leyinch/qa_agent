@@ -284,11 +284,11 @@ export default function ResultsView() {
                             <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
                                 <thead>
                                     <tr style={{ borderBottom: '2px solid var(--border)' }}>
-                                        <th style={{ padding: '0.75rem', textAlign: 'left', width: '15%' }}>Test Name</th>
-                                        <th style={{ padding: '0.75rem', textAlign: 'left', width: '10%' }}>Status</th>
-                                        <th style={{ padding: '0.75rem', textAlign: 'left', width: '10%' }}>Severity</th>
-                                        <th style={{ padding: '0.75rem', textAlign: 'left', width: '8%' }}>Affected</th>
-                                        <th style={{ padding: '0.75rem', textAlign: 'left', width: '57%' }}>Details</th>
+                                        <th style={{ padding: '0.75rem', textAlign: 'left', width: '12%' }}>Test Name</th>
+                                        <th style={{ padding: '0.75rem', textAlign: 'left', width: '8%' }}>Status</th>
+                                        <th style={{ padding: '0.75rem', textAlign: 'left', width: '8%' }}>Severity</th>
+                                        <th style={{ padding: '0.75rem', textAlign: 'left', width: '7%' }}>Affected</th>
+                                        <th style={{ padding: '0.75rem', textAlign: 'left', width: '65%' }}>Details</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -314,7 +314,7 @@ export default function ResultsView() {
                                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                                         <span>{test.error_message || test.description}</span>
                                                         <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                                            {test.status === 'FAIL' && test.sample_data && test.category !== 'smoke' && (
+                                                            {test.status === 'FAIL' && test.sample_data && test.sample_data.length > 0 && test.category !== 'smoke' && (
                                                                 <button
                                                                     onClick={() => {
                                                                         if (expandedData?.mappingIdx === activeTab && expandedData?.testIdx === testIdx) {
@@ -361,7 +361,7 @@ export default function ResultsView() {
                                                         </div>
                                                     </div>
 
-                                                    {test.status === 'FAIL' && test.sample_data && test.sample_data.length > 0 && (
+                                                    {expandedData?.mappingIdx === activeTab && expandedData?.testIdx === testIdx && test.status === 'FAIL' && test.sample_data && test.sample_data.length > 0 && (
                                                         <div style={{
                                                             marginTop: '0.5rem',
                                                             padding: '0.5rem',
