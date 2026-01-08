@@ -168,7 +168,7 @@ export default function ResultsView() {
     // Config table mode - show results grouped by mapping
     if (isConfigMode) {
         return (
-            <div style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
+            <div style={{ padding: '2rem', maxWidth: '95%', margin: '0 auto' }}>
                 <h2 style={{ fontSize: '2rem', fontWeight: '700', marginBottom: '1rem' }}>
                     Test Results - Config Table Mode
                 </h2>
@@ -362,7 +362,14 @@ export default function ResultsView() {
                                                     </div>
 
                                                     {test.status === 'FAIL' && test.sample_data && test.sample_data.length > 0 && (
-                                                        <>
+                                                        <div style={{
+                                                            marginTop: '0.5rem',
+                                                            padding: '0.5rem',
+                                                            background: '#fff',
+                                                            borderRadius: '4px',
+                                                            overflowX: 'auto',
+                                                            border: '1px solid #e2e8f0'
+                                                        }}>
                                                             <div style={{ fontWeight: '700', color: '#1d4ed8', marginBottom: '0.5rem', fontSize: '0.75rem' }}>
                                                                 Sample problematic rows (max 10):
                                                             </div>
@@ -370,7 +377,7 @@ export default function ResultsView() {
                                                                 <thead>
                                                                     <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
                                                                         {Object.keys(test.sample_data[0]).map((key: string) => (
-                                                                            <th key={key} style={{ padding: '0.25rem 0.5rem', textAlign: 'left' }}>{key}</th>
+                                                                            <th key={key} style={{ padding: '0.25rem 0.5rem', textAlign: 'left', whiteSpace: 'nowrap' }}>{key}</th>
                                                                         ))}
                                                                     </tr>
                                                                 </thead>
@@ -378,13 +385,13 @@ export default function ResultsView() {
                                                                     {test.sample_data.map((row: Record<string, any>, rIdx: number) => (
                                                                         <tr key={rIdx} style={{ borderBottom: '1px solid #f1f5f9' }}>
                                                                             {Object.values(row).map((val: any, vIdx: number) => (
-                                                                                <td key={vIdx} style={{ padding: '0.25rem 0.5rem' }}>{val?.toString() || 'NULL'}</td>
+                                                                                <td key={vIdx} style={{ padding: '0.25rem 0.5rem', whiteSpace: 'nowrap' }}>{val?.toString() || 'NULL'}</td>
                                                                             ))}
                                                                         </tr>
                                                                     ))}
                                                                 </tbody>
                                                             </table>
-                                                        </>
+                                                        </div>
                                                     )}
 
                                                     {expandedSql?.mappingIdx === activeTab && expandedSql?.testIdx === testIdx && (
@@ -495,7 +502,7 @@ export default function ResultsView() {
     ];
 
     return (
-        <div style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
+        <div style={{ padding: '2rem', maxWidth: '95%', margin: '0 auto' }}>
             <h2 style={{ fontSize: '2rem', fontWeight: '700', marginBottom: '2rem' }}>Test Results</h2>
 
             {/* Summary Cards */}
