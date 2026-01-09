@@ -125,6 +125,7 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
     const [newEndDateColumn, setNewEndDateColumn] = useState("DWEndEffDateTime");
     const [newActiveFlagColumn, setNewActiveFlagColumn] = useState("DWCurrentRowFlag");
     const [newDescription, setNewDescription] = useState("");
+    const [newCronSchedule, setNewCronSchedule] = useState("");
     const [newCustomTests, setNewCustomTests] = useState<CustomTest[]>([]);
 
     const addDataset = () => setDatasets([...datasets, '']);
@@ -277,50 +278,9 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
             localStorage.setItem("projectId", projectId);
 
             // Save to BigQuery history in background
-            try {
-                const saveHistory = async (results: any[], tDataset?: string, tTable?: string, mId?: string) => {
-                    if (!results || results.length === 0) return;
-
-                    const historyPayload = {
-                        project_id: projectId,
-                        comparison_mode: comparisonMode,
-                        target_dataset: tDataset || targetDataset,
-                        target_table: tTable || targetTable,
-                        mapping_id: mId,
-                        test_results: results,
-                        metadata: {
-                            scd_type: scdType,
-                            gcs_bucket: gcsBucket,
-                            config_dataset: configDataset,
-                            config_table: configTable
-                        }
-                    };
-
-                    fetch(`${backendUrl}/api/save-test-history`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(historyPayload)
-                    }).catch(err => console.error("Failed to save history:", err));
-                };
-
-                if (data.results_by_mapping) {
-                    data.results_by_mapping.forEach((m: any) => {
-                        saveHistory(
-                            m.predefined_results,
-                            m.mapping_info?.target_dataset || m.target_dataset,
-                            m.mapping_info?.target_table || m.target_table,
-                            m.mapping_id
-                        );
-                    });
-                } else if (data.predefined_results) {
-                    saveHistory(data.predefined_results);
-                }
-            } catch (historyErr) {
-                console.error("Error triggering history save:", historyErr);
-            }
-
+            // History save logic removed from manual runs as per user request.
+            // Only scheduled runs will save to history via backend.
             handleViewResult(data);
-
         } catch (error: any) {
             console.error("Error generating tests:", error);
             alert(error.message || "An error occurred while generating tests.");
@@ -353,7 +313,8 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
                 end_date_column: newScdType === 'scd2' ? newEndDateColumn : null,
                 active_flag_column: newScdType === 'scd2' ? newActiveFlagColumn : null,
                 description: newDescription,
-                custom_tests: newCustomTests.length > 0 ? newCustomTests : null
+                custom_tests: newCustomTests.length > 0 ? newCustomTests : null,
+                cron_schedule: newCronSchedule || null
             };
 
             const response = await fetch(endpoint, {
@@ -1174,26 +1135,43 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
                                                         + Add Business Rule
                                                     </button>
                                                 </div>
-                                            </div>
+                                                <div style={{ marginBottom: '1.75rem' }}>
+                                                    <label className="label" htmlFor="newCronSchedule">
+                                                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                            ⏰ Cron Schedule (Optional)
+                                                        </span>
+                                                    </label>
+                                                    <input
+                                                        id="newCronSchedule"
+                                                        type="text"
+                                                        className="input"
+                                                        value={newCronSchedule}
+                                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewCronSchedule(e.target.value)}
+                                                        placeholder="e.g., 0 2 * * * (Daily at 2 AM)"
+                                                    />
+                                                    <p style={{ fontSize: '0.75rem', color: 'var(--secondary-foreground)', marginTop: '0.25rem' }}>
+                                                        Leave empty for manual execution only. Scheduled runs will automatically save to history.
+                                                    </p>
+                                                </div>
 
-                                            {/* Save Button */}
-                                            <button
-                                                type="button"
-                                                onClick={handleAddConfig}
-                                                style={{
-                                                    width: '100%',
-                                                    padding: '0.75rem',
-                                                    background: 'var(--gradient-primary)',
-                                                    color: 'white',
-                                                    border: 'none',
-                                                    borderRadius: 'var(--radius)',
-                                                    cursor: 'pointer',
-                                                    fontWeight: '600',
-                                                    fontSize: '0.875rem'
-                                                }}
-                                            >
-                                                💾 Save Configuration
-                                            </button>
+                                                {/* Save Button */}
+                                                <button
+                                                    type="button"
+                                                    onClick={handleAddConfig}
+                                                    style={{
+                                                        width: '100%',
+                                                        padding: '0.75rem',
+                                                        background: 'var(--gradient-primary)',
+                                                        color: 'white',
+                                                        border: 'none',
+                                                        borderRadius: 'var(--radius)',
+                                                        cursor: 'pointer',
+                                                        fontWeight: '600',
+                                                        fontSize: '0.875rem'
+                                                    }}
+                                                >
+                                                </button>
+                                            </div>
                                         </div>
                                     )}
                                 </>

@@ -18,6 +18,7 @@ interface HistoryItem {
     failed_tests: number;
     test_results?: any; // New schema
     details?: any; // Old schema
+    cron_schedule?: string;
 }
 
 interface HistoryListProps {
@@ -197,6 +198,11 @@ export default function HistoryList({ projectId, onViewResult }: HistoryListProp
                                         </td>
                                         <td style={{ padding: '0.75rem 1rem', textTransform: 'capitalize' }}>
                                             {run.comparison_mode?.replace('_', ' ')}
+                                            {run.cron_schedule && (
+                                                <div style={{ fontSize: '0.7rem', color: 'var(--primary)', marginTop: '0.25rem', fontWeight: '600' }}>
+                                                    ⏰ {run.cron_schedule}
+                                                </div>
+                                            )}
                                         </td>
                                         <td style={{ padding: '0.75rem 1rem' }}>
                                             <div style={{ fontSize: '0.75rem', color: 'var(--secondary-foreground)' }}>Src: <span style={{ color: 'var(--foreground)' }}>{run.source || '-'}</span></div>

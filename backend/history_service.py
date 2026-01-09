@@ -55,6 +55,7 @@ class TestHistoryService:
                     bigquery.SchemaField("passed_tests", "INTEGER", mode="NULLABLE"),
                     bigquery.SchemaField("failed_tests", "INTEGER", mode="NULLABLE"),
                     bigquery.SchemaField("error_message", "STRING", mode="NULLABLE"),
+                    bigquery.SchemaField("cron_schedule", "STRING", mode="NULLABLE"),
                     bigquery.SchemaField("test_results", "JSON", mode="NULLABLE"),
                     bigquery.SchemaField("executed_by", "STRING", mode="NULLABLE"),
                     bigquery.SchemaField("metadata", "JSON", mode="NULLABLE")
@@ -77,6 +78,7 @@ class TestHistoryService:
         target_dataset: Optional[str] = None,
         target_table: Optional[str] = None,
         mapping_id: Optional[str] = None,
+        cron_schedule: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None
     ) -> str:
         """
@@ -110,6 +112,7 @@ class TestHistoryService:
             "passed_tests": passed_tests,
             "failed_tests": failed_tests,
             "error_message": next((t.get("error_message") for t in test_results if t.get("error_message")), None),
+            "cron_schedule": cron_schedule,
             "test_results": json.dumps(test_results),
             "executed_by": None,  # TODO: Add auth
             "metadata": json.dumps(metadata) if metadata else None

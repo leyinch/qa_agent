@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS `leyin-sandpit.qa_agent_metadata.test_results_history
   passed_tests INT64,
   failed_tests INT64,
   error_message STRING,
+  cron_schedule STRING,  -- To track how this run was scheduled
   test_results JSON,  -- Array of detailed test results
   executed_by STRING,  -- For future auth integration
   metadata JSON  -- Additional metadata (scd_type, source/target info, etc.)

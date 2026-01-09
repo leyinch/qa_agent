@@ -15,10 +15,12 @@ from app.models import (
     CustomTestRequest,
     AddSCDConfigRequest,
     TableMetadataResponse,
-    SaveHistoryRequest
+    SaveHistoryRequest,
+    ScheduledTestRunRequest
 )
 from app.services.test_executor import test_executor
 from app.services.bigquery_service import bigquery_service
+from app.services.scheduler_service import scheduler_service
 from history_service import TestHistoryService
 
 # Initialize history service
@@ -417,7 +419,9 @@ async def add_scd_config(request: AddSCDConfigRequest):
             "begin_date_column": request.begin_date_column,
             "end_date_column": request.end_date_column,
             "active_flag_column": request.active_flag_column,
-            "description": request.description
+            "description": request.description,
+            "custom_tests": request.custom_tests,
+            "cron_schedule": request.cron_schedule
         }
         
         # Insert into config table
@@ -432,6 +436,17 @@ async def add_scd_config(request: AddSCDConfigRequest):
             raise HTTPException(
                 status_code=500,
                 detail="Failed to insert SCD configuration into config table"
+            )
+        
+        # Upsert scheduler job if cron_schedule is provided
+        if request.cron_schedule:
+            await scheduler_service.upsert_job(
+                config_id=request.config_id,
+                cron_schedule=request.cron_schedule,
+                target_dataset=request.target_dataset,
+                target_table=request.target_table,
+                config_dataset=request.config_dataset,
+                config_table=request.config_table
             )
         
         return {
@@ -512,3 +527,50 @@ async def get_table_metadata(
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+@app.post("/api/run-scheduled-tests")
+async def run_scheduled_tests(request: ScheduledTestRunRequest):
+    """Endpoint triggered by Cloud Scheduler to run tests for a single table."""
+    try:
+        from app.services.test_executor import TestExecutor
+        
+        executor = TestExecutor(request.project_id)
+        
+        # Fetch full config details from BigQuery
+        configs = await bigquery_service.read_scd_config_table(
+            request.project_id, 
+            request.config_dataset, 
+            request.config_table
+        )
+        
+        table_config = next((c for c in configs if c['config_id'] == request.config_id), None)
+        if not table_config:
+            logger.error(f"Config {request.config_id} not found in {request.config_dataset}.{request.config_table}")
+            raise HTTPException(status_code=404, detail=f"Config {request.config_id} not found")
+            
+        logger.info(f"Running scheduled tests for {request.config_id}")
+        mapping_result = await executor.process_scd(request.project_id, table_config)
+        results = [r.dict() if hasattr(r, 'dict') else r for r in mapping_result.predefined_results]
+        
+        # Save to history (Policy: scheduled runs ALWAYS write to history)
+        history_service.save_test_results(
+            project_id=request.project_id,
+            comparison_mode="scd",
+            test_results=results,
+            target_dataset=request.target_dataset,
+            target_table=request.target_table,
+            mapping_id=request.config_id,
+            cron_schedule=request.cron_schedule
+        )
+        
+        return {
+            "success": True,
+            "message": f"Scheduled tests for {request.config_id} completed and saved to history",
+            "results_summary": {
+                "total": len(results),
+                "passed": len([t for t in results if t.get('status') == 'PASS']),
+                "failed": len([t for t in results if t.get('status') == 'FAIL'])
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error running scheduled tests: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))

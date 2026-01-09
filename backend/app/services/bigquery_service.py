@@ -193,7 +193,8 @@ class BigQueryService:
                 end_date_column,
                 active_flag_column,
                 description,
-                custom_tests
+                custom_tests,
+                cron_schedule
             FROM `{project_id}.{config_dataset}.{config_table}`
         """
         return await self.execute_query(query)
@@ -234,7 +235,8 @@ class BigQueryService:
                 "end_date_column": config_data.get("end_date_column"),
                 "active_flag_column": config_data.get("active_flag_column"),
                 "description": config_data.get("description", ""),
-                "custom_tests": config_data.get("custom_tests")
+                "custom_tests": config_data.get("custom_tests"),
+                "cron_schedule": config_data.get("cron_schedule")
             }
             
             # Insert into BigQuery
