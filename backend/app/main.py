@@ -13,12 +13,16 @@ from app.models import (
     TestSummary,
     ConfigTableSummary,
     CustomTestRequest,
-    CustomTestRequest,
     AddSCDConfigRequest,
-    TableMetadataResponse
+    TableMetadataResponse,
+    SaveHistoryRequest
 )
 from app.services.test_executor import test_executor
 from app.services.bigquery_service import bigquery_service
+from history_service import TestHistoryService
+
+# Initialize history service
+history_service = TestHistoryService()
 
 # Configure logging
 logging.basicConfig(
@@ -332,15 +336,70 @@ async def generate_tests(request: GenerateTestsRequest):
 
 
 
+@app.post("/api/save-test-history")
+async def save_test_history(request: SaveHistoryRequest):
+    """Save test execution results to BigQuery history."""
+    try:
+        execution_id = history_service.save_test_results(
+            project_id=request.project_id,
+            comparison_mode=request.comparison_mode,
+            test_results=request.test_results,
+            target_dataset=request.target_dataset,
+            target_table=request.target_table,
+            mapping_id=request.mapping_id,
+            metadata=request.metadata
+        )
+        return {"status": "success", "execution_id": execution_id}
+    except Exception as e:
+        logger.error(f"Error saving test history: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/history")
 async def get_test_history(project_id: str = settings.google_cloud_project, limit: int = 50):
-    """Get previous test runs from BigQuery."""
+    """Get previous test runs (summary level) from BigQuery."""
     try:
         from app.services.bigquery_service import bigquery_service
         return await bigquery_service.get_execution_history(project_id=project_id, limit=limit)
     except Exception as e:
-        logger.error(f"Error fetching history: {e}")
+        logger.error(f"Error fetching execution history: {e}")
         return []
+
+
+@app.get("/api/history-details")
+async def get_history_details(
+    execution_id: str,
+    project_id: str = settings.google_cloud_project
+):
+    """Get detailed test results for a specific execution."""
+    try:
+        # Query detailed results from the new history service
+        results = history_service.get_test_history(
+            project_id=project_id,
+            execution_id=execution_id
+        )
+        return results
+    except Exception as e:
+        logger.error(f"Error fetching detailed history: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/table-history")
+async def get_table_history(
+    target_table: str,
+    project_id: str = settings.google_cloud_project,
+    limit: int = 20
+):
+    """Get history for a specific table across all executions."""
+    try:
+        return history_service.get_test_history(
+            project_id=project_id,
+            target_table=target_table,
+            limit=limit
+        )
+    except Exception as e:
+        logger.error(f"Error fetching table history: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/api/scd-config")

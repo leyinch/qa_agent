@@ -48,6 +48,7 @@ class TestResult(BaseModel):
     rows_affected: int = 0
     sample_data: Optional[List[Dict[str, Any]]] = None
     error_message: Optional[str] = None
+    details: Optional[Dict[str, Any]] = None
 
 
 class MappingInfo(BaseModel):
@@ -106,3 +107,13 @@ class AddSCDConfigRequest(BaseModel):
     description: Optional[str] = Field("", description="Configuration description")
     custom_tests: Optional[List[Dict[str, str]]] = Field(None, description="List of custom business rules (name/sql)")
 
+
+class SaveHistoryRequest(BaseModel):
+    """Request model for saving test history."""
+    project_id: str
+    comparison_mode: str
+    test_results: List[Dict[str, Any]]
+    target_dataset: Optional[str] = None
+    target_table: Optional[str] = None
+    mapping_id: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
