@@ -5,16 +5,19 @@ import { PieChart, Pie, Cell, Tooltip as RechartsTooltip } from "recharts";
 
 interface HistoryItem {
     execution_id: string;
-    timestamp: string;
+    execution_timestamp: string;
+    timestamp?: string; // Compatibility
     project_id: string;
     comparison_mode: string;
-    source: string;
-    target: string;
+    source?: string;
+    target?: string;
+    target_table?: string; // New schema
     status: string;
     total_tests: number;
     passed_tests: number;
     failed_tests: number;
-    details: any;
+    test_results?: any; // New schema
+    details?: any; // Old schema
 }
 
 interface HistoryListProps {
@@ -50,17 +53,32 @@ export default function HistoryList({ projectId, onViewResult }: HistoryListProp
     }, []);
 
     const handleViewClick = (run: HistoryItem) => {
-        let details = run.details;
-        if (typeof details === 'string') {
+        let results = run.test_results || run.details;
+        if (typeof results === 'string') {
             try {
-                details = JSON.parse(details);
+                results = JSON.parse(results);
             } catch (e) {
-                console.error("Failed to parse details JSON", e);
+                console.error("Failed to parse results JSON", e);
                 alert("Error parsing result details.");
                 return;
             }
         }
-        onViewResult(details);
+
+        // Normalize for ResultsView
+        const normalized = {
+            summary: {
+                total_tests: run.total_tests,
+                passed: run.passed_tests,
+                failed: run.failed_tests,
+                errors: (run.total_tests - run.passed_tests - run.failed_tests)
+            },
+            predefined_results: Array.isArray(results) ? results : [],
+            comparison_mode: run.comparison_mode,
+            project_id: run.project_id,
+            target_table: run.target_table || run.target
+        };
+
+        onViewResult(normalized);
     };
 
     const getStatusColor = (status: string) => {
@@ -175,14 +193,14 @@ export default function HistoryList({ projectId, onViewResult }: HistoryListProp
                                 return (
                                     <tr key={run.execution_id} style={{ borderBottom: '1px solid var(--border)' }}>
                                         <td style={{ padding: '0.75rem 1rem' }}>
-                                            {new Date(run.timestamp).toLocaleString()}
+                                            {new Date(run.execution_timestamp || run.timestamp || '').toLocaleString()}
                                         </td>
                                         <td style={{ padding: '0.75rem 1rem', textTransform: 'capitalize' }}>
                                             {run.comparison_mode?.replace('_', ' ')}
                                         </td>
                                         <td style={{ padding: '0.75rem 1rem' }}>
-                                            <div style={{ fontSize: '0.75rem', color: 'var(--secondary-foreground)' }}>Src: <span style={{ color: 'var(--foreground)' }}>{run.source}</span></div>
-                                            <div style={{ fontSize: '0.75rem', color: 'var(--secondary-foreground)' }}>Tgt: <span style={{ color: 'var(--foreground)' }}>{run.target}</span></div>
+                                            <div style={{ fontSize: '0.75rem', color: 'var(--secondary-foreground)' }}>Src: <span style={{ color: 'var(--foreground)' }}>{run.source || '-'}</span></div>
+                                            <div style={{ fontSize: '0.75rem', color: 'var(--secondary-foreground)' }}>Tgt: <span style={{ color: 'var(--foreground)' }}>{run.target_table || run.target}</span></div>
                                         </td>
                                         <td style={{ padding: '0.75rem 1rem' }}>
                                             {getStatusBadge(run.status)}

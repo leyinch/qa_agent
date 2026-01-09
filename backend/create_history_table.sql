@@ -9,19 +9,17 @@ CREATE TABLE IF NOT EXISTS `leyin-sandpit.qa_agent_metadata.test_results_history
   target_dataset STRING,
   target_table STRING,
   mapping_id STRING,  -- For config mode
-  test_name STRING NOT NULL,
-  test_category STRING,  -- smoke, structural, data_quality, custom
-  test_status STRING NOT NULL,  -- PASS, FAIL, ERROR
-  severity STRING,  -- HIGH, MEDIUM, LOW
-  rows_affected INT64,
+  status STRING NOT NULL,  -- PASS, FAIL, ERROR (Overall table status)
+  total_tests INT64,
+  passed_tests INT64,
+  failed_tests INT64,
   error_message STRING,
-  sql_query STRING,
-  sample_data JSON,  -- Sample problematic rows
+  test_results JSON,  -- Array of detailed test results
   executed_by STRING,  -- For future auth integration
-  metadata JSON  -- Additional metadata (source/target info, etc.)
+  metadata JSON  -- Additional metadata (scd_type, source/target info, etc.)
 )
 PARTITION BY DATE(execution_timestamp)
-CLUSTER BY project_id, target_table, test_status;
+CLUSTER BY project_id, target_table, status;
 
 -- Create a view for easy querying of latest test results per table
 CREATE OR REPLACE VIEW `leyin-sandpit.qa_agent_metadata.latest_test_results_by_table` AS

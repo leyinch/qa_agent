@@ -50,21 +50,19 @@ class TestHistoryService:
                     bigquery.SchemaField("target_dataset", "STRING", mode="NULLABLE"),
                     bigquery.SchemaField("target_table", "STRING", mode="NULLABLE"),
                     bigquery.SchemaField("mapping_id", "STRING", mode="NULLABLE"),
-                    bigquery.SchemaField("test_name", "STRING", mode="REQUIRED"),
-                    bigquery.SchemaField("test_category", "STRING", mode="NULLABLE"),
-                    bigquery.SchemaField("test_status", "STRING", mode="REQUIRED"),
-                    bigquery.SchemaField("severity", "STRING", mode="NULLABLE"),
-                    bigquery.SchemaField("rows_affected", "INTEGER", mode="NULLABLE"),
+                    bigquery.SchemaField("status", "STRING", mode="REQUIRED"),
+                    bigquery.SchemaField("total_tests", "INTEGER", mode="NULLABLE"),
+                    bigquery.SchemaField("passed_tests", "INTEGER", mode="NULLABLE"),
+                    bigquery.SchemaField("failed_tests", "INTEGER", mode="NULLABLE"),
                     bigquery.SchemaField("error_message", "STRING", mode="NULLABLE"),
-                    bigquery.SchemaField("sql_query", "STRING", mode="NULLABLE"),
-                    bigquery.SchemaField("sample_data", "JSON", mode="NULLABLE"),
+                    bigquery.SchemaField("test_results", "JSON", mode="NULLABLE"),
                     bigquery.SchemaField("executed_by", "STRING", mode="NULLABLE"),
                     bigquery.SchemaField("metadata", "JSON", mode="NULLABLE")
                 ]
                 table = bigquery.Table(HISTORY_TABLE_FQN, schema=schema)
                 table.partitioning_type = "DAY"
                 table.time_partitioning = bigquery.TimePartitioning(field="execution_timestamp")
-                table.clustering_fields = ["project_id", "target_table", "test_status"]
+                table.clustering_fields = ["project_id", "target_table", "status"]
                 
                 self.client.create_table(table)
                 print(f"Created history table {HISTORY_TABLE_FQN}")
@@ -82,56 +80,46 @@ class TestHistoryService:
         metadata: Optional[Dict[str, Any]] = None
     ) -> str:
         """
-        Save test execution results to BigQuery history table.
-        
-        Args:
-            project_id: GCP project ID where tests were run
-            comparison_mode: Type of test (schema, gcs, scd, history)
-            test_results: List of test result dictionaries
-            target_dataset: Dataset being tested (optional)
-            target_table: Table being tested (optional)
-            mapping_id: Mapping identifier for config mode (optional)
-            metadata: Additional metadata (optional)
-        
-        Returns:
-            execution_id: Unique identifier for this test execution
+        Save test execution results to BigQuery history table (one row per table).
         """
         execution_id = str(uuid.uuid4())
         execution_timestamp = datetime.utcnow()
         
-        rows_to_insert = []
+        # Aggregate stats
+        total_tests = len(test_results)
+        passed_tests = len([t for t in test_results if t.get("status") == "PASS"])
+        failed_tests = len([t for t in test_results if t.get("status") == "FAIL"])
         
-        for test in test_results:
-            row = {
-                "execution_id": execution_id,
-                "execution_timestamp": execution_timestamp.isoformat(),
-                "project_id": project_id,
-                "comparison_mode": comparison_mode,
-                "target_dataset": target_dataset,
-                "target_table": target_table,
-                "mapping_id": mapping_id,
-                "test_name": test.get("test_name"),
-                "test_category": test.get("category"),
-                "test_status": test.get("status"),
-                "severity": test.get("severity"),
-                "rows_affected": test.get("rows_affected"),
-                "error_message": test.get("error_message"),
-                "sql_query": test.get("sql_query"),
-                "sample_data": json.dumps(test.get("sample_data")) if test.get("sample_data") else None,
-                "executed_by": None,  # TODO: Add auth
-                "metadata": json.dumps({
-                    **(metadata or {}),
-                    "test_details": test.get("details", {}),
-                    "ai_suggestions": test.get("ai_suggestions", [])
-                }) if (metadata or test.get("details") or test.get("ai_suggestions")) else None
-            }
-            rows_to_insert.append(row)
+        # Determine overall status
+        status = "PASS"
+        if any(t.get("status") == "ERROR" for t in test_results):
+            status = "ERROR"
+        elif failed_tests > 0:
+            status = "FAIL"
+            
+        row = {
+            "execution_id": execution_id,
+            "execution_timestamp": execution_timestamp.isoformat(),
+            "project_id": project_id,
+            "comparison_mode": comparison_mode,
+            "target_dataset": target_dataset,
+            "target_table": target_table,
+            "mapping_id": mapping_id,
+            "status": status,
+            "total_tests": total_tests,
+            "passed_tests": passed_tests,
+            "failed_tests": failed_tests,
+            "error_message": next((t.get("error_message") for t in test_results if t.get("error_message")), None),
+            "test_results": json.dumps(test_results),
+            "executed_by": None,  # TODO: Add auth
+            "metadata": json.dumps(metadata) if metadata else None
+        }
         
         # Insert into BigQuery
-        errors = self.client.insert_rows_json(HISTORY_TABLE_FQN, rows_to_insert)
+        errors = self.client.insert_rows_json(HISTORY_TABLE_FQN, [row])
         
         if errors:
-            raise Exception(f"Failed to insert rows into BigQuery: {errors}")
+            raise Exception(f"Failed to insert row into BigQuery: {errors}")
         
         return execution_id
     
@@ -223,10 +211,10 @@ class TestHistoryService:
         SELECT 
             execution_id,
             execution_timestamp,
-            test_name,
-            test_status,
-            severity,
-            rows_affected,
+            status,
+            total_tests,
+            passed_tests,
+            failed_tests,
             error_message
         FROM `{HISTORY_TABLE_FQN}`
         WHERE project_id = @project_id
