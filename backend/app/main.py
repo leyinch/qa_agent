@@ -318,7 +318,8 @@ async def generate_tests(request: GenerateTestsRequest):
                         'failed': len([t for t in result.predefined_results if t.status == 'FAIL']),
                         'errors': len([t for t in result.predefined_results if t.status == 'ERROR'])
                     },
-                    'results_by_mapping': [result]
+                    'results_by_mapping': [result.dict()],
+                    'cron_schedule': result.cron_schedule
                 }
             except Exception as e:
                 logger.error(f"Error in scd validation: {str(e)}")
@@ -349,7 +350,8 @@ async def save_test_history(request: SaveHistoryRequest):
             target_dataset=request.target_dataset,
             target_table=request.target_table,
             mapping_id=request.mapping_id,
-            metadata=request.metadata
+            metadata=request.metadata,
+            cron_schedule=request.cron_schedule
         )
         return {"status": "success", "execution_id": execution_id}
     except Exception as e:

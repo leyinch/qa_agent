@@ -34,6 +34,7 @@ interface MappingResult {
     };
     predefined_results: TestResult[];
     ai_suggestions?: AISuggestion[];
+    cron_schedule?: string;
     error?: string;
 }
 
@@ -63,6 +64,7 @@ export default function ResultsView() {
     const [projectId, setProjectId] = useState<string>("");
     const [expandedSql, setExpandedSql] = useState<{ mappingIdx: number, testIdx: number } | null>(null);
     const [expandedSingleSql, setExpandedSingleSql] = useState<number | null>(null);
+    const [cronSchedule, setCronSchedule] = useState<string | null>(null);
 
     const [activeTab, setActiveTab] = useState<number>(0);
 
@@ -81,6 +83,10 @@ export default function ResultsView() {
                     // If not, we might fail to save. 
                     // Let's check where projectId comes from. It was in DashboardForm.
                     // We should modify DashboardForm to save projectId in local storage too or pass it.
+                }
+
+                if (parsed.cron_schedule) {
+                    setCronSchedule(parsed.cron_schedule);
                 }
 
                 // Check if it's config table mode (has results_by_mapping)
@@ -168,9 +174,29 @@ export default function ResultsView() {
     if (isConfigMode) {
         return (
             <div style={{ padding: '1rem', maxWidth: '99%', margin: '0 auto' }}>
-                <h2 style={{ fontSize: '2rem', fontWeight: '700', marginBottom: '1rem' }}>
-                    Test Results - Config Table Mode
-                </h2>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                    <h2 style={{ fontSize: '2rem', fontWeight: '700', margin: 0 }}>
+                        Test Results - Config Table Mode
+                    </h2>
+                    <div style={{
+                        padding: '0.4rem 0.8rem',
+                        background: 'var(--secondary)',
+                        borderRadius: 'var(--radius)',
+                        border: '1px solid var(--border)',
+                        fontSize: '0.875rem',
+                        fontWeight: '600',
+                        color: 'var(--text-secondary)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem'
+                    }}>
+                        {cronSchedule ? (
+                            <><span>⏰</span> Scheduled: {cronSchedule}</>
+                        ) : (
+                            <><span>👤</span> Manual Run</>
+                        )}
+                    </div>
+                </div>
 
                 {/* Overall Summary */}
                 {summary && (
@@ -274,6 +300,11 @@ export default function ResultsView() {
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '0.5rem', fontSize: '0.875rem' }}>
                                     <div><strong>Source:</strong> {mappingResults[activeTab].mapping_info.source}</div>
                                     <div><strong>Target:</strong> {mappingResults[activeTab].mapping_info.target}</div>
+                                    {mappingResults[activeTab].cron_schedule && (
+                                        <div style={{ gridColumn: 'span 2', marginTop: '0.25rem', color: 'var(--text-secondary)' }}>
+                                            <strong>⏰ Configured Schedule:</strong> {mappingResults[activeTab].cron_schedule}
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -481,7 +512,27 @@ export default function ResultsView() {
 
     return (
         <div style={{ padding: '1rem', maxWidth: '99%', margin: '0 auto' }}>
-            <h2 style={{ fontSize: '2rem', fontWeight: '700', marginBottom: '2rem' }}>Test Results</h2>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+                <h2 style={{ fontSize: '2rem', fontWeight: '700', margin: 0 }}>Test Results</h2>
+                <div style={{
+                    padding: '0.4rem 0.8rem',
+                    background: 'var(--secondary)',
+                    borderRadius: 'var(--radius)',
+                    border: '1px solid var(--border)',
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    color: 'var(--text-secondary)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                }}>
+                    {cronSchedule ? (
+                        <><span>⏰</span> Scheduled: {cronSchedule}</>
+                    ) : (
+                        <><span>👤</span> Manual Run</>
+                    )}
+                </div>
+            </div>
 
             {/* Summary Cards */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>

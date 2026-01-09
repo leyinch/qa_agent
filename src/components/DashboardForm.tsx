@@ -278,8 +278,50 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
             localStorage.setItem("projectId", projectId);
 
             // Save to BigQuery history in background
-            // History save logic removed from manual runs as per user request.
-            // Only scheduled runs will save to history via backend.
+            try {
+                const saveHistory = async (results: any[], tDataset?: string, tTable?: string, mId?: string) => {
+                    if (!results || results.length === 0) return;
+
+                    const historyPayload = {
+                        project_id: projectId,
+                        comparison_mode: comparisonMode,
+                        target_dataset: tDataset || targetDataset,
+                        target_table: tTable || targetTable,
+                        mapping_id: mId,
+                        test_results: results,
+                        metadata: {
+                            scd_type: scdType,
+                            gcs_bucket: gcsBucket,
+                            config_dataset: configDataset,
+                            config_table: configTable
+                        },
+                        cron_schedule: null // Explicitly null for manual runs
+                    };
+
+                    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://data-qa-agent-backend-1037417342779.us-central1.run.app';
+                    fetch(`${backendUrl}/api/save-test-history`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(historyPayload)
+                    }).catch(err => console.error("Failed to save history:", err));
+                };
+
+                if (data.results_by_mapping) {
+                    data.results_by_mapping.forEach((m: any) => {
+                        saveHistory(
+                            m.predefined_results,
+                            m.mapping_info?.target_dataset || m.target_dataset,
+                            m.mapping_info?.target_table || m.target_table,
+                            m.mapping_id
+                        );
+                    });
+                } else if (data.predefined_results) {
+                    saveHistory(data.predefined_results);
+                }
+            } catch (historyErr) {
+                console.error("Error triggering history save:", historyErr);
+            }
+
             handleViewResult(data);
         } catch (error: any) {
             console.error("Error generating tests:", error);

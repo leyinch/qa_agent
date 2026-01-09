@@ -76,7 +76,8 @@ export default function HistoryList({ projectId, onViewResult }: HistoryListProp
             predefined_results: Array.isArray(results) ? results : [],
             comparison_mode: run.comparison_mode,
             project_id: run.project_id,
-            target_table: run.target_table || run.target
+            target_table: run.target_table || run.target,
+            cron_schedule: run.cron_schedule
         };
 
         onViewResult(normalized);

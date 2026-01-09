@@ -74,6 +74,7 @@ class MappingResult(BaseModel):
     mapping_info: Optional[MappingInfo] = None
     predefined_results: List[TestResult]
     ai_suggestions: List[AISuggestion] = []
+    cron_schedule: Optional[str] = None
     error: Optional[str] = None
 
 
@@ -125,3 +126,4 @@ class SaveHistoryRequest(BaseModel):
     target_table: Optional[str] = None
     mapping_id: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
+    cron_schedule: Optional[str] = None

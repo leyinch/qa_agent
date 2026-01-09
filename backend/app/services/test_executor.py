@@ -330,7 +330,8 @@ class TestExecutor:
             return MappingResult(
                 mapping_id=mapping_id,
                 predefined_results=predefined_results,
-                ai_suggestions=[]
+                ai_suggestions=[],
+                cron_schedule=mapping.get('cron_schedule')
             )
             
         except Exception as e:
@@ -381,7 +382,8 @@ class TestExecutor:
                     'begin_date_column': config.get('begin_date_column'),
                     'end_date_column': config.get('end_date_column'),
                     'active_flag_column': config.get('active_flag_column'),
-                    'custom_tests': config.get('custom_tests')
+                    'custom_tests': config.get('custom_tests'),
+                    'cron_schedule': config.get('cron_schedule')
                 }
                 mappings.append(mapping)
             
