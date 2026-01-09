@@ -64,7 +64,7 @@ export default function ResultsView() {
     const [expandedSql, setExpandedSql] = useState<{ mappingIdx: number, testIdx: number } | null>(null);
     const [viewBadDataState, setViewBadDataState] = useState<{ mappingIdx: number, testIdx: number } | null>(null);
     const [expandedSingleSql, setExpandedSingleSql] = useState<number | null>(null);
-    const [expandedSingleData, setExpandedSingleData] = useState<number | null>(null);
+    const [viewSingleBadDataState, setViewSingleBadDataState] = useState<number | null>(null);
     const [activeTab, setActiveTab] = useState<number>(0);
 
     useEffect(() => {
@@ -574,7 +574,7 @@ export default function ResultsView() {
                                                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                                                     {test.status === 'FAIL' && (test as any).sample_data && test.category !== 'smoke' && (
                                                         <button
-                                                            onClick={() => setExpandedSingleData(expandedSingleData === index ? null : index)}
+                                                            onClick={() => setViewSingleBadDataState(viewSingleBadDataState === index ? null : index)}
                                                             style={{
                                                                 fontSize: '0.75rem',
                                                                 background: '#3b82f6',
@@ -586,7 +586,7 @@ export default function ResultsView() {
                                                                 whiteSpace: 'nowrap'
                                                             }}
                                                         >
-                                                            {expandedSingleData === index ? 'Hide Data' : 'View Bad Data'}
+                                                            {viewSingleBadDataState === index ? 'Hide Data' : 'Show Bad Data'}
                                                         </button>
                                                     )}
                                                     <button
@@ -607,7 +607,7 @@ export default function ResultsView() {
                                                 </div>
                                             </div>
 
-                                            {expandedSingleData === index && test.sample_data && test.sample_data.length > 0 && (
+                                            {viewSingleBadDataState === index && test.sample_data && test.sample_data.length > 0 && (
                                                 <div style={{
                                                     marginTop: '0.5rem',
                                                     padding: '0.75rem',
