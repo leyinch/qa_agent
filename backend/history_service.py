@@ -23,6 +23,53 @@ class TestHistoryService:
     
     def __init__(self):
         self.client = bigquery.Client(project=HISTORY_PROJECT_ID)
+        self._ensure_table_exists()
+
+    def _ensure_table_exists(self):
+        """Ensure the history table exists in BigQuery."""
+        try:
+            # Check dataset
+            dataset_ref = f"{HISTORY_PROJECT_ID}.{HISTORY_DATASET}"
+            try:
+                self.client.get_dataset(dataset_ref)
+            except Exception:
+                dataset = bigquery.Dataset(dataset_ref)
+                dataset.location = "US"
+                self.client.create_dataset(dataset)
+            
+            # Check table
+            try:
+                self.client.get_table(HISTORY_TABLE_FQN)
+            except Exception:
+                # Schema definition matching backend/create_history_table.sql
+                schema = [
+                    bigquery.SchemaField("execution_id", "STRING", mode="REQUIRED"),
+                    bigquery.SchemaField("execution_timestamp", "TIMESTAMP", mode="REQUIRED"),
+                    bigquery.SchemaField("project_id", "STRING", mode="REQUIRED"),
+                    bigquery.SchemaField("comparison_mode", "STRING", mode="REQUIRED"),
+                    bigquery.SchemaField("target_dataset", "STRING", mode="NULLABLE"),
+                    bigquery.SchemaField("target_table", "STRING", mode="NULLABLE"),
+                    bigquery.SchemaField("mapping_id", "STRING", mode="NULLABLE"),
+                    bigquery.SchemaField("test_name", "STRING", mode="REQUIRED"),
+                    bigquery.SchemaField("test_category", "STRING", mode="NULLABLE"),
+                    bigquery.SchemaField("test_status", "STRING", mode="REQUIRED"),
+                    bigquery.SchemaField("severity", "STRING", mode="NULLABLE"),
+                    bigquery.SchemaField("rows_affected", "INTEGER", mode="NULLABLE"),
+                    bigquery.SchemaField("error_message", "STRING", mode="NULLABLE"),
+                    bigquery.SchemaField("sql_query", "STRING", mode="NULLABLE"),
+                    bigquery.SchemaField("sample_data", "JSON", mode="NULLABLE"),
+                    bigquery.SchemaField("executed_by", "STRING", mode="NULLABLE"),
+                    bigquery.SchemaField("metadata", "JSON", mode="NULLABLE")
+                ]
+                table = bigquery.Table(HISTORY_TABLE_FQN, schema=schema)
+                table.partitioning_type = "DAY"
+                table.time_partitioning = bigquery.TimePartitioning(field="execution_timestamp")
+                table.clustering_fields = ["project_id", "target_table", "test_status"]
+                
+                self.client.create_table(table)
+                print(f"Created history table {HISTORY_TABLE_FQN}")
+        except Exception as e:
+            print(f"Warning: Failed to ensure history table exists: {e}")
     
     def save_test_results(
         self,
