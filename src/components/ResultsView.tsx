@@ -167,7 +167,7 @@ export default function ResultsView() {
     // Config table mode - show results grouped by mapping
     if (isConfigMode) {
         return (
-            <div style={{ padding: '2rem', maxWidth: '99%', margin: '0 auto' }}>
+            <div style={{ padding: '1rem', maxWidth: '99%', margin: '0 auto' }}>
                 <h2 style={{ fontSize: '2rem', fontWeight: '700', marginBottom: '1rem' }}>
                     Test Results - Config Table Mode
                 </h2>
@@ -480,7 +480,7 @@ export default function ResultsView() {
     ];
 
     return (
-        <div style={{ padding: '2rem', maxWidth: '99%', margin: '0 auto' }}>
+        <div style={{ padding: '1rem', maxWidth: '99%', margin: '0 auto' }}>
             <h2 style={{ fontSize: '2rem', fontWeight: '700', marginBottom: '2rem' }}>Test Results</h2>
 
             {/* Summary Cards */}
