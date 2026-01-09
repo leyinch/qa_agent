@@ -340,29 +340,29 @@ export default function ResultsView() {
                                                     {/* Auto-display bad data for failed tests */}
                                                     {test.status === 'FAIL' && test.sample_data && test.sample_data.length > 0 && test.category !== 'smoke' && (
                                                         <div style={{
-                                                            marginTop: '0.5rem',
-                                                            padding: '0.5rem',
-                                                            background: '#fff3cd',
-                                                            borderRadius: '4px',
+                                                            marginTop: '0.75rem',
+                                                            padding: '0.75rem',
+                                                            background: '#f8fafc',
+                                                            borderRadius: '6px',
                                                             overflowX: 'auto',
-                                                            border: '1px solid #ffc107'
+                                                            border: '1px solid #e2e8f0'
                                                         }}>
-                                                            <div style={{ fontWeight: '700', color: '#856404', marginBottom: '0.5rem', fontSize: '0.75rem' }}>
-                                                                ⚠️ Sample problematic rows (max 10):
+                                                            <div style={{ fontWeight: '600', color: '#64748b', marginBottom: '0.5rem', fontSize: '0.75rem' }}>
+                                                                Sample problematic rows (max 10)
                                                             </div>
                                                             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
                                                                 <thead>
-                                                                    <tr style={{ background: '#fff3cd', borderBottom: '1px solid #ffc107' }}>
+                                                                    <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #e2e8f0' }}>
                                                                         {Object.keys(test.sample_data[0]).map((key: string) => (
-                                                                            <th key={key} style={{ padding: '0.25rem 0.5rem', textAlign: 'left', whiteSpace: 'nowrap' }}>{key}</th>
+                                                                            <th key={key} style={{ padding: '0.5rem', textAlign: 'left', whiteSpace: 'nowrap', fontWeight: '600', color: '#475569' }}>{key}</th>
                                                                         ))}
                                                                     </tr>
                                                                 </thead>
                                                                 <tbody>
                                                                     {test.sample_data.map((row: Record<string, any>, rIdx: number) => (
-                                                                        <tr key={rIdx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                                                        <tr key={rIdx} style={{ borderBottom: '1px solid #e2e8f0' }}>
                                                                             {Object.values(row).map((val: any, vIdx: number) => (
-                                                                                <td key={vIdx} style={{ padding: '0.25rem 0.5rem', whiteSpace: 'nowrap' }}>{val?.toString() || 'NULL'}</td>
+                                                                                <td key={vIdx} style={{ padding: '0.5rem', whiteSpace: 'nowrap', color: '#475569' }}>{val?.toString() || 'NULL'}</td>
                                                                             ))}
                                                                         </tr>
                                                                     ))}
@@ -572,29 +572,29 @@ export default function ResultsView() {
                                             {/* Auto-display bad data for failed tests */}
                                             {test.status === 'FAIL' && test.sample_data && test.sample_data.length > 0 && test.category !== 'smoke' && (
                                                 <div style={{
-                                                    marginTop: '0.5rem',
-                                                    padding: '0.5rem',
-                                                    background: '#fff3cd',
-                                                    borderRadius: '4px',
+                                                    marginTop: '0.75rem',
+                                                    padding: '0.75rem',
+                                                    background: '#f8fafc',
+                                                    borderRadius: '6px',
                                                     overflowX: 'auto',
-                                                    border: '1px solid #ffc107'
+                                                    border: '1px solid #e2e8f0'
                                                 }}>
-                                                    <div style={{ fontWeight: '700', color: '#856404', marginBottom: '0.5rem', fontSize: '0.75rem' }}>
-                                                        ⚠️ Sample problematic rows (max 10):
+                                                    <div style={{ fontWeight: '600', color: '#64748b', marginBottom: '0.5rem', fontSize: '0.75rem' }}>
+                                                        Sample problematic rows (max 10)
                                                     </div>
                                                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
                                                         <thead>
-                                                            <tr style={{ background: '#fff3cd', borderBottom: '1px solid #ffc107' }}>
+                                                            <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #e2e8f0' }}>
                                                                 {Object.keys(test.sample_data[0]).map((key: string) => (
-                                                                    <th key={key} style={{ padding: '0.25rem 0.5rem', textAlign: 'left', whiteSpace: 'nowrap' }}>{key}</th>
+                                                                    <th key={key} style={{ padding: '0.5rem', textAlign: 'left', whiteSpace: 'nowrap', fontWeight: '600', color: '#475569' }}>{key}</th>
                                                                 ))}
                                                             </tr>
                                                         </thead>
                                                         <tbody>
                                                             {test.sample_data.map((row: Record<string, any>, rIdx: number) => (
-                                                                <tr key={rIdx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                                                <tr key={rIdx} style={{ borderBottom: '1px solid #e2e8f0' }}>
                                                                     {Object.values(row).map((val: any, vIdx: number) => (
-                                                                        <td key={vIdx} style={{ padding: '0.25rem 0.5rem', whiteSpace: 'nowrap' }}>{val?.toString() || 'NULL'}</td>
+                                                                        <td key={vIdx} style={{ padding: '0.5rem', whiteSpace: 'nowrap', color: '#475569' }}>{val?.toString() || 'NULL'}</td>
                                                                     ))}
                                                                 </tr>
                                                             ))}
