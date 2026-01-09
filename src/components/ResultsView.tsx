@@ -168,7 +168,7 @@ export default function ResultsView() {
     // Config table mode - show results grouped by mapping
     if (isConfigMode) {
         return (
-            <div style={{ padding: '2rem', maxWidth: '95%', margin: '0 auto' }}>
+            <div style={{ padding: '2rem', maxWidth: '99%', margin: '0 auto' }}>
                 <h2 style={{ fontSize: '2rem', fontWeight: '700', marginBottom: '1rem' }}>
                     Test Results - Config Table Mode
                 </h2>
@@ -284,11 +284,11 @@ export default function ResultsView() {
                             <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
                                 <thead>
                                     <tr style={{ borderBottom: '2px solid var(--border)' }}>
-                                        <th style={{ padding: '0.75rem', textAlign: 'left', width: '12%' }}>Test Name</th>
+                                        <th style={{ padding: '0.75rem', textAlign: 'left', width: '15%' }}>Test Name</th>
                                         <th style={{ padding: '0.75rem', textAlign: 'left', width: '8%' }}>Status</th>
-                                        <th style={{ padding: '0.75rem', textAlign: 'left', width: '8%' }}>Severity</th>
-                                        <th style={{ padding: '0.75rem', textAlign: 'left', width: '7%' }}>Affected</th>
-                                        <th style={{ padding: '0.75rem', textAlign: 'left', width: '65%' }}>Details</th>
+                                        <th style={{ padding: '0.75rem', textAlign: 'left', width: '7%' }}>Severity</th>
+                                        <th style={{ padding: '0.75rem', textAlign: 'left', width: '6%' }}>Affected</th>
+                                        <th style={{ padding: '0.75rem', textAlign: 'left', width: '64%' }}>Details</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -309,11 +309,11 @@ export default function ResultsView() {
                                             </td>
                                             <td style={{ padding: '0.75rem' }}>{test.severity}</td>
                                             <td style={{ padding: '0.75rem' }}>{test.rows_affected || 0}</td>
-                                            <td style={{ padding: '0.75rem', fontSize: '0.875rem' }}>
+                                            <td style={{ padding: '0.75rem', fontSize: '0.875rem', wordBreak: 'break-word' }}>
                                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
                                                         <span>{test.error_message || test.description}</span>
-                                                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                                                             {test.status === 'FAIL' && test.sample_data && test.sample_data.length > 0 && test.category !== 'smoke' && (
                                                                 <button
                                                                     onClick={() => {
@@ -361,7 +361,7 @@ export default function ResultsView() {
                                                         </div>
                                                     </div>
 
-                                                    {expandedData?.mappingIdx === activeTab && expandedData?.testIdx === testIdx && test.status === 'FAIL' && test.sample_data && test.sample_data.length > 0 && (
+                                                    {expandedData?.mappingIdx === activeTab && expandedData?.testIdx === testIdx && test.sample_data && test.sample_data.length > 0 && (
                                                         <div style={{
                                                             marginTop: '0.5rem',
                                                             padding: '0.5rem',
@@ -502,7 +502,7 @@ export default function ResultsView() {
     ];
 
     return (
-        <div style={{ padding: '2rem', maxWidth: '95%', margin: '0 auto' }}>
+        <div style={{ padding: '2rem', maxWidth: '99%', margin: '0 auto' }}>
             <h2 style={{ fontSize: '2rem', fontWeight: '700', marginBottom: '2rem' }}>Test Results</h2>
 
             {/* Summary Cards */}
