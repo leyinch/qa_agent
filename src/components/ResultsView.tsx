@@ -283,11 +283,11 @@ export default function ResultsView() {
                             <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
                                 <thead>
                                     <tr style={{ borderBottom: '2px solid var(--border)' }}>
-                                        <th style={{ padding: '0.75rem', textAlign: 'left', width: '15%' }}>Test Name</th>
-                                        <th style={{ padding: '0.75rem', textAlign: 'left', width: '8%' }}>Status</th>
-                                        <th style={{ padding: '0.75rem', textAlign: 'left', width: '7%' }}>Severity</th>
-                                        <th style={{ padding: '0.75rem', textAlign: 'left', width: '6%' }}>Affected</th>
-                                        <th style={{ padding: '0.75rem', textAlign: 'left', width: '64%' }}>Details</th>
+                                        <th style={{ padding: '0.75rem', textAlign: 'left', width: '18%' }}>Test Name</th>
+                                        <th style={{ padding: '0.75rem', textAlign: 'left', width: '10%' }}>Status</th>
+                                        <th style={{ padding: '0.75rem', textAlign: 'left', width: '10%' }}>Severity</th>
+                                        <th style={{ padding: '0.75rem', textAlign: 'left', width: '10%' }}>Affected</th>
+                                        <th style={{ padding: '0.75rem', textAlign: 'left', width: '52%' }}>Details</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -337,7 +337,39 @@ export default function ResultsView() {
                                                             </button>
                                                         </div>
                                                     </div>
-
+                                                    {/* Auto-display bad data for failed tests */}
+                                                    {test.status === 'FAIL' && test.sample_data && test.sample_data.length > 0 && test.category !== 'smoke' && (
+                                                        <div style={{
+                                                            marginTop: '0.5rem',
+                                                            padding: '0.5rem',
+                                                            background: '#fff3cd',
+                                                            borderRadius: '4px',
+                                                            overflowX: 'auto',
+                                                            border: '1px solid #ffc107'
+                                                        }}>
+                                                            <div style={{ fontWeight: '700', color: '#856404', marginBottom: '0.5rem', fontSize: '0.75rem' }}>
+                                                                ⚠️ Sample problematic rows (max 10):
+                                                            </div>
+                                                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
+                                                                <thead>
+                                                                    <tr style={{ background: '#fff3cd', borderBottom: '1px solid #ffc107' }}>
+                                                                        {Object.keys(test.sample_data[0]).map((key: string) => (
+                                                                            <th key={key} style={{ padding: '0.25rem 0.5rem', textAlign: 'left', whiteSpace: 'nowrap' }}>{key}</th>
+                                                                        ))}
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody>
+                                                                    {test.sample_data.map((row: Record<string, any>, rIdx: number) => (
+                                                                        <tr key={rIdx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                                                            {Object.values(row).map((val: any, vIdx: number) => (
+                                                                                <td key={vIdx} style={{ padding: '0.25rem 0.5rem', whiteSpace: 'nowrap' }}>{val?.toString() || 'NULL'}</td>
+                                                                            ))}
+                                                                        </tr>
+                                                                    ))}
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                                    )}
 
 
                                                     {expandedSql?.mappingIdx === activeTab && expandedSql?.testIdx === testIdx && (
@@ -537,7 +569,39 @@ export default function ResultsView() {
                                                 </div>
                                             </div>
 
-
+                                            {/* Auto-display bad data for failed tests */}
+                                            {test.status === 'FAIL' && test.sample_data && test.sample_data.length > 0 && test.category !== 'smoke' && (
+                                                <div style={{
+                                                    marginTop: '0.5rem',
+                                                    padding: '0.5rem',
+                                                    background: '#fff3cd',
+                                                    borderRadius: '4px',
+                                                    overflowX: 'auto',
+                                                    border: '1px solid #ffc107'
+                                                }}>
+                                                    <div style={{ fontWeight: '700', color: '#856404', marginBottom: '0.5rem', fontSize: '0.75rem' }}>
+                                                        ⚠️ Sample problematic rows (max 10):
+                                                    </div>
+                                                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
+                                                        <thead>
+                                                            <tr style={{ background: '#fff3cd', borderBottom: '1px solid #ffc107' }}>
+                                                                {Object.keys(test.sample_data[0]).map((key: string) => (
+                                                                    <th key={key} style={{ padding: '0.25rem 0.5rem', textAlign: 'left', whiteSpace: 'nowrap' }}>{key}</th>
+                                                                ))}
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {test.sample_data.map((row: Record<string, any>, rIdx: number) => (
+                                                                <tr key={rIdx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                                                    {Object.values(row).map((val: any, vIdx: number) => (
+                                                                        <td key={vIdx} style={{ padding: '0.25rem 0.5rem', whiteSpace: 'nowrap' }}>{val?.toString() || 'NULL'}</td>
+                                                                    ))}
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            )}
 
                                             {expandedSingleSql === index && (
                                                 <pre style={{
