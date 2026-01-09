@@ -343,7 +343,7 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
     };
 
     return (
-        <form onSubmit={handleSubmit} className="card fade-in" style={{ width: '100%', maxWidth: '800px' }}>
+        <form onSubmit={handleSubmit} className="card fade-in" style={{ width: '100%', maxWidth: '800px', margin: '0 auto' }}>
             {/* Header Removed */}
 
             {/* Comparison Mode Toggle Removed */}
