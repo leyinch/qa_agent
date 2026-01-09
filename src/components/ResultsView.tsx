@@ -62,9 +62,8 @@ export default function ResultsView() {
     const [savedTests, setSavedTests] = useState<Set<string>>(new Set());
     const [projectId, setProjectId] = useState<string>("");
     const [expandedSql, setExpandedSql] = useState<{ mappingIdx: number, testIdx: number } | null>(null);
-    const [viewBadDataState, setViewBadDataState] = useState<{ mappingIdx: number, testIdx: number } | null>(null);
     const [expandedSingleSql, setExpandedSingleSql] = useState<number | null>(null);
-    const [viewSingleBadDataState, setViewSingleBadDataState] = useState<number | null>(null);
+
     const [activeTab, setActiveTab] = useState<number>(0);
 
     useEffect(() => {
@@ -314,29 +313,7 @@ export default function ResultsView() {
                                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
                                                         <span>{test.error_message || test.description}</span>
                                                         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                                                            {test.status === 'FAIL' && test.sample_data && test.sample_data.length > 0 && test.category !== 'smoke' && (
-                                                                <button
-                                                                    onClick={() => {
-                                                                        if (viewBadDataState?.mappingIdx === activeTab && viewBadDataState?.testIdx === testIdx) {
-                                                                            setViewBadDataState(null);
-                                                                        } else {
-                                                                            setViewBadDataState({ mappingIdx: activeTab, testIdx: testIdx });
-                                                                        }
-                                                                    }}
-                                                                    style={{
-                                                                        fontSize: '0.75rem',
-                                                                        background: '#3b82f6',
-                                                                        color: 'white',
-                                                                        border: 'none',
-                                                                        borderRadius: '4px',
-                                                                        padding: '2px 8px',
-                                                                        cursor: 'pointer',
-                                                                        whiteSpace: 'nowrap'
-                                                                    }}
-                                                                >
-                                                                    {viewBadDataState?.mappingIdx === activeTab && viewBadDataState?.testIdx === testIdx ? 'Hide Data' : 'Show Bad Data'}
-                                                                </button>
-                                                            )}
+
                                                             <button
                                                                 onClick={() => {
                                                                     if (expandedSql?.mappingIdx === activeTab && expandedSql?.testIdx === testIdx) {
@@ -361,38 +338,7 @@ export default function ResultsView() {
                                                         </div>
                                                     </div>
 
-                                                    {viewBadDataState?.mappingIdx === activeTab && viewBadDataState?.testIdx === testIdx && test.sample_data && test.sample_data.length > 0 && (
-                                                        <div style={{
-                                                            marginTop: '0.5rem',
-                                                            padding: '0.5rem',
-                                                            background: '#fff',
-                                                            borderRadius: '4px',
-                                                            overflowX: 'auto',
-                                                            border: '1px solid #e2e8f0'
-                                                        }}>
-                                                            <div style={{ fontWeight: '700', color: '#1d4ed8', marginBottom: '0.5rem', fontSize: '0.75rem' }}>
-                                                                Sample problematic rows (max 10):
-                                                            </div>
-                                                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
-                                                                <thead>
-                                                                    <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                                                                        {Object.keys(test.sample_data[0]).map((key: string) => (
-                                                                            <th key={key} style={{ padding: '0.25rem 0.5rem', textAlign: 'left', whiteSpace: 'nowrap' }}>{key}</th>
-                                                                        ))}
-                                                                    </tr>
-                                                                </thead>
-                                                                <tbody>
-                                                                    {test.sample_data.map((row: Record<string, any>, rIdx: number) => (
-                                                                        <tr key={rIdx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                                                                            {Object.values(row).map((val: any, vIdx: number) => (
-                                                                                <td key={vIdx} style={{ padding: '0.25rem 0.5rem', whiteSpace: 'nowrap' }}>{val?.toString() || 'NULL'}</td>
-                                                                            ))}
-                                                                        </tr>
-                                                                    ))}
-                                                                </tbody>
-                                                            </table>
-                                                        </div>
-                                                    )}
+
 
                                                     {expandedSql?.mappingIdx === activeTab && expandedSql?.testIdx === testIdx && (
                                                         <pre style={{
@@ -572,23 +518,7 @@ export default function ResultsView() {
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                                 <span>{test.error_message || test.description}</span>
                                                 <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                                    {test.status === 'FAIL' && (test as any).sample_data && test.category !== 'smoke' && (
-                                                        <button
-                                                            onClick={() => setViewSingleBadDataState(viewSingleBadDataState === index ? null : index)}
-                                                            style={{
-                                                                fontSize: '0.75rem',
-                                                                background: '#3b82f6',
-                                                                color: 'white',
-                                                                border: 'none',
-                                                                borderRadius: '4px',
-                                                                padding: '2px 8px',
-                                                                cursor: 'pointer',
-                                                                whiteSpace: 'nowrap'
-                                                            }}
-                                                        >
-                                                            {viewSingleBadDataState === index ? 'Hide Data' : 'Show Bad Data'}
-                                                        </button>
-                                                    )}
+
                                                     <button
                                                         onClick={() => setExpandedSingleSql(expandedSingleSql === index ? null : index)}
                                                         style={{
@@ -607,39 +537,7 @@ export default function ResultsView() {
                                                 </div>
                                             </div>
 
-                                            {viewSingleBadDataState === index && test.sample_data && test.sample_data.length > 0 && (
-                                                <div style={{
-                                                    marginTop: '0.5rem',
-                                                    padding: '0.75rem',
-                                                    background: '#fff',
-                                                    borderRadius: '4px',
-                                                    overflowX: 'auto',
-                                                    border: '1px solid #3b82f6',
-                                                    boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
-                                                }}>
-                                                    <div style={{ fontWeight: '700', color: '#1d4ed8', marginBottom: '0.5rem', fontSize: '0.75rem' }}>
-                                                        Sample problematic rows (max 10):
-                                                    </div>
-                                                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
-                                                        <thead>
-                                                            <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                                                                {Object.keys(test.sample_data[0]).map((key: string) => (
-                                                                    <th key={key} style={{ padding: '0.25rem 0.5rem', textAlign: 'left' }}>{key}</th>
-                                                                ))}
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody>
-                                                            {test.sample_data.map((row: Record<string, any>, rIdx: number) => (
-                                                                <tr key={rIdx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                                                                    {Object.values(row).map((val: any, vIdx: number) => (
-                                                                        <td key={vIdx} style={{ padding: '0.25rem 0.5rem' }}>{val?.toString() || 'NULL'}</td>
-                                                                    ))}
-                                                                </tr>
-                                                            ))}
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-                                            )}
+
 
                                             {expandedSingleSql === index && (
                                                 <pre style={{
