@@ -62,7 +62,7 @@ export default function ResultsView() {
     const [savedTests, setSavedTests] = useState<Set<string>>(new Set());
     const [projectId, setProjectId] = useState<string>("");
     const [expandedSql, setExpandedSql] = useState<{ mappingIdx: number, testIdx: number } | null>(null);
-    const [expandedData, setExpandedData] = useState<{ mappingIdx: number, testIdx: number } | null>(null);
+    const [viewBadDataState, setViewBadDataState] = useState<{ mappingIdx: number, testIdx: number } | null>(null);
     const [expandedSingleSql, setExpandedSingleSql] = useState<number | null>(null);
     const [expandedSingleData, setExpandedSingleData] = useState<number | null>(null);
     const [activeTab, setActiveTab] = useState<number>(0);
@@ -317,10 +317,10 @@ export default function ResultsView() {
                                                             {test.status === 'FAIL' && test.sample_data && test.sample_data.length > 0 && test.category !== 'smoke' && (
                                                                 <button
                                                                     onClick={() => {
-                                                                        if (expandedData?.mappingIdx === activeTab && expandedData?.testIdx === testIdx) {
-                                                                            setExpandedData(null);
+                                                                        if (viewBadDataState?.mappingIdx === activeTab && viewBadDataState?.testIdx === testIdx) {
+                                                                            setViewBadDataState(null);
                                                                         } else {
-                                                                            setExpandedData({ mappingIdx: activeTab, testIdx: testIdx });
+                                                                            setViewBadDataState({ mappingIdx: activeTab, testIdx: testIdx });
                                                                         }
                                                                     }}
                                                                     style={{
@@ -334,7 +334,7 @@ export default function ResultsView() {
                                                                         whiteSpace: 'nowrap'
                                                                     }}
                                                                 >
-                                                                    {expandedData?.mappingIdx === activeTab && expandedData?.testIdx === testIdx ? 'Hide Data' : 'View Bad Data'}
+                                                                    {viewBadDataState?.mappingIdx === activeTab && viewBadDataState?.testIdx === testIdx ? 'Hide Data' : 'Show Bad Data'}
                                                                 </button>
                                                             )}
                                                             <button
@@ -361,7 +361,7 @@ export default function ResultsView() {
                                                         </div>
                                                     </div>
 
-                                                    {expandedData?.mappingIdx === activeTab && expandedData?.testIdx === testIdx && test.sample_data && test.sample_data.length > 0 && (
+                                                    {viewBadDataState?.mappingIdx === activeTab && viewBadDataState?.testIdx === testIdx && test.sample_data && test.sample_data.length > 0 && (
                                                         <div style={{
                                                             marginTop: '0.5rem',
                                                             padding: '0.5rem',
