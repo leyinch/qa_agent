@@ -125,7 +125,8 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
     const [newEndDateColumn, setNewEndDateColumn] = useState("DWEndEffDateTime");
     const [newActiveFlagColumn, setNewActiveFlagColumn] = useState("DWCurrentRowFlag");
     const [newDescription, setNewDescription] = useState("");
-    const [newCronSchedule, setNewCronSchedule] = useState("");
+    const [newCronSchedule, setNewCronSchedule] = useState<string>('0 9 * * *');
+    const [scheduleFrequency, setScheduleFrequency] = useState<string>('daily');
     const [newCustomTests, setNewCustomTests] = useState<CustomTest[]>([]);
 
     const addDataset = () => setDatasets([...datasets, '']);
@@ -362,7 +363,7 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
             {/* ... */}
 
             {/* Project ID (common field) */}
-            <div style={{ marginBottom: '1.75rem' }}>
+            <div style={{ marginBottom: '1.75rem', width: '100%' }}>
                 <label className="label" htmlFor="projectId">
                     <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         🔑 Google Cloud Project ID<span className="required">*</span>
@@ -372,12 +373,14 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
                     id="projectId"
                     type="text"
                     className="input"
+                    style={{ width: '100%' }}
                     value={projectId}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setProjectId(e.target.value)}
                     required
                     placeholder="Project with BigQuery data (e.g., miruna-sandpit)"
                 />
             </div>
+
 
             {/* History Mode */}
             {comparisonMode === 'history' ? (
@@ -1134,362 +1137,396 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
                                                     </button>
                                                 </div>
                                                 <div style={{ marginBottom: '1.75rem' }}>
+                                                    <label className="label" htmlFor="scheduleFrequency">
+                                                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                            📅 Schedule Frequency
+                                                        </span>
+                                                    </label>
+                                                    <select
+                                                        id="scheduleFrequency"
+                                                        className="input"
+                                                        value={scheduleFrequency}
+                                                        onChange={(e) => {
+                                                            const freq = e.target.value;
+                                                            setScheduleFrequency(freq);
+                                                            if (freq === 'daily') setNewCronSchedule('0 9 * * *');
+                                                            else if (freq === 'weekly') setNewCronSchedule('0 9 * * 1');
+                                                            else if (freq === 'monthly') setNewCronSchedule('0 9 1 * *');
+                                                        }}
+                                                    >
+                                                        <option value="daily">Daily (9 AM)</option>
+                                                        <option value="weekly">Weekly (Monday 9 AM)</option>
+                                                        <option value="monthly">Monthly (1st of Month 9 AM)</option>
+                                                        <option value="custom">Custom Cron Expression</option>
+                                                    </select>
+                                                </div>
+
+                                                <div style={{ marginBottom: '1.75rem' }}>
                                                     <label className="label" htmlFor="newCronSchedule">
                                                         <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                            ⏰ Cron Schedule (Optional)
+                                                            ⏱️ Cron Schedule {scheduleFrequency === 'custom' ? '(Custom)' : ''}
                                                         </span>
                                                     </label>
                                                     <input
                                                         id="newCronSchedule"
                                                         type="text"
                                                         className="input"
+                                                        style={{ width: '100%' }}
                                                         value={newCronSchedule}
-                                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewCronSchedule(e.target.value)}
+                                                        onChange={(e) => {
+                                                            setNewCronSchedule(e.target.value);
+                                                            setScheduleFrequency('custom');
+                                                        }}
                                                         placeholder="e.g., 0 2 * * * (Daily at 2 AM)"
                                                     />
-                                                    <p style={{ fontSize: '0.75rem', color: 'var(--secondary-foreground)', marginTop: '0.25rem' }}>
-                                                        Leave empty for manual execution only. Scheduled runs will automatically save to history.
-                                                    </p>
                                                 </div>
-
-                                                {/* Save Button */}
-                                                <button
-                                                    type="button"
-                                                    onClick={handleAddConfig}
-                                                    style={{
-                                                        width: '100%',
-                                                        padding: '0.75rem',
-                                                        background: 'var(--gradient-primary)',
-                                                        color: 'white',
-                                                        border: 'none',
-                                                        borderRadius: 'var(--radius)',
-                                                        cursor: 'pointer',
-                                                        fontWeight: '600',
-                                                        fontSize: '0.875rem'
-                                                    }}
-                                                >
-                                                </button>
+                                                <p style={{ fontSize: '0.75rem', color: 'var(--secondary-foreground)', marginTop: '0.25rem' }}>
+                                                    Leave empty for manual execution only. Scheduled runs will automatically save to history.
+                                                </p>
                                             </div>
-                                        </div>
-                                    )}
-                                </>
-                            )}
 
-                            {/* Direct Input Mode */}
-                            {scdMode === 'direct' && (
-                                <>
-                                    {/* Target Dataset & Table */}
-                                    <div style={{ display: 'flex', gap: '1.75rem' }}>
-                                        <div style={{ flex: 1, marginBottom: '1.75rem' }}>
-                                            <label className="label" htmlFor="targetDatasetScd">
-                                                <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                    🎯 Target Dataset
-                                                </span>
-                                            </label>
-                                            <input
-                                                id="targetDatasetScd"
-                                                type="text"
-                                                className="input"
-                                                placeholder="e.g., DW_Dimensions"
-                                            />
-                                        </div>
-                                        <div style={{ flex: 1, marginBottom: '1.75rem' }}>
-                                            <label className="label" htmlFor="targetTableScd">
-                                                <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                    📊 Target Table
-                                                </span>
-                                            </label>
-                                            <input
-                                                id="targetTableScd"
-                                                type="text"
-                                                className="input"
-                                                value={targetTable}
-                                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                                                    setTargetTable(e.target.value);
-                                                    setScdTargetTable(e.target.value);
-                                                }}
-                                                onBlur={() => {
-                                                    setScdTargetDataset(targetDataset);
-                                                    setScdTargetTable(targetTable);
-                                                }}
-                                                required
-                                                placeholder="e.g., D_Employee_WD"
-                                            />
-                                        </div>
-                                    </div>
-
-                                    {/* SCD Type Toggle */}
-                                    <div style={{ marginBottom: '1.75rem' }}>
-                                        <label className="label">SCD Type</label>
-                                        <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
+                                            {/* Save Button */}
                                             <button
                                                 type="button"
-                                                onClick={() => setScdType('scd1')}
+                                                onClick={handleAddConfig}
                                                 style={{
-                                                    flex: 1,
+                                                    width: '100%',
                                                     padding: '0.75rem',
-                                                    background: scdType === 'scd1' ? 'var(--gradient-primary)' : 'var(--secondary)',
-                                                    color: scdType === 'scd1' ? 'white' : 'var(--foreground)',
-                                                    border: scdType === 'scd1' ? 'none' : '2px solid var(--border)',
-                                                    borderRadius: 'var(--radius)',
-                                                    cursor: 'pointer',
-                                                    fontWeight: '600',
-                                                    transition: 'all 0.2s ease'
-                                                }}
-                                            >
-                                                🔢 SCD Type 1
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => setScdType('scd2')}
-                                                style={{
-                                                    flex: 1,
-                                                    padding: '0.75rem',
-                                                    background: scdType === 'scd2' ? 'var(--gradient-primary)' : 'var(--secondary)',
-                                                    color: scdType === 'scd2' ? 'white' : 'var(--foreground)',
-                                                    border: scdType === 'scd2' ? 'none' : '2px solid var(--border)',
-                                                    borderRadius: 'var(--radius)',
-                                                    cursor: 'pointer',
-                                                    fontWeight: '600',
-                                                    transition: 'all 0.2s ease'
-                                                }}
-                                            >
-                                                🕒 SCD Type 2
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    {/* Primary Keys */}
-                                    <div style={{ marginBottom: '1.75rem' }}>
-                                        <label className="label" htmlFor="primaryKeys">
-                                            <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                🔑 Primary Keys
-                                            </span>
-                                        </label>
-                                        <input
-                                            id="primaryKeys"
-                                            type="text"
-                                            className="input"
-                                            value={primaryKeys}
-                                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPrimaryKeys(e.target.value)}
-                                            required
-                                            placeholder="e.g., UserId (comma separate for composite)"
-                                        />
-                                        <p style={{ fontSize: '0.8125rem', color: 'var(--secondary-foreground)', marginTop: '0.5rem', fontStyle: 'italic' }}>
-                                            💡 Primary business identifier(s) used for comparison
-                                        </p>
-                                    </div>
-
-                                    {/* Surrogate Key */}
-                                    <div style={{ marginBottom: '1.75rem' }}>
-                                        <label className="label" htmlFor="surrogateKey">
-                                            <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                🆔 Surrogate Key (Optional)
-                                            </span>
-                                        </label>
-                                        <input
-                                            id="surrogateKey"
-                                            type="text"
-                                            className="input"
-                                            value={surrogateKey}
-                                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSurrogateKey(e.target.value)}
-                                            placeholder="e.g., DWEmployeeID"
-                                        />
-                                    </div>
-
-                                    {/* SCD2 Specific Fields */}
-                                    {scdType === 'scd2' && (
-                                        <div style={{
-                                            padding: '1.25rem',
-                                            background: 'var(--secondary)',
-                                            borderRadius: 'var(--radius)',
-                                            border: '1px solid var(--border)',
-                                            marginBottom: '1.75rem'
-                                        }}>
-                                            <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '1rem' }}>📜 History Tracking Columns</h3>
-
-                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
-                                                <div style={{ flex: '1 1 200px' }}>
-                                                    <label className="label" htmlFor="beginDate">Begin Date</label>
-                                                    <input
-                                                        id="beginDate"
-                                                        type="text"
-                                                        className="input"
-                                                        value={beginDateColumn}
-                                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setBeginDateColumn(e.target.value)}
-                                                        placeholder="DWBeginEffDateTime"
-                                                    />
-                                                </div>
-                                                <div style={{ flex: '1 1 200px' }}>
-                                                    <label className="label" htmlFor="endDate">End Date</label>
-                                                    <input
-                                                        id="endDate"
-                                                        type="text"
-                                                        className="input"
-                                                        value={endDateColumn}
-                                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEndDateColumn(e.target.value)}
-                                                        placeholder="DWEndEffDateTime"
-                                                    />
-                                                </div>
-                                                <div style={{ flex: '1 1 100%' }}>
-                                                    <label className="label" htmlFor="activeFlag">Active Row Flag</label>
-                                                    <input
-                                                        id="activeFlag"
-                                                        type="text"
-                                                        className="input"
-                                                        value={activeFlagColumn}
-                                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setActiveFlagColumn(e.target.value)}
-                                                        placeholder="DWCurrentRowFlag"
-                                                    />
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Custom Business Rules (Direct Mode) */}
-                                    <div style={{ marginBottom: '1.75rem' }}>
-                                        <label className="label">
-                                            <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                🛠️ Custom Business Rules
-                                            </span>
-                                        </label>
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                                            {customTests.map((test, index) => (
-                                                <div key={index} style={{
-                                                    padding: '1rem',
-                                                    background: 'var(--secondary)',
-                                                    borderRadius: 'var(--radius)',
-                                                    border: '1px solid var(--border)',
-                                                    position: 'relative'
-                                                }}>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => removeCustomTest(index, false)}
-                                                        style={{
-                                                            position: 'absolute',
-                                                            top: '0.5rem',
-                                                            right: '0.5rem',
-                                                            background: 'none',
-                                                            border: 'none',
-                                                            color: 'var(--error)',
-                                                            cursor: 'pointer',
-                                                            fontSize: '1.25rem'
-                                                        }}
-                                                    >
-                                                        ×
-                                                    </button>
-                                                    <div style={{ display: 'flex', gap: '1rem', marginBottom: '0.75rem' }}>
-                                                        <div style={{ flex: 1 }}>
-                                                            <label className="label" style={{ fontSize: '0.75rem' }}>Rule Name</label>
-                                                            <input
-                                                                type="text"
-                                                                className="input"
-                                                                value={test.name}
-                                                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleCustomTestChange(index, 'name', e.target.value, false)}
-                                                                placeholder="e.g., CreatedDtm NOT NULL"
-                                                                style={{ marginBottom: 0 }}
-                                                            />
-                                                        </div>
-                                                        <div style={{ width: '120px' }}>
-                                                            <label className="label" style={{ fontSize: '0.75rem' }}>Severity</label>
-                                                            <select
-                                                                className="input"
-                                                                value={test.severity}
-                                                                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleCustomTestChange(index, 'severity', e.target.value, false)}
-                                                                style={{ marginBottom: 0, padding: '0.55rem' }}
-                                                            >
-                                                                <option value="HIGH">HIGH</option>
-                                                                <option value="MEDIUM">MEDIUM</option>
-                                                                <option value="LOW">LOW</option>
-                                                            </select>
-                                                        </div>
-                                                    </div>
-                                                    <div style={{ marginBottom: '0.75rem' }}>
-                                                        <label className="label" style={{ fontSize: '0.75rem' }}>Description</label>
-                                                        <input
-                                                            type="text"
-                                                            className="input"
-                                                            value={test.description}
-                                                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleCustomTestChange(index, 'description', e.target.value, false)}
-                                                            placeholder="Describe the purpose of this rule..."
-                                                            style={{ marginBottom: 0 }}
-                                                        />
-                                                    </div>
-                                                    <div>
-                                                        <label className="label" style={{ fontSize: '0.75rem' }}>SQL Query (Use {'{{target}}'} for table name)</label>
-                                                        <textarea
-                                                            className="input"
-                                                            value={test.sql}
-                                                            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => handleCustomTestChange(index, 'sql', e.target.value, false)}
-                                                            placeholder="SELECT COUNT(0) = 0 FROM {{target}} WHERE CreatedDtm IS NULL"
-                                                            rows={3}
-                                                            style={{ marginBottom: 0, resize: 'vertical', fontFamily: 'monospace' }}
-                                                        />
-                                                        {availableColumns.length > 0 && (
-                                                            <div style={{ marginTop: '0.5rem' }}>
-                                                                <label className="label" style={{ fontSize: '0.75rem' }}>Insert Column:</label>
-                                                                <select
-                                                                    className="input"
-                                                                    style={{ padding: '0.25rem', fontSize: '0.8rem', width: 'auto' }}
-                                                                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
-                                                                        handleInsertColumn(index, e.target.value, false);
-                                                                        e.target.value = ""; // Reset dropdown
-                                                                    }}
-                                                                >
-                                                                    <option value="">-- Select Column --</option>
-                                                                    {availableColumns.map(col => (
-                                                                        <option key={col} value={col}>{col}</option>
-                                                                    ))}
-                                                                </select>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                            <button
-                                                type="button"
-                                                onClick={() => addCustomTest(false)}
-                                                style={{
-                                                    padding: '0.5rem',
-                                                    background: 'none',
-                                                    border: '2px dashed var(--primary)',
-                                                    color: 'var(--primary)',
+                                                    background: 'var(--gradient-primary)',
+                                                    color: 'white',
+                                                    border: 'none',
                                                     borderRadius: 'var(--radius)',
                                                     cursor: 'pointer',
                                                     fontWeight: '600',
                                                     fontSize: '0.875rem'
                                                 }}
                                             >
-                                                + Add Business Rule
                                             </button>
                                         </div>
-                                    </div>
-                                </>
-                            )}
+                                        </div>
+                                    )}
                         </>
                     )}
 
-                    {/* Submit Button */}
-                    <button
-                        type="submit"
-                        className="btn btn-primary"
-                        style={{ width: '100%', fontSize: '1rem', padding: '1rem' }}
-                        disabled={loading}
-                    >
-                        {loading ? (
-                            <span style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                                <span className="loading">⏳</span>
-                                {comparisonMode === 'gcs' ? 'Comparing GCS File...' : 'Generating Test Cases...'}
-                            </span>
-                        ) : (
-                            <span style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                                <span>🚀</span>
-                                {comparisonMode === 'gcs' ? 'Compare & Test' : 'Generate & Run Tests'}
-                            </span>
-                        )}
-                    </button>
+                    {/* Direct Input Mode */}
+                    {scdMode === 'direct' && (
+                        <>
+                            {/* Target Dataset & Table */}
+                            <div style={{ display: 'flex', gap: '1.75rem', width: '100%' }}>
+                                <div style={{ flex: 1, marginBottom: '1.75rem' }}>
+                                    <label className="label" htmlFor="targetDatasetScd">
+                                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                            🎯 Target Dataset
+                                        </span>
+                                    </label>
+                                    <input
+                                        id="targetDatasetScd"
+                                        type="text"
+                                        className="input"
+                                        style={{ width: '100%' }}
+                                        placeholder="e.g., DW_Dimensions"
+                                    />
+                                </div>
+                                <div style={{ flex: 1, marginBottom: '1.75rem' }}>
+                                    <label className="label" htmlFor="targetTableScd">
+                                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                            📊 Target Table
+                                        </span>
+                                    </label>
+                                    <input
+                                        id="targetTableScd"
+                                        type="text"
+                                        className="input"
+                                        style={{ width: '100%' }}
+                                        value={targetTable}
+                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                                            setTargetTable(e.target.value);
+                                            setScdTargetTable(e.target.value);
+                                        }}
+                                        onBlur={() => {
+                                            setScdTargetDataset(targetDataset);
+                                            setScdTargetTable(targetTable);
+                                        }}
+                                        required
+                                        placeholder="e.g., D_Employee_WD"
+                                    />
+                                </div>
+                            </div>
+
+
+                            {/* SCD Type Toggle */}
+                            <div style={{ marginBottom: '1.75rem' }}>
+                                <label className="label">SCD Type</label>
+                                <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
+                                    <button
+                                        type="button"
+                                        onClick={() => setScdType('scd1')}
+                                        style={{
+                                            flex: 1,
+                                            padding: '0.75rem',
+                                            background: scdType === 'scd1' ? 'var(--gradient-primary)' : 'var(--secondary)',
+                                            color: scdType === 'scd1' ? 'white' : 'var(--foreground)',
+                                            border: scdType === 'scd1' ? 'none' : '2px solid var(--border)',
+                                            borderRadius: 'var(--radius)',
+                                            cursor: 'pointer',
+                                            fontWeight: '600',
+                                            transition: 'all 0.2s ease'
+                                        }}
+                                    >
+                                        🔢 SCD Type 1
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setScdType('scd2')}
+                                        style={{
+                                            flex: 1,
+                                            padding: '0.75rem',
+                                            background: scdType === 'scd2' ? 'var(--gradient-primary)' : 'var(--secondary)',
+                                            color: scdType === 'scd2' ? 'white' : 'var(--foreground)',
+                                            border: scdType === 'scd2' ? 'none' : '2px solid var(--border)',
+                                            borderRadius: 'var(--radius)',
+                                            cursor: 'pointer',
+                                            fontWeight: '600',
+                                            transition: 'all 0.2s ease'
+                                        }}
+                                    >
+                                        🕒 SCD Type 2
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Primary Keys */}
+                            <div style={{ marginBottom: '1.75rem' }}>
+                                <label className="label" htmlFor="primaryKeys">
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        🔑 Primary Keys
+                                    </span>
+                                </label>
+                                <input
+                                    id="primaryKeys"
+                                    type="text"
+                                    className="input"
+                                    value={primaryKeys}
+                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPrimaryKeys(e.target.value)}
+                                    required
+                                    placeholder="e.g., UserId (comma separate for composite)"
+                                />
+                                <p style={{ fontSize: '0.8125rem', color: 'var(--secondary-foreground)', marginTop: '0.5rem', fontStyle: 'italic' }}>
+                                    💡 Primary business identifier(s) used for comparison
+                                </p>
+                            </div>
+
+                            {/* Surrogate Key */}
+                            <div style={{ marginBottom: '1.75rem' }}>
+                                <label className="label" htmlFor="surrogateKey">
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        🆔 Surrogate Key (Optional)
+                                    </span>
+                                </label>
+                                <input
+                                    id="surrogateKey"
+                                    type="text"
+                                    className="input"
+                                    value={surrogateKey}
+                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSurrogateKey(e.target.value)}
+                                    placeholder="e.g., DWEmployeeID"
+                                />
+                            </div>
+
+                            {/* SCD2 Specific Fields */}
+                            {scdType === 'scd2' && (
+                                <div style={{
+                                    padding: '1.25rem',
+                                    background: 'var(--secondary)',
+                                    borderRadius: 'var(--radius)',
+                                    border: '1px solid var(--border)',
+                                    marginBottom: '1.75rem'
+                                }}>
+                                    <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '1rem' }}>📜 History Tracking Columns</h3>
+
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
+                                        <div style={{ flex: '1 1 200px' }}>
+                                            <label className="label" htmlFor="beginDate">Begin Date</label>
+                                            <input
+                                                id="beginDate"
+                                                type="text"
+                                                className="input"
+                                                value={beginDateColumn}
+                                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setBeginDateColumn(e.target.value)}
+                                                placeholder="DWBeginEffDateTime"
+                                            />
+                                        </div>
+                                        <div style={{ flex: '1 1 200px' }}>
+                                            <label className="label" htmlFor="endDate">End Date</label>
+                                            <input
+                                                id="endDate"
+                                                type="text"
+                                                className="input"
+                                                value={endDateColumn}
+                                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEndDateColumn(e.target.value)}
+                                                placeholder="DWEndEffDateTime"
+                                            />
+                                        </div>
+                                        <div style={{ flex: '1 1 100%' }}>
+                                            <label className="label" htmlFor="activeFlag">Active Row Flag</label>
+                                            <input
+                                                id="activeFlag"
+                                                type="text"
+                                                className="input"
+                                                value={activeFlagColumn}
+                                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setActiveFlagColumn(e.target.value)}
+                                                placeholder="DWCurrentRowFlag"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Custom Business Rules (Direct Mode) */}
+                            <div style={{ marginBottom: '1.75rem' }}>
+                                <label className="label">
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        🛠️ Custom Business Rules
+                                    </span>
+                                </label>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                    {customTests.map((test, index) => (
+                                        <div key={index} style={{
+                                            padding: '1rem',
+                                            background: 'var(--secondary)',
+                                            borderRadius: 'var(--radius)',
+                                            border: '1px solid var(--border)',
+                                            position: 'relative'
+                                        }}>
+                                            <button
+                                                type="button"
+                                                onClick={() => removeCustomTest(index, false)}
+                                                style={{
+                                                    position: 'absolute',
+                                                    top: '0.5rem',
+                                                    right: '0.5rem',
+                                                    background: 'none',
+                                                    border: 'none',
+                                                    color: 'var(--error)',
+                                                    cursor: 'pointer',
+                                                    fontSize: '1.25rem'
+                                                }}
+                                            >
+                                                ×
+                                            </button>
+                                            <div style={{ display: 'flex', gap: '1rem', marginBottom: '0.75rem' }}>
+                                                <div style={{ flex: 1 }}>
+                                                    <label className="label" style={{ fontSize: '0.75rem' }}>Rule Name</label>
+                                                    <input
+                                                        type="text"
+                                                        className="input"
+                                                        value={test.name}
+                                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleCustomTestChange(index, 'name', e.target.value, false)}
+                                                        placeholder="e.g., CreatedDtm NOT NULL"
+                                                        style={{ marginBottom: 0 }}
+                                                    />
+                                                </div>
+                                                <div style={{ width: '120px' }}>
+                                                    <label className="label" style={{ fontSize: '0.75rem' }}>Severity</label>
+                                                    <select
+                                                        className="input"
+                                                        value={test.severity}
+                                                        onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleCustomTestChange(index, 'severity', e.target.value, false)}
+                                                        style={{ marginBottom: 0, padding: '0.55rem' }}
+                                                    >
+                                                        <option value="HIGH">HIGH</option>
+                                                        <option value="MEDIUM">MEDIUM</option>
+                                                        <option value="LOW">LOW</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div style={{ marginBottom: '0.75rem' }}>
+                                                <label className="label" style={{ fontSize: '0.75rem' }}>Description</label>
+                                                <input
+                                                    type="text"
+                                                    className="input"
+                                                    value={test.description}
+                                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleCustomTestChange(index, 'description', e.target.value, false)}
+                                                    placeholder="Describe the purpose of this rule..."
+                                                    style={{ marginBottom: 0 }}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="label" style={{ fontSize: '0.75rem' }}>SQL Query (Use {'{{target}}'} for table name)</label>
+                                                <textarea
+                                                    className="input"
+                                                    value={test.sql}
+                                                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => handleCustomTestChange(index, 'sql', e.target.value, false)}
+                                                    placeholder="SELECT COUNT(0) = 0 FROM {{target}} WHERE CreatedDtm IS NULL"
+                                                    rows={3}
+                                                    style={{ marginBottom: 0, resize: 'vertical', fontFamily: 'monospace' }}
+                                                />
+                                                {availableColumns.length > 0 && (
+                                                    <div style={{ marginTop: '0.5rem' }}>
+                                                        <label className="label" style={{ fontSize: '0.75rem' }}>Insert Column:</label>
+                                                        <select
+                                                            className="input"
+                                                            style={{ padding: '0.25rem', fontSize: '0.8rem', width: 'auto' }}
+                                                            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+                                                                handleInsertColumn(index, e.target.value, false);
+                                                                e.target.value = ""; // Reset dropdown
+                                                            }}
+                                                        >
+                                                            <option value="">-- Select Column --</option>
+                                                            {availableColumns.map(col => (
+                                                                <option key={col} value={col}>{col}</option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                    <button
+                                        type="button"
+                                        onClick={() => addCustomTest(false)}
+                                        style={{
+                                            padding: '0.5rem',
+                                            background: 'none',
+                                            border: '2px dashed var(--primary)',
+                                            color: 'var(--primary)',
+                                            borderRadius: 'var(--radius)',
+                                            cursor: 'pointer',
+                                            fontWeight: '600',
+                                            fontSize: '0.875rem'
+                                        }}
+                                    >
+                                        + Add Business Rule
+                                    </button>
+                                </div>
+                            </div>
+                        </>
+                    )}
                 </>
             )}
-        </form>
+
+            {/* Submit Button */}
+            <button
+                type="submit"
+                className="btn btn-primary"
+                style={{ width: '100%', fontSize: '1rem', padding: '1rem' }}
+                disabled={loading}
+            >
+                {loading ? (
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <span className="loading">⏳</span>
+                        {comparisonMode === 'gcs' ? 'Comparing GCS File...' : 'Generating Test Cases...'}
+                    </span>
+                ) : (
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <span>🚀</span>
+                        {comparisonMode === 'gcs' ? 'Compare & Test' : 'Generate & Run Tests'}
+                    </span>
+                )}
+            </button>
+        </>
+    )
+}
+        </form >
     );
 }

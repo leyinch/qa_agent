@@ -69,11 +69,12 @@ CREATE OR REPLACE TABLE `leyin-sandpit.transform_config.scd_validation_config` (
     cron_schedule STRING
 );
 
-INSERT INTO `leyin-sandpit.transform_config.scd_validation_config` (config_id, target_dataset, target_table, scd_type, primary_keys, surrogate_key, begin_date_column, end_date_column, active_flag_column, description, custom_tests)
+INSERT INTO `leyin-sandpit.transform_config.scd_validation_config` (config_id, target_dataset, target_table, scd_type, primary_keys, surrogate_key, begin_date_column, end_date_column, active_flag_column, description, custom_tests, cron_schedule)
 VALUES
-    ('seat_scd1', 'crown_scd_mock', 'D_Seat_WD', 'scd1', ['TableId', 'PositionIDX'], 'DWSeatID', NULL, NULL, NULL, 'SCD1 Mock for Gaming Seats (Test Data)', NULL),
-    ('employee_scd2', 'crown_scd_mock', 'D_Employee_WD', 'scd2', ['UserId'], 'DWEmployeeID', 'DWBeginEffDateTime', 'DWEndEffDateTime', 'DWCurrentRowFlag', 'SCD2 Mock for Employees (Test Data)', NULL),
+    ('seat_scd1', 'crown_scd_mock', 'D_Seat_WD', 'scd1', ['TableId', 'PositionIDX'], 'DWSeatID', NULL, NULL, NULL, 'SCD1 Mock for Gaming Seats (Test Data)', NULL, '0 9 * * *'),
+    ('employee_scd2', 'crown_scd_mock', 'D_Employee_WD', 'scd2', ['UserId'], 'DWEmployeeID', 'DWBeginEffDateTime', 'DWEndEffDateTime', 'DWCurrentRowFlag', 'SCD2 Mock for Employees (Test Data)', NULL, '0 9 * * *'),
     ('player_scd2', 'crown_scd_mock', 'D_Player_WD', 'scd2', ['PlayerId'], 'DWPlayerID', 'DWBeginEffDateTime', 'DWEndEffDateTime', 'DWCurrentRowFlag', 'SCD2 Mock for Players (Test Data)', JSON """[
+
     {
         "name": "CreatedDtm Not Null",
         "sql": "SELECT * FROM {{target}} WHERE CreatedDtm IS NULL",
@@ -86,7 +87,8 @@ VALUES
         "description": "CreatedDtm must be less than or equal to UpdatedDtm",
         "severity": "HIGH"
     }
-]""");
+]""", '0 9 * * *');
+
 
 -- 5. Setup SCD2 Mock Table D_Player_WD (with Business Rules)
 CREATE OR REPLACE TABLE `leyin-sandpit.crown_scd_mock.D_Player_WD` (

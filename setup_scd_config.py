@@ -41,8 +41,10 @@ rows_to_insert = [
         "scd_type": "scd1",
         "primary_keys": ["TableId", "PositionIDX"],
         "surrogate_key": "DWSeatID",
-        "description": "SCD1 Mock for Gaming Seats (Test Data)"
+        "description": "SCD1 Mock for Gaming Seats (Test Data)",
+        "cron_schedule": "0 9 * * *"
     },
+
     {
         "config_id": "employee_scd2",
         "target_dataset": "crown_scd_mock",
@@ -53,8 +55,10 @@ rows_to_insert = [
         "begin_date_column": "DWBeginEffDateTime",
         "end_date_column": "DWEndEffDateTime",
         "active_flag_column": "DWCurrentRowFlag",
-        "description": "SCD2 Mock for Employees (Test Data)"
+        "description": "SCD2 Mock for Employees (Test Data)",
+        "cron_schedule": "0 9 * * *"
     },
+
     {
         "config_id": "player_scd2",
         "target_dataset": "crown_scd_mock",
@@ -65,8 +69,11 @@ rows_to_insert = [
         "begin_date_column": "DWBeginEffDateTime",
         "end_date_column": "DWEndEffDateTime",
         "active_flag_column": "DWCurrentRowFlag",
+        "active_flag_column": "DWCurrentRowFlag",
         "description": "SCD2 Mock for Players (Test Data)",
+        "cron_schedule": "0 9 * * *",
         "custom_tests": [
+
             {
                 "name": "CreatedDtm NOT NULL",
                 "sql": "SELECT COUNT(0) = 0 FROM {{target}} WHERE CreatedDtm IS NULL",
