@@ -55,11 +55,14 @@ The QA Agent now supports **SCD Type 1 and Type 2 Validation**. This feature val
 **File**: `src/components/Sidebar.tsx`
 - Added "SCD Validation" navigation option with 🔄 icon
 
-  - **New Feature**: "Add New Configuration" toggle allows adding new SCD tables to the configuration table directly from the UI, including **Cloud Scheduler cron expressions**.
+**File**: `src/components/DashboardForm.tsx` (Major Update)
+- **New Feature**: Added **"Schedule Frequency"** dropdown (Daily, Weekly, Monthly) for easier cron setup.
+- **Layout Fixes**: Improved alignment and width of all form fields (Project ID, Dataset, etc.) for a premium UI feel.
+- **Add New Configuration**: Native support for adding new SCD tables to the configuration table directly from the UI.
 
 **File**: `src/components/HistoryList.tsx`
-- Refactored to display unified history data from the new consolidated table
-- Added display for `cron_schedule` with ⏰ icon
+- Refactored to display unified history data from the new `test_results_history` table.
+- Added display for `cron_schedule` with ⏰ icon.
 
 **File**: `src/app/page.tsx` & `src/app/dashboard/page.tsx`
 - Updated `ComparisonMode` type to include `'scd'`
@@ -91,13 +94,18 @@ The results page now provides deep insight into test failures:
 1. **Open BigQuery Console**:  
    https://console.cloud.google.com/bigquery?project=leyin-sandpit
 
-2. **Run the Setup SQL**:  
-   Copy and paste the entire contents of [`setup_scd_resources.sql`](file:///c:/Users/LeyinChen/Documents/Client%20-%20Crown/Antigravity/qa_agent/setup_scd_resources.sql) into the query editor and click **Run**.
+2. **Run the Master Setup SQL**:  
+   Copy and paste the entire contents of [`setup_scd_resources.sql`](file:///c:/Users/LeyinChen/Documents/Client%20-%20Crown/Antigravity/qa_agent/setup_scd_resources.sql) into the query editor and click **Run**. This single script sets up:
+   - ✅ SCD & GCS configuration tables
+   - ✅ Mock datasets and tables for testing
+   - ✅ Unified execution history table and views
 
-3. **Verify Tables Created**:
-   - `leyin-sandpit.crown_scd_mock.D_Seat_WD` (4 rows)
-   - `leyin-sandpit.crown_scd_mock.D_Employee_WD` (9 rows)
-   - `leyin-sandpit.transform_config.scd_validation_config` (3 rows)
+3. **Verify Resources Created**:
+   - `leyin-sandpit.crown_scd_mock.D_Seat_WD` (SCD1 Mock)
+   - `leyin-sandpit.crown_scd_mock.D_Employee_WD` (SCD2 Mock)
+   - `leyin-sandpit.transform_config.scd_validation_config` (SCD Config)
+   - `leyin-sandpit.transform_config.data_load_config` (GCS Config)
+   - `leyin-sandpit.qa_agent_metadata.test_results_history` (Audit Trail)
 
 ### Step 2: Test SCD Type 1 Validation
 
