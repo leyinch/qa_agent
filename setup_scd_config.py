@@ -23,7 +23,8 @@ schema = [
     bigquery.SchemaField("end_date_column", "STRING"),
     bigquery.SchemaField("active_flag_column", "STRING"),
     bigquery.SchemaField("description", "STRING"),
-    bigquery.SchemaField("custom_tests", "JSON")
+    bigquery.SchemaField("custom_tests", "JSON"),
+    bigquery.SchemaField("cron_schedule", "STRING")
 ]
 
 table = bigquery.Table(f"leyin-sandpit.{table_id}", schema=schema)

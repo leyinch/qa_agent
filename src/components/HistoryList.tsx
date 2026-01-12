@@ -206,8 +206,8 @@ export default function HistoryList({ projectId, onViewResult }: HistoryListProp
                                             )}
                                         </td>
                                         <td style={{ padding: '0.75rem 1rem' }}>
-                                            <div style={{ fontSize: '0.75rem', color: 'var(--secondary-foreground)' }}>Src: <span style={{ color: 'var(--foreground)' }}>{run.source || '-'}</span></div>
-                                            <div style={{ fontSize: '0.75rem', color: 'var(--secondary-foreground)' }}>Tgt: <span style={{ color: 'var(--foreground)' }}>{run.target_table || run.target}</span></div>
+                                            <div style={{ fontSize: '0.75rem', color: 'var(--secondary-foreground)' }}>Src: <span style={{ color: 'var(--foreground)' }}>{run.source || (run as any).metadata?.source || '-'}</span></div>
+                                            <div style={{ fontSize: '0.75rem', color: 'var(--secondary-foreground)' }}>Tgt: <span style={{ color: 'var(--foreground)' }}>{run.target_table || run.target || (run as any).metadata?.target || '-'}</span></div>
                                         </td>
                                         <td style={{ padding: '0.75rem 1rem' }}>
                                             {getStatusBadge(run.status)}

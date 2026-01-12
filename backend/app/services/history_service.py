@@ -9,10 +9,15 @@ from google.cloud import bigquery
 from datetime import datetime, timedelta
 import uuid
 import json
+import logging
 from typing import List, Dict, Optional, Any
 
-# Configuration - TODO: Move to environment variables
-HISTORY_PROJECT_ID = "leyin-sandpit"
+from app.config import settings
+
+logger = logging.getLogger(__name__)
+
+# Configuration
+HISTORY_PROJECT_ID = settings.google_cloud_project
 HISTORY_DATASET = "qa_agent_metadata"
 HISTORY_TABLE = "test_results_history"
 HISTORY_TABLE_FQN = f"{HISTORY_PROJECT_ID}.{HISTORY_DATASET}.{HISTORY_TABLE}"
@@ -33,6 +38,7 @@ class TestHistoryService:
             try:
                 self.client.get_dataset(dataset_ref)
             except Exception:
+                logger.info(f"Creating dataset {dataset_ref}")
                 dataset = bigquery.Dataset(dataset_ref)
                 dataset.location = "US"
                 self.client.create_dataset(dataset)
@@ -41,6 +47,7 @@ class TestHistoryService:
             try:
                 self.client.get_table(HISTORY_TABLE_FQN)
             except Exception:
+                logger.info(f"Creating table {HISTORY_TABLE_FQN}")
                 # Schema definition matching backend/create_history_table.sql
                 schema = [
                     bigquery.SchemaField("execution_id", "STRING", mode="REQUIRED"),
@@ -66,15 +73,14 @@ class TestHistoryService:
                 table.clustering_fields = ["project_id", "target_table", "status"]
                 
                 self.client.create_table(table)
-                print(f"Created history table {HISTORY_TABLE_FQN}")
         except Exception as e:
-            print(f"Warning: Failed to ensure history table exists: {e}")
+            logger.warning(f"Failed to ensure history table exists: {e}")
     
     def save_test_results(
         self,
         project_id: str,
         comparison_mode: str,
-        test_results: List[Dict[str, Any]],
+        test_results: Any,
         target_dataset: Optional[str] = None,
         target_table: Optional[str] = None,
         mapping_id: Optional[str] = None,
@@ -88,17 +94,26 @@ class TestHistoryService:
         execution_timestamp = datetime.utcnow()
         
         # Aggregate stats
-        total_tests = len(test_results)
-        passed_tests = len([t for t in test_results if t.get("status") == "PASS"])
-        failed_tests = len([t for t in test_results if t.get("status") == "FAIL"])
-        
-        # Determine overall status
-        status = "PASS"
-        if any(t.get("status") == "ERROR" for t in test_results):
-            status = "ERROR"
-        elif failed_tests > 0:
-            status = "FAIL"
+        if isinstance(test_results, list):
+            total_tests = len(test_results)
+            passed_tests = len([t for t in test_results if t.get("status") == "PASS"])
+            failed_tests = len([t for t in test_results if t.get("status") == "FAIL"])
+            error_message = next((t.get("error_message") for t in test_results if t.get("error_message")), None)
             
+            # Determine overall status
+            status = "PASS"
+            if any(t.get("status") == "ERROR" for t in test_results):
+                status = "ERROR"
+            elif failed_tests > 0:
+                status = "FAIL"
+        else:
+            # Handle non-list results (e.g. schema validation dict)
+            total_tests = 1
+            status = metadata.get("status") if metadata else "PASS" # Default or from metadata
+            passed_tests = 1 if status == "PASS" else 0
+            failed_tests = 1 if status == "FAIL" else 0
+            error_message = None
+
         row = {
             "execution_id": execution_id,
             "execution_timestamp": execution_timestamp.isoformat(),
@@ -111,7 +126,7 @@ class TestHistoryService:
             "total_tests": total_tests,
             "passed_tests": passed_tests,
             "failed_tests": failed_tests,
-            "error_message": next((t.get("error_message") for t in test_results if t.get("error_message")), None),
+            "error_message": error_message,
             "cron_schedule": cron_schedule,
             "test_results": json.dumps(test_results),
             "executed_by": None,  # TODO: Add auth

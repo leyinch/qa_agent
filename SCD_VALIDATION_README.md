@@ -12,12 +12,19 @@ The QA Agent now supports **SCD Type 1 and Type 2 Validation**. This feature val
 - Added `process_scd()` method to handle SCD validation requests
 - Auto-selects appropriate tests based on SCD type (Type 1 or Type 2)
 
-**File**: `backend/app/services/bigquery_service.py`
-- Added `insert_scd_config()` method to insert new configurations into BigQuery
-
 **File**: `backend/app/main.py`
 - Added SCD mode handling in `/api/generate-tests` endpoint
 - Added `/api/scd-config` endpoint to support adding new configurations
+- **Consolidated History**: Now uses a single backend-driven logging system for all test modes
+
+**File**: `backend/app/services/history_service.py` [NEW LOCATION]
+- Moved and refactored to `backend/app/services/`
+- Handles automatic creation of the history table and dataset
+- Provides a unified source of truth for both summary and detailed results
+
+**File**: `backend/app/services/scheduler_service.py`
+- Added support for Google Cloud Scheduler integration
+- Manually triggers tests based on `cron_schedule` stored in config
 
 **File**: `backend/app/tests/predefined_tests.py`
 - Added 16 data quality test templates:
@@ -48,13 +55,11 @@ The QA Agent now supports **SCD Type 1 and Type 2 Validation**. This feature val
 **File**: `src/components/Sidebar.tsx`
 - Added "SCD Validation" navigation option with 🔄 icon
 
-**File**: `src/components/DashboardForm.tsx`
-- Added SCD-specific form fields:
-  - SCD Type selector (Type 1 / Type 2)
-  - Primary Keys input (comma-separated)
-  - Surrogate Key input (optional)
-  - SCD2-specific fields: Begin Date Column, End Date Column, Active Flag Column
-  - **New Feature**: "Add New Configuration" toggle allows adding new SCD tables to the configuration table directly from the UI
+  - **New Feature**: "Add New Configuration" toggle allows adding new SCD tables to the configuration table directly from the UI, including **Cloud Scheduler cron expressions**.
+
+**File**: `src/components/HistoryList.tsx`
+- Refactored to display unified history data from the new consolidated table
+- Added display for `cron_schedule` with ⏰ icon
 
 **File**: `src/app/page.tsx` & `src/app/dashboard/page.tsx`
 - Updated `ComparisonMode` type to include `'scd'`
@@ -226,6 +231,12 @@ The `transform_config.scd_validation_config` table can now be used for **batch v
    - **Config Table**: `scd_validation_config`
 4. Click "Generate & Run Tests"
 5. The app will validate ALL tables defined in the config table
+
+### Automated Scheduling
+The system now supports automated test runs via **Google Cloud Scheduler**:
+- **Setup**: When adding a new configuration, provide a standard cron expression (e.g., `0 2 * * *` for daily at 2 AM).
+- **Execution**: Cloud Scheduler will trigger the backend, and results will be automatically saved to the unified history table.
+- **Monitoring**: Scheduled runs are identifiable in the "Execution History" tab by the ⏰ icon.
 
 **Current Config Table Contents:**
 - `crown_scd_mock.D_Seat_WD` (SCD Type 1) - Gaming Seats mock data with intentional errors

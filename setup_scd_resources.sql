@@ -65,7 +65,8 @@ CREATE OR REPLACE TABLE `leyin-sandpit.transform_config.scd_validation_config` (
     end_date_column STRING,
     active_flag_column STRING,
     description STRING,
-    custom_tests JSON
+    custom_tests JSON,
+    cron_schedule STRING
 );
 
 INSERT INTO `leyin-sandpit.transform_config.scd_validation_config` (config_id, target_dataset, target_table, scd_type, primary_keys, surrogate_key, begin_date_column, end_date_column, active_flag_column, description, custom_tests)

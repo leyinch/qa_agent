@@ -21,9 +21,10 @@ from app.models import (
 from app.services.test_executor import test_executor
 from app.services.bigquery_service import bigquery_service
 from app.services.scheduler_service import scheduler_service
-from history_service import TestHistoryService
+from app.services.history_service import TestHistoryService
 
 # Initialize history service
+# This service automatically ensures the BigQuery dataset and table exist
 history_service = TestHistoryService()
 
 # Configure logging
@@ -100,20 +101,16 @@ async def generate_tests(request: GenerateTestsRequest):
                 # Convert results objects to dicts for JSON serialization
                 results_by_mapping_dicts = [r.dict() for r in result['results_by_mapping']]
 
-                await bigquery_service.log_execution(
+                history_service.save_test_results(
                     project_id=request.project_id,
-                    execution_data={
-                        "comparison_mode": "gcs_config_table",
+                    comparison_mode="gcs_config_table",
+                    test_results=results_by_mapping_dicts,
+                    target_dataset=request.config_dataset,
+                    target_table=request.config_table,
+                    metadata={
+                        "summary": summary_data,
                         "source": f"{request.config_dataset}.{request.config_table}",
-                        "target": "Multiple Targets",
-                        "status": "AT_RISK" if summary_data['failed'] > 0 else "PASS",
-                        "total_tests": summary_data['total_tests'],
-                        "passed_tests": summary_data['passed'],
-                        "failed_tests": summary_data['failed'],
-                        "details": {
-                            "summary": summary_data,
-                            "results_by_mapping": results_by_mapping_dicts
-                        }
+                        "status": "AT_RISK" if summary_data['failed'] > 0 else "PASS"
                     }
                 )
             except Exception as e:
@@ -165,22 +162,18 @@ async def generate_tests(request: GenerateTestsRequest):
 
             # Log execution
             try:
-                await bigquery_service.log_execution(
+                history_service.save_test_results(
                     project_id=request.project_id,
-                    execution_data={
-                        "comparison_mode": "gcs_single_file",
+                    comparison_mode="gcs_single_file",
+                    test_results=[r.dict() for r in result.predefined_results],
+                    target_dataset=request.target_dataset,
+                    target_table=request.target_table,
+                    metadata={
+                        "summary": summary.dict(),
+                        "mapping_info": result.mapping_info.dict() if result.mapping_info else None,
+                        "ai_suggestions": [s.dict() for s in result.ai_suggestions],
                         "source": f"gs://{request.gcs_bucket}/{request.gcs_file_path}",
-                        "target": f"{request.target_dataset}.{request.target_table}",
-                        "status": "FAIL" if summary.failed > 0 or summary.errors > 0 else "PASS",
-                        "total_tests": summary.total_tests,
-                        "passed_tests": summary.passed,
-                        "failed_tests": summary.failed,
-                        "details": {
-                            "summary": summary.dict(),
-                            "mapping_info": result.mapping_info.dict() if result.mapping_info else None,
-                            "predefined_results": [r.dict() for r in result.predefined_results],
-                            "ai_suggestions": [s.dict() for s in result.ai_suggestions]
-                        }
+                        "status": "FAIL" if summary.failed > 0 or summary.errors > 0 else "PASS"
                     }
                 )
             except Exception as e:
@@ -202,17 +195,15 @@ async def generate_tests(request: GenerateTestsRequest):
                     summary = result_data.get('summary', {})
                     issues = result_data.get('summary', {}).get('total_issues', 0)
                     
-                    await bigquery_service.log_execution(
+                    history_service.save_test_results(
                         project_id=request.project_id,
-                        execution_data={
-                            "comparison_mode": "schema_validation",
+                        comparison_mode="schema_validation",
+                        test_results=result_data, # Schema validation returns a dict
+                        target_dataset=",".join(request.datasets or []),
+                        metadata={
+                            "summary": summary,
                             "source": "ERD Description",
-                            "target": ",".join(request.datasets or []),
-                            "status": "AT_RISK" if issues > 0 else "PASS",
-                            "total_tests": summary.get('total_tables', 0),
-                            "passed_tests": summary.get('total_tables', 0) - (1 if issues > 0 else 0),
-                            "failed_tests": issues,
-                            "details": result_data
+                            "status": "AT_RISK" if issues > 0 else "PASS"
                         }
                     )
                 except Exception as log_err:
@@ -242,20 +233,16 @@ async def generate_tests(request: GenerateTestsRequest):
                 # Convert results objects to dicts for JSON serialization
                 results_by_mapping_dicts = [r.dict() for r in result['results_by_mapping']]
 
-                await bigquery_service.log_execution(
+                history_service.save_test_results(
                     project_id=request.project_id,
-                    execution_data={
-                        "comparison_mode": "scd_config_table",
+                    comparison_mode="scd_config_table",
+                    test_results=results_by_mapping_dicts,
+                    target_dataset=request.config_dataset,
+                    target_table=request.config_table,
+                    metadata={
+                        "summary": summary_data,
                         "source": f"{request.config_dataset}.{request.config_table}",
-                        "target": "Multiple SCD Tables",
-                        "status": "AT_RISK" if summary_data['failed'] > 0 else "PASS",
-                        "total_tests": summary_data['total_tests'],
-                        "passed_tests": summary_data['passed'],
-                        "failed_tests": summary_data['failed'],
-                        "details": {
-                            "summary": summary_data,
-                            "results_by_mapping": results_by_mapping_dicts
-                        }
+                        "status": "AT_RISK" if summary_data['failed'] > 0 else "PASS"
                     }
                 )
             except Exception as e:
@@ -287,25 +274,21 @@ async def generate_tests(request: GenerateTestsRequest):
                 
                 # Log execution
                 try:
-                    await bigquery_service.log_execution(
+                    history_service.save_test_results(
                         project_id=request.project_id,
-                        execution_data={
-                            "comparison_mode": "scd",
+                        comparison_mode="scd",
+                        test_results=[r.dict() for r in result.predefined_results],
+                        target_dataset=request.target_dataset,
+                        target_table=request.target_table,
+                        metadata={
+                            "summary": {
+                                "total_tests": len(result.predefined_results),
+                                "passed": len([t for t in result.predefined_results if t.status == 'PASS']),
+                                "failed": len([t for t in result.predefined_results if t.status == 'FAIL']),
+                                "errors": len([t for t in result.predefined_results if t.status == 'ERROR'])
+                            },
                             "source": f"SCD: {request.target_table}",
-                            "target": f"{request.target_dataset}.{request.target_table}",
-                            "status": "FAIL" if any(r.status in ['FAIL', 'ERROR'] for r in result.predefined_results) else "PASS",
-                            "total_tests": len(result.predefined_results),
-                            "passed_tests": len([t for t in result.predefined_results if t.status == 'PASS']),
-                            "failed_tests": len([t for t in result.predefined_results if t.status == 'FAIL']),
-                            "details": {
-                                "summary": {
-                                    "total_tests": len(result.predefined_results),
-                                    "passed": len([t for t in result.predefined_results if t.status == 'PASS']),
-                                    "failed": len([t for t in result.predefined_results if t.status == 'FAIL']),
-                                    "errors": len([t for t in result.predefined_results if t.status == 'ERROR'])
-                                },
-                                "predefined_results": [r.dict() for r in result.predefined_results]
-                            }
+                            "status": "FAIL" if any(r.status in ['FAIL', 'ERROR'] for r in result.predefined_results) else "PASS"
                         }
                     )
                 except Exception as log_err:
@@ -364,7 +347,7 @@ async def get_test_history(project_id: str = settings.google_cloud_project, limi
     """Get previous test runs (summary level) from BigQuery."""
     try:
         from app.services.bigquery_service import bigquery_service
-        return await bigquery_service.get_execution_history(project_id=project_id, limit=limit)
+        return history_service.get_test_history(project_id=project_id, limit=limit)
     except Exception as e:
         logger.error(f"Error fetching execution history: {e}")
         return []
