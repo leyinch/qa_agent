@@ -31,11 +31,12 @@ class SchedulerService:
         target_table: str,
         config_dataset: str,
         config_table: str
-    ) -> bool:
+    ) -> tuple[bool, str]:
         """Create or update a Cloud Scheduler job for the given config."""
         if not settings.cloud_run_url:
-            logger.warning("CLOUD_RUN_URL not set. Cannot upsert scheduler job.")
-            return False
+            msg = "CLOUD_RUN_URL not set. Cannot upsert scheduler job."
+            logger.warning(msg)
+            return False, msg
 
         job_name = self._get_job_name(config_id)
         
@@ -73,14 +74,16 @@ class SchedulerService:
                 update_mask = field_mask_pb2.FieldMask(paths=["schedule", "http_target"])
                 self.client.update_job(job=job, update_mask=update_mask)
                 logger.info(f"Updated Cloud Scheduler job: {job_name}")
+                return True, "Updated successfully"
             except Exception:
                 # If not exists, create
                 self.client.create_job(parent=self.parent, job=job)
                 logger.info(f"Created Cloud Scheduler job: {job_name}")
-            return True
+                return True, "Created successfully"
         except Exception as e:
-            logger.error(f"Failed to upsert Cloud Scheduler job {job_name}: {str(e)}")
-            return False
+            error_msg = str(e)
+            logger.error(f"Failed to upsert Cloud Scheduler job {job_name}: {error_msg}")
+            return False, error_msg
 
     async def delete_job(self, config_id: str) -> bool:
         """Delete a Cloud Scheduler job."""
@@ -122,26 +125,21 @@ class SchedulerService:
                         summary["skipped"] += 1
                         continue
                     
-                    try:
-                        success = await self.upsert_job(
-                            config_id=config_id,
-                            cron_schedule=cron,
-                            target_dataset=config.get('target_dataset', ''),
-                            target_table=config.get('target_table', ''),
-                            config_dataset="transform_config",
-                            config_table="scd_validation_config"
-                        )
-                        
-                        if success:
-                            summary["synced"] += 1
-                            summary["details"].append(f"Synced SCD: {config_id}")
-                        else:
-                            summary["failed"] += 1
-                            summary["details"].append(f"Failed SCD: {config_id}")
-                    except Exception as e:
-                        logger.error(f"Error syncing SCD config {config_id}: {e}")
+                    success, message = await self.upsert_job(
+                        config_id=config_id,
+                        cron_schedule=cron,
+                        target_dataset=config.get('target_dataset', ''),
+                        target_table=config.get('target_table', ''),
+                        config_dataset="transform_config",
+                        config_table="scd_validation_config"
+                    )
+                    
+                    if success:
+                        summary["synced"] += 1
+                        summary["details"].append(f"Synced SCD {config_id}: {message}")
+                    else:
                         summary["failed"] += 1
-                        summary["details"].append(f"Error SCD {config_id}: {str(e)}")
+                        summary["details"].append(f"Failed SCD {config_id}: {message}")
             except Exception as e:
                 logger.error(f"Failed to read SCD configs: {e}")
                 summary["details"].append(f"Error reading SCD configs: {str(e)}")
@@ -162,26 +160,21 @@ class SchedulerService:
                         summary["skipped"] += 1
                         continue
                     
-                    try:
-                        success = await self.upsert_job(
-                            config_id=config_id,
-                            cron_schedule=cron,
-                            target_dataset=config.get('target_dataset', ''),
-                            target_table=config.get('target_table', ''),
-                            config_dataset="transform_config",
-                            config_table="data_load_config"
-                        )
-                        
-                        if success:
-                            summary["synced"] += 1
-                            summary["details"].append(f"Synced GCS: {config_id}")
-                        else:
-                            summary["failed"] += 1
-                            summary["details"].append(f"Failed GCS: {config_id}")
-                    except Exception as e:
-                        logger.error(f"Error syncing GCS config {config_id}: {e}")
+                    success, message = await self.upsert_job(
+                        config_id=config_id,
+                        cron_schedule=cron,
+                        target_dataset=config.get('target_dataset', ''),
+                        target_table=config.get('target_table', ''),
+                        config_dataset="transform_config",
+                        config_table="data_load_config"
+                    )
+                    
+                    if success:
+                        summary["synced"] += 1
+                        summary["details"].append(f"Synced GCS {config_id}: {message}")
+                    else:
                         summary["failed"] += 1
-                        summary["details"].append(f"Error GCS {config_id}: {str(e)}")
+                        summary["details"].append(f"Failed GCS {config_id}: {message}")
             except Exception as e:
                 logger.error(f"Failed to read GCS configs: {e}")
                 summary["details"].append(f"Error reading GCS configs: {str(e)}")
