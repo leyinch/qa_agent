@@ -21,6 +21,8 @@ steps:
       - '--platform'
       - 'managed'
       - '--allow-unauthenticated'
+      - '--set-env-vars'
+      - 'CLOUD_RUN_URL=https://data-qa-agent-backend2-1037417342779.us-central1.run.app'
 
 substitutions:
     # These values are read from deploy.config or can be overridden in Cloud Build Trigger

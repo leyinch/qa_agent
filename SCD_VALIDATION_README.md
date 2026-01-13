@@ -249,10 +249,17 @@ The system is now **fully resilient**. Here is how it handles both cases:
 2. **If you add via manual SQL**: 
    Since the backend doesn't "watch" BigQuery for changes every second, it handles it in two ways:
    - **Automatically**: Every time the backend service starts (e.g., after redeployment or cold start), it runs a full scan of the config table and registers any missing/updated jobs.
-   - **On-Demand**: If you've just run a manual SQL script and want the jobs created instantly, call the sync endpoint:
+   - **Manual Trigger**: You can force a synchronization at any time by calling the sync endpoint:
      ```bash
-     curl -X POST https://[your-backend-url]/api/sync-scheduler
+     Invoke-RestMethod -Method Post -Uri "https://[your-backend-url]/api/sync-scheduler"
      ```
+
+> [!IMPORTANT]
+> **Cloud Scheduler Requirement**: If Cloud Scheduler is not active in your project, you must initialize a location by running:
+> ```bash
+> gcloud app create --region=us-central
+> ```
+> *This is required even if you are not using App Engine, as it defines the default location for the Scheduler parent resource.*
      *(In PowerShell: `Invoke-RestMethod -Method Post -Uri "https://[your-backend-url]/api/sync-scheduler"`)*
 
 **Monitoring**: Scheduled runs are identifiable in the "Execution History" tab by the ⏰ icon.
