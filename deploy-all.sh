@@ -187,8 +187,20 @@ if [ "$FIRST_TIME_DEPLOYMENT" = true ]; then
         artifactregistry.googleapis.com \
         bigquery.googleapis.com \
         aiplatform.googleapis.com \
-        storage.googleapis.com
+        storage.googleapis.com \
+        cloudscheduler.googleapis.com
     echo -e "${GREEN}✓ APIs enabled${NC}"
+
+    # Initialize Cloud Scheduler (requires App Engine app in some regions)
+    echo -e "${YELLOW}Checking if Cloud Scheduler is initialized...${NC}"
+    if ! gcloud app describe --project "$PROJECT_ID" &>/dev/null; then
+        echo -e "${BLUE}Initializing Cloud Scheduler (creating App Engine stub in $REGION)...${NC}"
+        # Extract base region (e.g., us-central from us-central1)
+        BASE_REGION=$(echo "$REGION" | sed 's/[0-9]$//')
+        gcloud app create --region="$BASE_REGION" --project="$PROJECT_ID" || echo -e "${YELLOW}Warning: App creation failed (might already be initialized or insufficient permissions). Skipping...${NC}"
+    else
+        echo -e "${GREEN}✓ Cloud Scheduler already initialized${NC}"
+    fi
 fi
 
 # Deploy Backend

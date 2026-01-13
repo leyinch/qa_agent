@@ -13,6 +13,9 @@ The Data QA Agent now uses a hybrid architecture:
 - Google Cloud SDK
 - Docker (optional, for containerized deployment)
 
+### ⚙️ One-Time Project Setup
+Most infrastructure (APIs, Cloud Scheduler location) is automatically handled by the `deploy-all.sh` script during first-time deployment.
+
 ---
 
 ## 🚀 Local Development

@@ -255,11 +255,10 @@ The system is now **fully resilient**. Here is how it handles both cases:
      ```
 
 > [!IMPORTANT]
-> **Cloud Scheduler Requirement**: If Cloud Scheduler is not active in your project, you must initialize a location by running:
+> **Cloud Scheduler Requirement**: If Cloud Scheduler is not active in your project, it must be initialized. The `deploy-all.sh` script handles this automatically, but you can also run this **once** manually if needed:
 > ```bash
-> gcloud app create --region=us-central
+> gcloud app create --region=[YOUR_REGION_BASE] --project=[YOUR_PROJECT_ID]
 > ```
-> *This is required even if you are not using App Engine, as it defines the default location for the Scheduler parent resource.*
      *(In PowerShell: `Invoke-RestMethod -Method Post -Uri "https://[your-backend-url]/api/sync-scheduler"`)*
 
 **Monitoring**: Scheduled runs are identifiable in the "Execution History" tab by the ⏰ icon.
