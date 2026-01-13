@@ -101,40 +101,95 @@ class SchedulerService:
         # Lazy import to avoid circular dependency
         from app.services.bigquery_service import bigquery_service
         
-        summary = {"total": 0, "synced": 0, "failed": 0, "skipped": 0}
+        summary = {"total": 0, "synced": 0, "failed": 0, "skipped": 0, "details": []}
         
         try:
-            # Sync SCD Configs
-            scd_configs = await bigquery_service.read_scd_config_table(
-                self.project, "transform_config", "scd_validation_config"
-            )
+            logger.info(f"Starting Cloud Scheduler sync for project {self.project}")
             
-            for config in scd_configs:
-                summary["total"] += 1
-                config_id = config.get('config_id')
-                cron = config.get('cron_schedule')
-                
-                if not cron:
-                    summary["skipped"] += 1
-                    continue
-                
-                success = await self.upsert_job(
-                    config_id=config_id,
-                    cron_schedule=cron,
-                    target_dataset=config['target_dataset'],
-                    target_table=config['target_table'],
-                    config_dataset="transform_config",
-                    config_table="scd_validation_config"
+            # 1. Sync SCD Configs
+            try:
+                scd_configs = await bigquery_service.read_scd_config_table(
+                    self.project, "transform_config", "scd_validation_config"
                 )
+                logger.info(f"Found {len(scd_configs)} SCD configurations")
                 
-                if success:
-                    summary["synced"] += 1
-                else:
-                    summary["failed"] += 1
+                for config in scd_configs:
+                    summary["total"] += 1
+                    config_id = config.get('config_id')
+                    cron = config.get('cron_schedule')
                     
+                    if not cron:
+                        summary["skipped"] += 1
+                        continue
+                    
+                    try:
+                        success = await self.upsert_job(
+                            config_id=config_id,
+                            cron_schedule=cron,
+                            target_dataset=config.get('target_dataset', ''),
+                            target_table=config.get('target_table', ''),
+                            config_dataset="transform_config",
+                            config_table="scd_validation_config"
+                        )
+                        
+                        if success:
+                            summary["synced"] += 1
+                            summary["details"].append(f"Synced SCD: {config_id}")
+                        else:
+                            summary["failed"] += 1
+                            summary["details"].append(f"Failed SCD: {config_id}")
+                    except Exception as e:
+                        logger.error(f"Error syncing SCD config {config_id}: {e}")
+                        summary["failed"] += 1
+                        summary["details"].append(f"Error SCD {config_id}: {str(e)}")
+            except Exception as e:
+                logger.error(f"Failed to read SCD configs: {e}")
+                summary["details"].append(f"Error reading SCD configs: {str(e)}")
+
+            # 2. Sync GCS Configs
+            try:
+                gcs_configs = await bigquery_service.read_config_table(
+                    self.project, "transform_config", "data_load_config"
+                )
+                logger.info(f"Found {len(gcs_configs)} GCS configurations")
+                
+                for config in gcs_configs:
+                    summary["total"] += 1
+                    config_id = config.get('mapping_id') # GCS uses mapping_id
+                    cron = config.get('cron_schedule')
+                    
+                    if not cron:
+                        summary["skipped"] += 1
+                        continue
+                    
+                    try:
+                        success = await self.upsert_job(
+                            config_id=config_id,
+                            cron_schedule=cron,
+                            target_dataset=config.get('target_dataset', ''),
+                            target_table=config.get('target_table', ''),
+                            config_dataset="transform_config",
+                            config_table="data_load_config"
+                        )
+                        
+                        if success:
+                            summary["synced"] += 1
+                            summary["details"].append(f"Synced GCS: {config_id}")
+                        else:
+                            summary["failed"] += 1
+                            summary["details"].append(f"Failed GCS: {config_id}")
+                    except Exception as e:
+                        logger.error(f"Error syncing GCS config {config_id}: {e}")
+                        summary["failed"] += 1
+                        summary["details"].append(f"Error GCS {config_id}: {str(e)}")
+            except Exception as e:
+                logger.error(f"Failed to read GCS configs: {e}")
+                summary["details"].append(f"Error reading GCS configs: {str(e)}")
+                    
+            logger.info(f"Scheduler sync complete. Summary: {summary}")
             return summary
         except Exception as e:
-            logger.error(f"Error during scheduler sync: {str(e)}")
+            logger.error(f"Fatal error during scheduler sync: {str(e)}")
             raise
 
 scheduler_service = SchedulerService()
