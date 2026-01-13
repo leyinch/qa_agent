@@ -158,18 +158,20 @@ CREATE TABLE IF NOT EXISTS `leyin-sandpit.transform_config.data_load_config` (
   enabled_test_ids ARRAY<STRING>,
   auto_suggest BOOLEAN DEFAULT true,
   is_active BOOLEAN DEFAULT true,
+  cron_schedule STRING,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP(),
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
 );
 
 INSERT INTO `leyin-sandpit.transform_config.data_load_config`
-(mapping_id, mapping_name, description, source_bucket, source_file_path, source_file_format, target_dataset, target_table, primary_key_columns, required_columns, enabled_test_ids)
+(mapping_id, mapping_name, description, source_bucket, source_file_path, source_file_format, target_dataset, target_table, primary_key_columns, required_columns, enabled_test_ids, cron_schedule)
 VALUES (
   'customers_daily', 'Daily Customer Load', 'Sample GCS workload', 
   'leyin-sandpit-raw', 'customers/*.csv', 'csv', 
   'analytics', 'customers', 
   ['customer_id'], ['customer_id', 'email'],
-  ['row_count_match', 'no_nulls_required', 'no_duplicates_pk']
+  ['row_count_match', 'no_nulls_required', 'no_duplicates_pk'],
+  '0 9 * * *'
 );
 
 

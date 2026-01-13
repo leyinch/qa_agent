@@ -39,6 +39,18 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """Lifespan context manager for startup/shutdown events."""
     logger.info("Starting Data QA Agent Backend...")
+    
+    # Auto-sync scheduler jobs on startup to catch manual DB entries
+    try:
+        from app.services.scheduler_service import scheduler_service
+        if settings.cloud_run_url:
+            await scheduler_service.sync_all_from_config()
+            logger.info("Successfully synchronized Cloud Scheduler jobs on startup")
+        else:
+            logger.warning("CLOUD_RUN_URL not set, skipping scheduler sync on startup")
+    except Exception as e:
+        logger.error(f"Failed to sync scheduler on startup: {e}")
+        
     yield
     logger.info("Shutting down Data QA Agent Backend...")
 
@@ -66,6 +78,25 @@ async def health_check():
     """Health check endpoint."""
     logger.info("Health check probe received")
     return HealthResponse(status="healthy", version="1.0.0")
+
+
+@app.post("/api/sync-scheduler")
+async def sync_scheduler():
+    """Trigger a full synchronization of Cloud Scheduler jobs with BigQuery config."""
+    try:
+        from app.services.scheduler_service import scheduler_service
+        if not settings.cloud_run_url:
+            raise HTTPException(status_code=400, detail="CLOUD_RUN_URL environment variable is not set")
+            
+        summary = await scheduler_service.sync_all_from_config()
+        return {
+            "status": "success",
+            "message": "Cloud Scheduler synchronization completed",
+            "summary": summary
+        }
+    except Exception as e:
+        logger.error(f"Error syncing scheduler: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/api/generate-tests")

@@ -93,4 +93,48 @@ class SchedulerService:
             logger.error(f"Failed to delete Cloud Scheduler job {job_name}: {str(e)}")
             return False
 
+    async def sync_all_from_config(self) -> Dict[str, Any]:
+        """
+        Read all configurations from BigQuery and ensure Cloud Scheduler jobs exist.
+        Returns a summary of the sync operation.
+        """
+        # Lazy import to avoid circular dependency
+        from app.services.bigquery_service import bigquery_service
+        
+        summary = {"total": 0, "synced": 0, "failed": 0, "skipped": 0}
+        
+        try:
+            # Sync SCD Configs
+            scd_configs = await bigquery_service.read_scd_config_table(
+                self.project, "transform_config", "scd_validation_config"
+            )
+            
+            for config in scd_configs:
+                summary["total"] += 1
+                config_id = config.get('config_id')
+                cron = config.get('cron_schedule')
+                
+                if not cron:
+                    summary["skipped"] += 1
+                    continue
+                
+                success = await self.upsert_job(
+                    config_id=config_id,
+                    cron_schedule=cron,
+                    target_dataset=config['target_dataset'],
+                    target_table=config['target_table'],
+                    config_dataset="transform_config",
+                    config_table="scd_validation_config"
+                )
+                
+                if success:
+                    summary["synced"] += 1
+                else:
+                    summary["failed"] += 1
+                    
+            return summary
+        except Exception as e:
+            logger.error(f"Error during scheduler sync: {str(e)}")
+            raise
+
 scheduler_service = SchedulerService()
