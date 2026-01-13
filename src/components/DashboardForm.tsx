@@ -73,7 +73,7 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
             }
 
             try {
-                const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://data-qa-agent-backend-1037417342779.us-central1.run.app';
+                const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://data-qa-agent-backend2-1037417342779.us-central1.run.app';
                 const endpoint = `${backendUrl}/api/table-metadata?project_id=${projectId}&dataset_id=${scdTargetDataset}&table_id=${scdTargetTable}`;
 
                 const response = await fetch(endpoint);
@@ -198,7 +198,7 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
         setLoading(true);
 
         try {
-            const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://data-qa-agent-backend-1037417342779.us-central1.run.app';
+            const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://data-qa-agent-backend2-1037417342779.us-central1.run.app';
             const endpoint = `${backendUrl}/api/generate-tests`;
 
             let payload: any = {
@@ -295,7 +295,7 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
                 return;
             }
 
-            const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://data-qa-agent-backend-1037417342779.us-central1.run.app';
+            const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://data-qa-agent-backend2-1037417342779.us-central1.run.app';
             const endpoint = `${backendUrl}/api/scd-config`;
 
             const payload = {

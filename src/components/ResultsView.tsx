@@ -125,7 +125,7 @@ export default function ResultsView() {
         try {
             const globalObj = (typeof window !== 'undefined' ? window : globalThis) as any;
             const env = globalObj.process?.env || {};
-            const backendUrl = env.NEXT_PUBLIC_BACKEND_URL || 'https://data-qa-agent-backend-1037417342779.us-central1.run.app';
+            const backendUrl = env.NEXT_PUBLIC_BACKEND_URL || 'https://data-qa-agent-backend2-1037417342779.us-central1.run.app';
             const payload = {
                 project_id: projectId,
                 test_name: suggestion.test_name,
