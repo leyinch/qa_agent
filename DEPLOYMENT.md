@@ -229,6 +229,21 @@ git push origin feature_leyin2
 - Runs `cloudbuild.yaml` (frontend) or `backend/cloudbuild.yaml` (backend)
 - Automatically deploys to Cloud Run
 
+### Scheduler Infrastructure Resilience
+
+The system is designed to keep Google Cloud Scheduler in sync with your BigQuery configurations, regardless of how you update the data:
+
+1. **Native UI Addition**: 
+   When you use the "Add New Configuration" form in the UI, the backend creates or updates the Cloud Scheduler job **instantly**.
+
+2. **Manual SQL Updates**: 
+   If you insert or update records directly in BigQuery (bypassing the UI):
+   - **Auto-Sync on Startup**: The backend scans the entire config table every time it starts (deployment or cold start) and synchronizes all jobs.
+   - **Manual Trigger**: You can force a synchronization at any time by calling the sync endpoint:
+     ```bash
+     Invoke-RestMethod -Method Post -Uri "https://[your-backend-url]/api/sync-scheduler"
+     ```
+
 ## Cloud Build Triggers (Optional)
 
 ### Setup Automated Deployment

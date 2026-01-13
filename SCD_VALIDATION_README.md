@@ -240,11 +240,22 @@ The `transform_config.scd_validation_config` table can now be used for **batch v
 4. Click "Generate & Run Tests"
 5. The app will validate ALL tables defined in the config table
 
-### Automated Scheduling
-The system now supports automated test runs via **Google Cloud Scheduler**:
-- **Setup**: When adding a new configuration, provide a standard cron expression (e.g., `0 2 * * *` for daily at 2 AM).
-- **Execution**: Cloud Scheduler will trigger the backend, and results will be automatically saved to the unified history table.
-- **Monitoring**: Scheduled runs are identifiable in the "Execution History" tab by the ⏰ icon.
+### Automated Scheduling & Infrastructure Resilience
+The system is now **fully resilient**. Here is how it handles both cases:
+
+1. **If you add via the UI**: 
+   The backend creates or updates the Cloud Scheduler job **immediately** the moment you click "Save". This is the fastest way.
+
+2. **If you add via manual SQL**: 
+   Since the backend doesn't "watch" BigQuery for changes every second, it handles it in two ways:
+   - **Automatically**: Every time the backend service starts (e.g., after redeployment or cold start), it runs a full scan of the config table and registers any missing/updated jobs.
+   - **On-Demand**: If you've just run a manual SQL script and want the jobs created instantly, call the sync endpoint:
+     ```bash
+     curl -X POST https://[your-backend-url]/api/sync-scheduler
+     ```
+     *(In PowerShell: `Invoke-RestMethod -Method Post -Uri "https://[your-backend-url]/api/sync-scheduler"`)*
+
+**Monitoring**: Scheduled runs are identifiable in the "Execution History" tab by the ⏰ icon.
 
 **Current Config Table Contents:**
 - `crown_scd_mock.D_Seat_WD` (SCD Type 1) - Gaming Seats mock data with intentional errors
