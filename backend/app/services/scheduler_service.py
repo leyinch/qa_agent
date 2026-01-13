@@ -3,6 +3,7 @@ import json
 from typing import Optional, Dict, Any
 from google.cloud import scheduler_v1
 from google.protobuf import field_mask_pb2
+from google.api_core import exceptions
 from app.config import settings
 import logging
 
@@ -75,16 +76,20 @@ class SchedulerService:
                 self.client.update_job(job=job, update_mask=update_mask)
                 logger.info(f"Updated Cloud Scheduler job: {job_name}")
                 return True, "Updated successfully"
-            except Exception as e:
-                # If 404 error, we try to create
-                if hasattr(e, "code") and (e.code() == 404 or "404" in str(e)):
-                    # If it's a 404 on the job, we create. 
-                    # But if it's a 404 on the parent, it will fail again in create_job.
+            except exceptions.NotFound:
+                # If job doesn't exist, create it
+                try:
                     self.client.create_job(parent=self.parent, job=job)
                     logger.info(f"Created Cloud Scheduler job: {job_name}")
                     return True, "Created successfully"
-                else:
-                    raise e
+                except exceptions.NotFound as e:
+                    # This usually means the parent location doesn't exist
+                    error_msg = f"Parent location not found. Make sure Cloud Scheduler is initialized in {self.location}. Original error: {str(e)}"
+                    logger.error(f"Failed to create job {job_name}: {error_msg}")
+                    return False, error_msg
+            except Exception as e:
+                # Other errors during get or update
+                raise e
         except Exception as e:
             error_msg = str(e)
             if "404 Requested entity was not found" in error_msg:
