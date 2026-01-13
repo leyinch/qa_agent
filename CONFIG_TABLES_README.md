@@ -16,7 +16,7 @@ This guide explains how to set up the configuration tables for the Data QA Agent
 2. **Verify tables were created**:
    ```sql
    SELECT table_name 
-   FROM `leyin-sandpit.transform_config.INFORMATION_SCHEMA.TABLES`;
+   FROM `[YOUR_PROJECT_ID].transform_config.INFORMATION_SCHEMA.TABLES`;
    ```
 
 
@@ -35,7 +35,7 @@ Stores GCS-to-BigQuery mappings and test configurations.
 
 **Example:**
 ```sql
-SELECT * FROM `leyin-sandpit.transform_config.data_load_config` 
+SELECT * FROM `[YOUR_PROJECT_ID].transform_config.data_load_config` 
 WHERE is_active = true;
 ```
 
@@ -69,7 +69,7 @@ Tracks all test executions for monitoring and debugging.
 ## Adding a New Mapping
 
 ```sql
-INSERT INTO `leyin-sandpit.transform_config.data_load_config`
+INSERT INTO `[YOUR_PROJECT_ID].transform_config.data_load_config`
 (mapping_id, mapping_name, source_bucket, source_file_path, source_file_format,
  target_dataset, target_table, primary_key_columns, required_columns,
  enabled_test_ids, is_active)
@@ -127,13 +127,13 @@ The app will:
 ### View Active Mappings
 ```sql
 SELECT mapping_id, mapping_name, target_table, is_active
-FROM `leyin-sandpit.transform_config.data_load_config`
+FROM `[YOUR_PROJECT_ID].transform_config.data_load_config`
 WHERE is_active = true;
 ```
 
 ### Disable a Mapping
 ```sql
-UPDATE `leyin-sandpit.transform_config.data_load_config`
+UPDATE `[YOUR_PROJECT_ID].transform_config.data_load_config`
 SET is_active = false, updated_at = CURRENT_TIMESTAMP()
 WHERE mapping_id = 'my_data_load';
 ```
@@ -146,7 +146,7 @@ SELECT
   status,
   rows_affected,
   executed_at
-FROM `leyin-sandpit.transform_config.test_execution_history`
+FROM `[YOUR_PROJECT_ID].transform_config.test_execution_history`
 WHERE mapping_id = 'my_data_load'
 ORDER BY executed_at DESC
 LIMIT 100;

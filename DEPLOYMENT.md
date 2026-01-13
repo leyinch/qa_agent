@@ -44,8 +44,8 @@ All deployment parameters are centralized in one file:
 
 ```bash
 # deploy.config
-PROJECT_ID=leyin-sandpit
-REGION=us-central1
+PROJECT_ID=[YOUR_PROJECT_ID]
+REGION=[YOUR_REGION]
 FRONTEND_SERVICE=data-qa-agent-frontend
 BACKEND_SERVICE=data-qa-agent-backend
 ```
@@ -107,8 +107,8 @@ Syncing cloudbuild.yaml files with deploy.config...
 ========================================
 QA Agent Deployment
 ========================================
-Project: leyin-sandpit
-Region: us-central1
+Project: [YOUR_PROJECT_ID]
+Region: [YOUR_REGION]
 
 Service Status:
 Backend:  ✓ Deploy (exists)
@@ -132,7 +132,7 @@ Redeployment detected
 ### OAuth Setup Steps
 
 1. **Create OAuth Credentials**:
-   - Go to [Google Cloud Console - Credentials](https://console.cloud.google.com/apis/credentials?project=leyin-sandpit)
+   - Go to [Google Cloud Console - Credentials](https://console.cloud.google.com/apis/credentials?project=[YOUR_PROJECT_ID])
    - Click "Create Credentials" → "OAuth 2.0 Client ID"
    - Application type: "Web application"
    - Name: "QA Agent Frontend"
@@ -152,7 +152,7 @@ Redeployment detected
 
 ```bash
 gcloud run services update data-qa-agent-frontend \
-  --region us-central1 \
+  --region [YOUR_REGION] \
   --set-env-vars "GOOGLE_CLIENT_ID=...,GOOGLE_CLIENT_SECRET=...,NEXTAUTH_SECRET=$(openssl rand -base64 32),NEXTAUTH_URL=https://..."
 ```
 
@@ -166,7 +166,7 @@ git clone https://github.com/mirunasuresh23/qa_agent.git
 cd qa_agent
 
 # 2. Set gcloud project (IMPORTANT!)
-gcloud config set project leyin-sandpit
+gcloud config set project [YOUR_PROJECT_ID]
 
 # 3. Make scripts executable
 chmod +x deploy-all.sh sync-config.sh
@@ -314,7 +314,7 @@ Cloud Build configuration for backend service.
 **Solution**:
 ```bash
 # Set your gcloud project
-gcloud config set project leyin-sandpit
+gcloud config set project [YOUR_PROJECT_ID]
 
 # Then run deployment again
 ./deploy-all.sh
@@ -326,7 +326,7 @@ This happens when gcloud doesn't have a default project configured. Setting it o
 
 ```bash
 gcloud run services describe data-qa-agent-frontend \
-  --region us-central1 \
+  --region [YOUR_REGION] \
   --format="value(spec.template.spec.containers[0].env)"
 ```
 
@@ -334,7 +334,7 @@ gcloud run services describe data-qa-agent-frontend \
 
 ```bash
 gcloud run services describe data-qa-agent-frontend \
-  --region us-central1 \
+  --region [YOUR_REGION] \
   --format="value(status.url)"
 ```
 
@@ -342,10 +342,10 @@ gcloud run services describe data-qa-agent-frontend \
 
 ```bash
 # Frontend logs
-gcloud run logs tail data-qa-agent-frontend --region us-central1
+gcloud run logs tail data-qa-agent-frontend --region [YOUR_REGION]
 
 # Backend logs
-gcloud run logs tail data-qa-agent-backend --region us-central1
+gcloud run logs tail data-qa-agent-backend --region [YOUR_REGION]
 ```
 
 ### Force OAuth Reconfiguration

@@ -65,7 +65,7 @@ docker-compose up
 
 Create `backend/.env`:
 ```bash
-GOOGLE_CLOUD_PROJECT=leyin-sandpit
+GOOGLE_CLOUD_PROJECT=[YOUR_PROJECT_ID]
 ```
 
 ### Frontend (.env.local)
@@ -91,10 +91,10 @@ cd backend
 gcloud run deploy data-qa-agent-backend \
   --source . \
   --platform managed \
-  --region us-central1 \
-  --project leyin-sandpit \
+  --region [YOUR_REGION] \
+  --project [YOUR_PROJECT_ID] \
   --allow-unauthenticated \
-  --set-env-vars GOOGLE_CLOUD_PROJECT=leyin-sandpit
+  --set-env-vars GOOGLE_CLOUD_PROJECT=[YOUR_PROJECT_ID]
 ```
 
 **Note the backend URL** from the output (e.g., `https://data-qa-agent-backend-xxx.run.app`)
@@ -106,8 +106,8 @@ gcloud run deploy data-qa-agent-backend \
 gcloud run deploy data-qa-agent-frontend \
   --source . \
   --platform managed \
-  --region us-central1 \
-  --project leyin-sandpit \
+  --region [YOUR_REGION] \
+  --project [YOUR_PROJECT_ID] \
   --allow-unauthenticated \
   --set-env-vars NEXT_PUBLIC_BACKEND_URL=https://data-qa-agent-backend-xxx.run.app,GOOGLE_CLIENT_ID=your-id,GOOGLE_CLIENT_SECRET=your-secret,NEXTAUTH_SECRET=your-secret,NEXTAUTH_URL=https://data-qa-agent-frontend-xxx.run.app
 ```
@@ -139,7 +139,7 @@ curl http://localhost:8000/api/predefined-tests
 curl -X POST http://localhost:8000/api/generate-tests \
   -H "Content-Type: application/json" \
   -d '{
-    "project_id": "leyin-sandpit",
+    "project_id": "[YOUR_PROJECT_ID]",
     "comparison_mode": "gcs",
     "gcs_bucket": "your-bucket",
     "gcs_file_path": "path/to/file.csv",
@@ -154,7 +154,7 @@ curl -X POST http://localhost:8000/api/generate-tests \
 curl -X POST http://localhost:8000/api/generate-tests \
   -H "Content-Type: application/json" \
   -d '{
-    "project_id": "leyin-sandpit",
+    "project_id": "[YOUR_PROJECT_ID]",
     "comparison_mode": "gcs-config",
     "config_dataset": "config",
     "config_table": "data_load_config"

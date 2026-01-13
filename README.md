@@ -4,7 +4,7 @@ This is a Next.js application for testing data quality using AI. It uses Google 
 
 ## Prerequisites
 
-- Google Cloud Project: `leyin-sandpit`
+- Google Cloud Project: `[YOUR_PROJECT_ID]`
 - BigQuery Dataset: `transform_config`, `qa_agent_metadata`, `crown_scd_mock`
 - Vertex AI API enabled
 - BigQuery API enabled
@@ -13,7 +13,7 @@ This is a Next.js application for testing data quality using AI. It uses Google 
 
 To set up all required BigQuery datasets and tables in a single step:
 
-1. Open [BigQuery Console](https://console.cloud.google.com/bigquery?project=leyin-sandpit).
+1. Open [BigQuery Console](https://console.cloud.google.com/bigquery?project=[YOUR_PROJECT_ID]).
 2. Run the master setup script: [setup_scd_resources.sql](file:///c:/Users/LeyinChen/Documents/Client%20-%20Crown/Antigravity/qa_agent/setup_scd_resources.sql).
 3. Follow the [SCD Validation Guide](file:///c:/Users/LeyinChen/Documents/Client%20-%20Crown/Antigravity/qa_agent/SCD_VALIDATION_README.md) for detailed test instructions.
 
@@ -46,7 +46,7 @@ Note: Node.js is required for local development.
    gcloud run deploy test-case-generator \
      --image gcr.io/PROJECT_ID/test-case-generator \
      --platform managed \
-     --region us-central1 \
+     --region [YOUR_REGION] \
      --allow-unauthenticated \
      --set-env-vars GOOGLE_CLIENT_ID=your-client-id,GOOGLE_CLIENT_SECRET=your-client-secret,NEXTAUTH_SECRET=your-secret,NEXTAUTH_URL=https://your-service-url
    ```

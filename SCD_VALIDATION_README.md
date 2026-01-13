@@ -92,7 +92,7 @@ The results page now provides deep insight into test failures:
 ### Step 1: Create Mock Data in BigQuery
 
 1. **Open BigQuery Console**:  
-   https://console.cloud.google.com/bigquery?project=leyin-sandpit
+   https://console.cloud.google.com/bigquery?project=[YOUR_PROJECT_ID]
 
 2. **Run the Master Setup SQL**:  
    Copy and paste the entire contents of [`setup_scd_resources.sql`](file:///c:/Users/LeyinChen/Documents/Client%20-%20Crown/Antigravity/qa_agent/setup_scd_resources.sql) into the query editor and click **Run**. This single script sets up:
@@ -101,22 +101,22 @@ The results page now provides deep insight into test failures:
    - ✅ Unified execution history table and views
 
 3. **Verify Resources Created**:
-   - `leyin-sandpit.crown_scd_mock.D_Seat_WD` (SCD1 Mock)
-   - `leyin-sandpit.crown_scd_mock.D_Employee_WD` (SCD2 Mock)
-   - `leyin-sandpit.transform_config.scd_validation_config` (SCD Config)
-   - `leyin-sandpit.transform_config.data_load_config` (GCS Config)
-   - `leyin-sandpit.qa_agent_metadata.test_results_history` (Audit Trail)
+   - `[YOUR_PROJECT_ID].crown_scd_mock.D_Seat_WD` (SCD1 Mock)
+   - `[YOUR_PROJECT_ID].crown_scd_mock.D_Employee_WD` (SCD2 Mock)
+   - `[YOUR_PROJECT_ID].transform_config.scd_validation_config` (SCD Config)
+   - `[YOUR_PROJECT_ID].transform_config.data_load_config` (GCS Config)
+   - `[YOUR_PROJECT_ID].qa_agent_metadata.test_results_history` (Audit Trail)
 
 ### Step 2: Test SCD Type 1 Validation
 
 1. **Open the Frontend**:  
-   Navigate to your Cloud Run frontend URL (e.g., `https://data-qa-agent-frontend-xxxxx.us-central1.run.app`)
+   Navigate to your Cloud Run frontend URL (e.g., `https://data-qa-agent-frontend-xxxxx.[YOUR_REGION].run.app`)
 
 2. **Select SCD Validation**:  
    Click "SCD Validation" in the sidebar (🔄 icon)
 
 3. **Fill in the Form**:
-   - **Project ID**: `leyin-sandpit`
+   - **Project ID**: `[YOUR_PROJECT_ID]`
    - **Target Dataset**: `crown_scd_mock`
    - **Target Table**: `D_Seat_WD`
    - **SCD Type**: Select **Type 1**
@@ -136,7 +136,7 @@ The results page now provides deep insight into test failures:
 ### Step 3: Test SCD Type 2 Validation
 
 1. **Fill in the Form**:
-   - **Project ID**: `leyin-sandpit`
+   - **Project ID**: `[YOUR_PROJECT_ID]`
    - **Target Dataset**: `crown_scd_mock`
    - **Target Table**: `D_Employee_WD`
    - **SCD Type**: Select **Type 2**
