@@ -164,6 +164,99 @@ class BigQueryService:
         """
         return await self.execute_query(query)
 
+    async def ensure_config_tables(
+        self,
+        project_id: str,
+        config_dataset: str = "transform_config"
+    ) -> None:
+        """Ensure all configuration tables exist."""
+        try:
+            # 1. Ensure dataset exists
+            dataset_ref = f"{project_id}.{config_dataset}"
+            try:
+                self.client.get_dataset(dataset_ref)
+            except Exception:
+                dataset = bigquery.Dataset(dataset_ref)
+                dataset.location = "US"
+                self.client.create_dataset(dataset)
+                print(f"Created dataset: {config_dataset}")
+
+            # 2. Ensure scd_validation_config exists
+            scd_table = f"{dataset_ref}.scd_validation_config"
+            try:
+                self.client.get_table(scd_table)
+            except Exception:
+                schema = [
+                    bigquery.SchemaField("config_id", "STRING", mode="REQUIRED"),
+                    bigquery.SchemaField("target_dataset", "STRING", mode="REQUIRED"),
+                    bigquery.SchemaField("target_table", "STRING", mode="REQUIRED"),
+                    bigquery.SchemaField("scd_type", "STRING", mode="REQUIRED"),
+                    bigquery.SchemaField("primary_keys", "STRING", mode="REPEATED"),
+                    bigquery.SchemaField("surrogate_key", "STRING", mode="NULLABLE"),
+                    bigquery.SchemaField("begin_date_column", "STRING", mode="NULLABLE"),
+                    bigquery.SchemaField("end_date_column", "STRING", mode="NULLABLE"),
+                    bigquery.SchemaField("active_flag_column", "STRING", mode="NULLABLE"),
+                    bigquery.SchemaField("description", "STRING", mode="NULLABLE"),
+                    bigquery.SchemaField("custom_tests", "JSON", mode="NULLABLE"),
+                    bigquery.SchemaField("cron_schedule", "STRING", mode="NULLABLE"),
+                ]
+                table = bigquery.Table(scd_table, schema=schema)
+                self.client.create_table(table)
+                print(f"Created table: scd_validation_config")
+
+            # 3. Ensure data_load_config exists
+            gcs_table = f"{dataset_ref}.data_load_config"
+            try:
+                self.client.get_table(gcs_table)
+            except Exception:
+                schema = [
+                    bigquery.SchemaField("mapping_id", "STRING", mode="REQUIRED"),
+                    bigquery.SchemaField("mapping_name", "STRING", mode="NULLABLE"),
+                    bigquery.SchemaField("description", "STRING", mode="NULLABLE"),
+                    bigquery.SchemaField("source_bucket", "STRING", mode="REQUIRED"),
+                    bigquery.SchemaField("source_file_path", "STRING", mode="REQUIRED"),
+                    bigquery.SchemaField("source_file_format", "STRING", mode="REQUIRED"),
+                    bigquery.SchemaField("target_dataset", "STRING", mode="REQUIRED"),
+                    bigquery.SchemaField("target_table", "STRING", mode="REQUIRED"),
+                    bigquery.SchemaField("primary_key_columns", "STRING", mode="REPEATED"),
+                    bigquery.SchemaField("required_columns", "STRING", mode="REPEATED"),
+                    bigquery.SchemaField("date_columns", "STRING", mode="REPEATED"),
+                    bigquery.SchemaField("numeric_range_checks", "JSON", mode="NULLABLE"),
+                    bigquery.SchemaField("date_range_checks", "JSON", mode="NULLABLE"),
+                    bigquery.SchemaField("foreign_key_checks", "JSON", mode="NULLABLE"),
+                    bigquery.SchemaField("pattern_checks", "JSON", mode="NULLABLE"),
+                    bigquery.SchemaField("outlier_columns", "STRING", mode="REPEATED"),
+                    bigquery.SchemaField("enabled_test_ids", "STRING", mode="REPEATED"),
+                    bigquery.SchemaField("auto_suggest", "BOOLEAN", mode="NULLABLE"),
+                    bigquery.SchemaField("is_active", "BOOLEAN", mode="NULLABLE"),
+                    bigquery.SchemaField("cron_schedule", "STRING", mode="NULLABLE"),
+                    bigquery.SchemaField("created_at", "TIMESTAMP", mode="NULLABLE"),
+                    bigquery.SchemaField("updated_at", "TIMESTAMP", mode="NULLABLE"),
+                ]
+                table = bigquery.Table(gcs_table, schema=schema)
+                self.client.create_table(table)
+                print(f"Created table: data_load_config")
+
+        except Exception as e:
+            print(f"Error ensuring config tables: {str(e)}")
+
+    async def read_config_table(
+        self, 
+        project_id: str, 
+        config_dataset: str, 
+        config_table: str
+    ) -> List[Dict[str, Any]]:
+        """
+        Read mappings from config table.
+        """
+        await self.ensure_config_tables(project_id, config_dataset)
+        query = f"""
+            SELECT *
+            FROM `{project_id}.{config_dataset}.{config_table}`
+            WHERE is_active = true
+        """
+        return await self.execute_query(query)
+
     async def read_scd_config_table(
         self, 
         project_id: str, 
@@ -172,29 +265,10 @@ class BigQueryService:
     ) -> List[Dict[str, Any]]:
         """
         Read SCD validation configurations from config table.
-        
-        Args:
-            project_id: Google Cloud project ID
-            config_dataset: Config table dataset
-            config_table: Config table name
-            
-        Returns:
-            List of SCD validation configurations
         """
+        await self.ensure_config_tables(project_id, config_dataset)
         query = f"""
-            SELECT 
-                config_id,
-                target_dataset,
-                target_table,
-                scd_type,
-                primary_keys,
-                surrogate_key,
-                begin_date_column,
-                end_date_column,
-                active_flag_column,
-                description,
-                custom_tests,
-                cron_schedule
+            SELECT *
             FROM `{project_id}.{config_dataset}.{config_table}`
         """
         return await self.execute_query(query)

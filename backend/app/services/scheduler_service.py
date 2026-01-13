@@ -75,13 +75,20 @@ class SchedulerService:
                 self.client.update_job(job=job, update_mask=update_mask)
                 logger.info(f"Updated Cloud Scheduler job: {job_name}")
                 return True, "Updated successfully"
-            except Exception:
-                # If not exists, create
-                self.client.create_job(parent=self.parent, job=job)
-                logger.info(f"Created Cloud Scheduler job: {job_name}")
-                return True, "Created successfully"
+            except Exception as e:
+                # If 404 error, we try to create
+                if hasattr(e, "code") and (e.code() == 404 or "404" in str(e)):
+                    # If it's a 404 on the job, we create. 
+                    # But if it's a 404 on the parent, it will fail again in create_job.
+                    self.client.create_job(parent=self.parent, job=job)
+                    logger.info(f"Created Cloud Scheduler job: {job_name}")
+                    return True, "Created successfully"
+                else:
+                    raise e
         except Exception as e:
             error_msg = str(e)
+            if "404 Requested entity was not found" in error_msg:
+                error_msg = f"Parent location not found. TIP: You must initialize a region by running 'gcloud app create --region=us-central' in your project even if not using App Engine. Original error: {error_msg}"
             logger.error(f"Failed to upsert Cloud Scheduler job {job_name}: {error_msg}")
             return False, error_msg
 
