@@ -33,20 +33,8 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """Lifespan context manager for startup/shutdown events."""
     logger.info("Starting Data QA Agent Backend...")
-    
-    # Auto-sync scheduler jobs on startup to catch manual DB entries
-    try:
-        import asyncio
-        from app.services.scheduler_service import scheduler_service
-        if settings.cloud_run_url:
-            # Run in background to avoid blocking startup
-            asyncio.create_task(scheduler_service.sync_all_from_config())
-            logger.info("Initiated background Cloud Scheduler sync")
-        else:
-            logger.warning("CLOUD_RUN_URL not set, skipping scheduler sync on startup")
-    except Exception as e:
-        logger.error(f"Failed to initiate scheduler sync on startup: {e}")
-        
+    # Scheduler sync removed from startup to prevent blocking
+    # Use POST /api/sync-scheduler to manually sync after deployment
     yield
     logger.info("Shutting down Data QA Agent Backend...")
 
