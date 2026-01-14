@@ -13,7 +13,11 @@ class SchedulerService:
     """Service to handle Cloud Scheduler job operations."""
 
     def __init__(self):
-        self.client = scheduler_v1.CloudSchedulerClient()
+        try:
+            self.client = scheduler_v1.CloudSchedulerClient()
+        except Exception as e:
+            logger.warning(f"Failed to initialize SchedulerService (will retry on usage if needed): {e}")
+            self.client = None
         self.project = settings.google_cloud_project
         self.location = settings.scheduler_location
         self.parent = f"projects/{self.project}/locations/{self.location}"

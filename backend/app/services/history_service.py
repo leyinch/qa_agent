@@ -29,8 +29,12 @@ class TestHistoryService:
     """Service for managing test execution history in BigQuery"""
     
     def __init__(self):
-        self.client = bigquery.Client(project=HISTORY_PROJECT_ID)
-        self._ensure_table_exists()
+        try:
+            self.client = bigquery.Client(project=HISTORY_PROJECT_ID)
+            self._ensure_table_exists()
+        except Exception as e:
+            logger.error(f"Failed to initialize TestHistoryService: {e}")
+            self.client = None
 
     def _ensure_table_exists(self):
         """Ensure the history table exists in BigQuery."""
