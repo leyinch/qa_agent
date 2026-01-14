@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     vertex_ai_location: str = "us-central1"
     vertex_ai_model: str = "gemini-1.5-flash"
     scheduler_location: str = "us-central1"
+    scheduler_timezone: str = "Australia/Melbourne"
     
     # CORS
     cors_origins: list[str] = ["*"]

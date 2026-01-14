@@ -63,7 +63,7 @@ class SchedulerService:
         job = scheduler_v1.Job(
             name=job_name,
             schedule=cron_schedule,
-            time_zone="UTC",
+            time_zone=settings.scheduler_timezone,
             http_target=http_target
         )
 
@@ -72,7 +72,7 @@ class SchedulerService:
             try:
                 self.client.get_job(name=job_name)
                 # If exists, update
-                update_mask = field_mask_pb2.FieldMask(paths=["schedule", "http_target"])
+                update_mask = field_mask_pb2.FieldMask(paths=["schedule", "time_zone", "http_target"])
                 self.client.update_job(job=job, update_mask=update_mask)
                 logger.info(f"Updated Cloud Scheduler job: {job_name}")
                 return True, "Updated successfully"
