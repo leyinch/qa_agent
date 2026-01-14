@@ -18,14 +18,8 @@ from app.models import (
     SaveHistoryRequest,
     ScheduledTestRunRequest
 )
-from app.services.test_executor import test_executor
-from app.services.bigquery_service import bigquery_service
-from app.services.scheduler_service import scheduler_service
-from app.services.history_service import TestHistoryService
+# Services will be imported lazily within endpoints to improve startup time
 
-# Initialize history service
-# This service automatically ensures the BigQuery dataset and table exist
-history_service = TestHistoryService()
 
 # Configure logging
 logging.basicConfig(
@@ -112,6 +106,10 @@ async def generate_tests(request: GenerateTestsRequest):
     - gcs-config: Process multiple mappings from config table
     - scd: Validate Slowly Changing Dimension (Type 1 or Type 2)
     """
+    from app.services.test_executor import test_executor
+    from app.services.history_service import TestHistoryService
+    history_service = TestHistoryService()
+
     try:
         logger.info(f"Received test generation request: mode={request.comparison_mode}")
         
@@ -363,6 +361,9 @@ async def generate_tests(request: GenerateTestsRequest):
 @app.post("/api/save-test-history")
 async def save_test_history(request: SaveHistoryRequest):
     """Save test execution results to BigQuery history."""
+    from app.services.history_service import TestHistoryService
+    history_service = TestHistoryService()
+
     try:
         execution_id = history_service.save_test_results(
             project_id=request.project_id,
@@ -374,6 +375,7 @@ async def save_test_history(request: SaveHistoryRequest):
             metadata=request.metadata,
             cron_schedule=request.cron_schedule
         )
+
         return {"status": "success", "execution_id": execution_id}
     except Exception as e:
         logger.error(f"Error saving test history: {e}")
@@ -384,8 +386,10 @@ async def save_test_history(request: SaveHistoryRequest):
 async def get_test_history(project_id: str = settings.google_cloud_project, limit: int = 50):
     """Get previous test runs (summary level) from BigQuery."""
     try:
-        from app.services.bigquery_service import bigquery_service
+        from app.services.history_service import TestHistoryService
+        history_service = TestHistoryService()
         return history_service.get_test_history(project_id=project_id, limit=limit)
+
     except Exception as e:
         logger.error(f"Error fetching execution history: {e}")
         return []
@@ -398,11 +402,15 @@ async def get_history_details(
 ):
     """Get detailed test results for a specific execution."""
     try:
+        from app.services.history_service import TestHistoryService
+        history_service = TestHistoryService()
+        
         # Query detailed results from the new history service
         results = history_service.get_test_history(
             project_id=project_id,
             execution_id=execution_id
         )
+
         return results
     except Exception as e:
         logger.error(f"Error fetching detailed history: {e}")
@@ -417,11 +425,15 @@ async def get_table_history(
 ):
     """Get history for a specific table across all executions."""
     try:
+        from app.services.history_service import TestHistoryService
+        history_service = TestHistoryService()
+
         return history_service.get_test_history(
             project_id=project_id,
             target_table=target_table,
             limit=limit
         )
+
     except Exception as e:
         logger.error(f"Error fetching table history: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -448,6 +460,7 @@ async def add_scd_config(request: AddSCDConfigRequest):
         }
         
         # Insert into config table
+        from app.services.bigquery_service import bigquery_service
         success = await bigquery_service.insert_scd_config(
             project_id=request.project_id,
             config_dataset=request.config_dataset,
@@ -463,6 +476,7 @@ async def add_scd_config(request: AddSCDConfigRequest):
         
         # Upsert scheduler job if cron_schedule is provided
         if request.cron_schedule:
+            from app.services.scheduler_service import scheduler_service
             await scheduler_service.upsert_job(
                 config_id=request.config_id,
                 cron_schedule=request.cron_schedule,
@@ -552,8 +566,11 @@ async def run_scheduled_tests(request: ScheduledTestRunRequest):
     """Endpoint triggered by Cloud Scheduler to run tests for a single table."""
     try:
         from app.services.test_executor import TestExecutor
+        from app.services.bigquery_service import bigquery_service
+        from app.services.history_service import TestHistoryService
         
         executor = TestExecutor()
+        history_service = TestHistoryService()
         
         # Fetch full config details from BigQuery
         configs = await bigquery_service.read_scd_config_table(
@@ -561,6 +578,7 @@ async def run_scheduled_tests(request: ScheduledTestRunRequest):
             request.config_dataset, 
             request.config_table
         )
+
         
         table_config = next((c for c in configs if c['config_id'] == request.config_id), None)
         if not table_config:
