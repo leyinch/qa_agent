@@ -13,14 +13,21 @@ class SchedulerService:
     """Service to handle Cloud Scheduler job operations."""
 
     def __init__(self):
-        try:
-            self.client = scheduler_v1.CloudSchedulerClient()
-        except Exception as e:
-            logger.warning(f"Failed to initialize SchedulerService (will retry on usage if needed): {e}")
-            self.client = None
+        self._client = None
         self.project = settings.google_cloud_project
         self.location = settings.scheduler_location
         self.parent = f"projects/{self.project}/locations/{self.location}"
+
+    @property
+    def client(self):
+        """Lazy load Cloud Scheduler client."""
+        if not self._client:
+            try:
+                self._client = scheduler_v1.CloudSchedulerClient()
+            except Exception as e:
+                logger.warning(f"Failed to initialize SchedulerService (will retry on usage if needed): {e}")
+                return None
+        return self._client
 
     def _get_job_name(self, config_id: str) -> str:
         """Generate a unique job name for a configuration."""

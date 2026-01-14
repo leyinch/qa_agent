@@ -28,13 +28,24 @@ HISTORY_TABLE_FQN = f"{HISTORY_PROJECT_ID}.{HISTORY_DATASET}.{HISTORY_TABLE}"
 class TestHistoryService:
     """Service for managing test execution history in BigQuery"""
     
+    
     def __init__(self):
-        try:
-            self.client = bigquery.Client(project=HISTORY_PROJECT_ID)
-            self._ensure_table_exists()
-        except Exception as e:
-            logger.error(f"Failed to initialize TestHistoryService: {e}")
-            self.client = None
+        self._client = None
+        self._table_checked = False
+
+    @property
+    def client(self):
+        """Lazy load BigQuery client and ensure table exists."""
+        if not self._client:
+            try:
+                self._client = bigquery.Client(project=HISTORY_PROJECT_ID)
+                if not self._table_checked:
+                    self._ensure_table_exists()
+                    self._table_checked = True
+            except Exception as e:
+                logger.error(f"Failed to initialize TestHistoryService client: {e}")
+                raise
+        return self._client
 
     def _ensure_table_exists(self):
         """Ensure the history table exists in BigQuery."""
@@ -42,16 +53,16 @@ class TestHistoryService:
             # Check dataset
             dataset_ref = f"{HISTORY_PROJECT_ID}.{HISTORY_DATASET}"
             try:
-                self.client.get_dataset(dataset_ref)
+                self._client.get_dataset(dataset_ref)
             except Exception:
                 logger.info(f"Creating dataset {dataset_ref}")
                 dataset = bigquery.Dataset(dataset_ref)
                 dataset.location = "US"
-                self.client.create_dataset(dataset)
+                self._client.create_dataset(dataset)
             
             # Check table
             try:
-                self.client.get_table(HISTORY_TABLE_FQN)
+                self._client.get_table(HISTORY_TABLE_FQN)
             except Exception:
                 logger.info(f"Creating table {HISTORY_TABLE_FQN}")
                 # Schema definition matching backend/create_history_table.sql
@@ -78,7 +89,7 @@ class TestHistoryService:
                 table.time_partitioning = bigquery.TimePartitioning(field="execution_timestamp")
                 table.clustering_fields = ["project_id", "target_table", "status"]
                 
-                self.client.create_table(table)
+                self._client.create_table(table)
         except Exception as e:
             logger.warning(f"Failed to ensure history table exists: {e}")
     
