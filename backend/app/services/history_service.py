@@ -12,6 +12,7 @@ import json
 import logging
 from typing import List, Dict, Optional, Any
 from datetime import datetime, timedelta, date
+import pytz
 
 from app.config import settings
 
@@ -86,13 +87,21 @@ class TestHistoryService:
         target_table: Optional[str] = None,
         mapping_id: Optional[str] = None,
         cron_schedule: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
+        executed_by: Optional[str] = None
     ) -> str:
         """
         Save test execution results to BigQuery history table (one row per table).
         """
         execution_id = str(uuid.uuid4())
-        execution_timestamp = datetime.utcnow()
+        
+        # Get execution timestamp and localize to scheduler timezone if possible
+        try:
+            tz = pytz.timezone(settings.scheduler_timezone)
+            execution_timestamp = datetime.now(tz)
+        except Exception as e:
+            logger.warning(f"Could not localize timestamp to {settings.scheduler_timezone}: {e}")
+            execution_timestamp = datetime.utcnow()
         
         # Aggregate stats
         if isinstance(test_results, list):
@@ -136,7 +145,7 @@ class TestHistoryService:
             "error_message": error_message,
             "cron_schedule": cron_schedule,
             "test_results": json.dumps(test_results, default=json_serial),
-            "executed_by": None,
+            "executed_by": executed_by or "System",
             "metadata": json.dumps(metadata, default=json_serial) if metadata else None
         }
         
