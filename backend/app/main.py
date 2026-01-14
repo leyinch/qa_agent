@@ -315,6 +315,7 @@ async def generate_tests(request: GenerateTestsRequest):
                         test_results=[r.dict() for r in result.predefined_results],
                         target_dataset=request.target_dataset,
                         target_table=request.target_table,
+                        executed_by="Manual Run",
                         metadata={
                             "summary": {
                                 "total_tests": len(result.predefined_results),
@@ -572,6 +573,13 @@ async def run_scheduled_tests(request: ScheduledTestRunRequest):
         results = [r.dict() if hasattr(r, 'dict') else r for r in mapping_result.predefined_results]
         
         # Save to history (Policy: scheduled runs ALWAYS write to history)
+        summary = {
+            "total": len(results),
+            "passed": len([r for r in results if r.get("status") == "PASS"]),
+            "failed": len([r for r in results if r.get("status") == "FAIL"]),
+            "errors": len([r for r in results if r.get("status") == "ERROR"])
+        }
+        
         history_service.save_test_results(
             project_id=request.project_id,
             comparison_mode="scd",
@@ -580,7 +588,12 @@ async def run_scheduled_tests(request: ScheduledTestRunRequest):
             target_table=request.target_table,
             mapping_id=request.config_id,
             cron_schedule=request.cron_schedule,
-            executed_by="Scheduled Run"
+            executed_by="Scheduled Run",
+            metadata={
+                "summary": summary,
+                "source": f"Scheduled SCD: {request.target_table}",
+                "status": "FAIL" if summary["failed"] > 0 or summary["errors"] > 0 else "PASS"
+            }
         )
         
         return {
