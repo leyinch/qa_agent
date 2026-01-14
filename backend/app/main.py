@@ -549,7 +549,7 @@ async def run_scheduled_tests(request: ScheduledTestRunRequest):
     try:
         from app.services.test_executor import TestExecutor
         
-        executor = TestExecutor(request.project_id)
+        executor = TestExecutor()
         
         # Fetch full config details from BigQuery
         configs = await bigquery_service.read_scd_config_table(
