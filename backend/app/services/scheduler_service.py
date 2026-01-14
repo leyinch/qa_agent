@@ -156,40 +156,7 @@ class SchedulerService:
                 logger.error(f"Failed to read SCD configs: {e}")
                 summary["details"].append(f"Error reading SCD configs: {str(e)}")
 
-            # 2. Sync GCS Configs
-            try:
-                gcs_configs = await bigquery_service.read_config_table(
-                    self.project, "transform_config", "data_load_config"
-                )
-                logger.info(f"Found {len(gcs_configs)} GCS configurations")
-                
-                for config in gcs_configs:
-                    summary["total"] += 1
-                    config_id = config.get('mapping_id') # GCS uses mapping_id
-                    cron = config.get('cron_schedule')
-                    
-                    if not cron:
-                        summary["skipped"] += 1
-                        continue
-                    
-                    success, message = await self.upsert_job(
-                        config_id=config_id,
-                        cron_schedule=cron,
-                        target_dataset=config.get('target_dataset', ''),
-                        target_table=config.get('target_table', ''),
-                        config_dataset="transform_config",
-                        config_table="data_load_config"
-                    )
-                    
-                    if success:
-                        summary["synced"] += 1
-                        summary["details"].append(f"Synced GCS {config_id}: {message}")
-                    else:
-                        summary["failed"] += 1
-                        summary["details"].append(f"Failed GCS {config_id}: {message}")
-            except Exception as e:
-                logger.error(f"Failed to read GCS configs: {e}")
-                summary["details"].append(f"Error reading GCS configs: {str(e)}")
+            # GCS Config Syncing removed as it is not required at this stage
                     
             logger.info(f"Scheduler sync complete. Summary: {summary}")
             return summary

@@ -148,18 +148,6 @@ curl -X POST http://localhost:8000/api/generate-tests \
   }'
 ```
 
-### Generate Tests (Config Table)
-
-```bash
-curl -X POST http://localhost:8000/api/generate-tests \
-  -H "Content-Type: application/json" \
-  -d '{
-    "project_id": "[YOUR_PROJECT_ID]",
-    "comparison_mode": "gcs-config",
-    "config_dataset": "config",
-    "config_table": "data_load_config"
-  }'
-```
 
 ---
 

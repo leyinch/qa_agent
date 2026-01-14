@@ -90,30 +90,7 @@ async def sync_all():
     except Exception as e:
         print(f"Error reading SCD config: {e}")
 
-    # 2. Sync GCS Configurations (Optional but recommended)
-    print("\n--- Syncing GCS Configurations ---")
-    try:
-        gcs_configs = await bigquery_service.read_config_table(
-            project_id, "transform_config", "data_load_config"
-        )
-        
-        for config in gcs_configs:
-            mapping_id = config.get('mapping_id')
-            cron = config.get('cron_schedule') # We just added this column
-            
-            if not cron:
-                print(f"Skipping {mapping_id}: No cron schedule set.")
-                continue
-                
-            print(f"Syncing {mapping_id} ({cron})...")
-            # Note: GCS mode uses a slightly different logic in backend/app/main.py 
-            # for triggering but the scheduler job structure is similar.
-            # For now, we reuse the same logic if applicable or just skip for simplicity.
-            # The user mostly cares about SCD right now.
-            print("  (GCS sync skip logic for now - focused on SCD)")
-
-    except Exception as e:
-        print(f"Note: GCS config sync skipped or failed (column might not exist yet): {e}")
+    # GCS Configuration syncing removed as it is not required at this stage
 
     print("\nSync complete!")
 

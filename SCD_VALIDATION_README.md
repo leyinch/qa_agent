@@ -96,7 +96,7 @@ The results page now provides deep insight into test failures:
 
 2. **Run the Master Setup SQL**:  
    Copy and paste the entire contents of [`setup_scd_resources.sql`](file:///c:/Users/LeyinChen/Documents/Client%20-%20Crown/Antigravity/qa_agent/setup_scd_resources.sql) into the query editor and click **Run**. This single script sets up:
-   - ✅ SCD & GCS configuration tables
+   - ✅ SCD validation configuration tables
    - ✅ Mock datasets and tables for testing
    - ✅ Unified execution history table and views
 
@@ -104,7 +104,6 @@ The results page now provides deep insight into test failures:
    - `[YOUR_PROJECT_ID].crown_scd_mock.D_Seat_WD` (SCD1 Mock)
    - `[YOUR_PROJECT_ID].crown_scd_mock.D_Employee_WD` (SCD2 Mock)
    - `[YOUR_PROJECT_ID].transform_config.scd_validation_config` (SCD Config)
-   - `[YOUR_PROJECT_ID].transform_config.data_load_config` (GCS Config)
    - `[YOUR_PROJECT_ID].qa_agent_metadata.test_results_history` (Audit Trail)
 
 ### Step 2: Test SCD Type 1 Validation

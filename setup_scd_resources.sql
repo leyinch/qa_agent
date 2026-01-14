@@ -136,43 +136,7 @@ VALUES
 ]""", '0 9 * * *');
 
 
--- 6. Setup GCS Load Mappings Configuration
-
-CREATE TABLE IF NOT EXISTS `leyin-sandpit.transform_config.data_load_config` (
-  mapping_id STRING NOT NULL,
-  mapping_name STRING,
-  description STRING,
-  source_bucket STRING NOT NULL,
-  source_file_path STRING NOT NULL,
-  source_file_format STRING NOT NULL,
-  target_dataset STRING NOT NULL,
-  target_table STRING NOT NULL,
-  primary_key_columns ARRAY<STRING>,
-  required_columns ARRAY<STRING>,
-  date_columns ARRAY<STRING>,
-  numeric_range_checks JSON,
-  date_range_checks JSON,
-  foreign_key_checks JSON,
-  pattern_checks JSON,
-  outlier_columns ARRAY<STRING>,
-  enabled_test_ids ARRAY<STRING>,
-  auto_suggest BOOLEAN DEFAULT true,
-  is_active BOOLEAN DEFAULT true,
-  cron_schedule STRING,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP(),
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
-);
-
-INSERT INTO `leyin-sandpit.transform_config.data_load_config`
-(mapping_id, mapping_name, description, source_bucket, source_file_path, source_file_format, target_dataset, target_table, primary_key_columns, required_columns, enabled_test_ids, cron_schedule)
-VALUES (
-  'customers_daily', 'Daily Customer Load', 'Sample GCS workload', 
-  'leyin-sandpit-raw', 'customers/*.csv', 'csv', 
-  'analytics', 'customers', 
-  ['customer_id'], ['customer_id', 'email'],
-  ['row_count_match', 'no_nulls_required', 'no_duplicates_pk'],
-  '0 9 * * *'
-);
+-- 6. GCS Load Mappings Configuration (Removed as not required at this stage)
 
 
 -- 7. Setup System Predefined Tests
