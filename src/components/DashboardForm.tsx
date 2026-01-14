@@ -41,7 +41,7 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
 
     // GCS mode state
     const [gcsMode, setGcsMode] = useState<GCSMode>('single');
-    const [configDataset, setConfigDataset] = useState("");
+    const [configDataset, setConfigDataset] = useState("config");
     const [configTable, setConfigTable] = useState("");
     const [gcsBucket, setGcsBucket] = useState("");
     const [gcsFilePath, setGcsFilePath] = useState("");
@@ -812,7 +812,7 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
                                             value={configDataset}
                                             onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfigDataset(e.target.value)}
                                             required
-                                            placeholder="e.g., transform_config"
+                                            placeholder="e.g., config"
                                         />
                                     </div>
 

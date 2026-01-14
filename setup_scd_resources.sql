@@ -3,10 +3,9 @@
 
 
 -- 1. Create Datasets
-CREATE SCHEMA IF NOT EXISTS `leyin-sandpit.crown_scd_mock` OPTIONS(location="US");
-CREATE SCHEMA IF NOT EXISTS `leyin-sandpit.transform_config` OPTIONS(location="US");
-CREATE SCHEMA IF NOT EXISTS `leyin-sandpit.qa_agent_metadata` OPTIONS(location="US");
-CREATE SCHEMA IF NOT EXISTS `leyin-sandpit.analytics` OPTIONS(location="US"); -- For GCS mock targets
+CREATE SCHEMA IF NOT EXISTS `leyin-sandpit.crown_scd_mock` OPTIONS(location="US"); -- Mock tables for testing SCD Type 1 and Type 2 validation logic
+CREATE SCHEMA IF NOT EXISTS `leyin-sandpit.config` OPTIONS(location="US");         -- Centralized configuration tables for the QA Agent (SCD, GCS, and system-wide tests)
+CREATE SCHEMA IF NOT EXISTS `leyin-sandpit.qa_results` OPTIONS(location="US");     -- History and reporting views for test execution results
 
 
 
@@ -53,7 +52,7 @@ VALUES
     
     -- Invalid Date Order (U4)
     ('U4', 'User 4', 5007, '2023-12-01 00:00:00', '2023-01-01 00:00:00', 'Y'),
-
+    
     -- Gap (U5)
     ('U5', 'User 5 A', 5008, '2023-01-01 00:00:00', '2023-03-01 00:00:00', 'N'),
     ('U5', 'User 5 B', 5009, '2023-05-01 00:00:00', '2099-12-31 23:59:59', 'Y');
@@ -101,7 +100,7 @@ VALUES
 
 -- 5. Setup SCD Validation Config Table
 
-CREATE OR REPLACE TABLE `leyin-sandpit.transform_config.scd_validation_config` (
+CREATE TABLE IF NOT EXISTS `leyin-sandpit.config.scd_validation_config` (
     config_id STRING NOT NULL,
     target_dataset STRING NOT NULL,
     target_table STRING NOT NULL,
@@ -116,11 +115,14 @@ CREATE OR REPLACE TABLE `leyin-sandpit.transform_config.scd_validation_config` (
     cron_schedule STRING
 );
 
-INSERT INTO `leyin-sandpit.transform_config.scd_validation_config` (config_id, target_dataset, target_table, scd_type, primary_keys, surrogate_key, begin_date_column, end_date_column, active_flag_column, description, custom_tests, cron_schedule)
-VALUES
-    ('seat_scd1', 'crown_scd_mock', 'D_Seat_WD', 'scd1', ['TableId', 'PositionIDX'], 'DWSeatID', NULL, NULL, NULL, 'SCD1 Mock for Gaming Seats (Test Data)', NULL, '0 9 * * *'),
-    ('employee_scd2', 'crown_scd_mock', 'D_Employee_WD', 'scd2', ['UserId'], 'DWEmployeeID', 'DWBeginEffDateTime', 'DWEndEffDateTime', 'DWCurrentRowFlag', 'SCD2 Mock for Employees (Test Data)', NULL, '0 9 * * *'),
-    ('player_scd2', 'crown_scd_mock', 'D_Player_WD', 'scd2', ['PlayerId'], 'DWPlayerID', 'DWBeginEffDateTime', 'DWEndEffDateTime', 'DWCurrentRowFlag', 'SCD2 Mock for Players (Test Data)', JSON """[
+-- Insert sample configs if not already present
+INSERT INTO `leyin-sandpit.config.scd_validation_config` (config_id, target_dataset, target_table, scd_type, primary_keys, surrogate_key, begin_date_column, end_date_column, active_flag_column, description, custom_tests, cron_schedule)
+SELECT * FROM (
+  SELECT 'seat_scd1' as config_id, 'crown_scd_mock' as target_dataset, 'D_Seat_WD' as target_table, 'scd1' as scd_type, ['TableId', 'PositionIDX'] as primary_keys, 'DWSeatID' as surrogate_key, CAST(NULL AS STRING) as begin_date_column, CAST(NULL AS STRING) as end_date_column, CAST(NULL AS STRING) as active_flag_column, 'SCD1 Mock for Gaming Seats (Test Data)' as description, CAST(NULL AS JSON) as custom_tests, '0 9 * * *' as cron_schedule
+  UNION ALL
+  SELECT 'employee_scd2', 'crown_scd_mock', 'D_Employee_WD', 'scd2', ['UserId'], 'DWEmployeeID', 'DWBeginEffDateTime', 'DWEndEffDateTime', 'DWCurrentRowFlag', 'SCD2 Mock for Employees (Test Data)', NULL, '0 9 * * *'
+  UNION ALL
+  SELECT 'player_scd2', 'crown_scd_mock', 'D_Player_WD', 'scd2', ['PlayerId'], 'DWPlayerID', 'DWBeginEffDateTime', 'DWEndEffDateTime', 'DWCurrentRowFlag', 'SCD2 Mock for Players (Test Data)', JSON """[
     {
         "name": "CreatedDtm Not Null",
         "sql": "SELECT * FROM {{target}} WHERE CreatedDtm IS NULL",
@@ -133,14 +135,13 @@ VALUES
         "description": "CreatedDtm must be less than or equal to UpdatedDtm",
         "severity": "HIGH"
     }
-]""", '0 9 * * *');
+]""", '0 9 * * *'
+) AS t
+WHERE NOT EXISTS (SELECT 1 FROM `leyin-sandpit.config.scd_validation_config` WHERE config_id = t.config_id);
 
 
--- 6. GCS Load Mappings Configuration (Removed as not required at this stage)
-
-
--- 7. Setup System Predefined Tests
-CREATE TABLE IF NOT EXISTS `leyin-sandpit.transform_config.predefined_tests` (
+-- 6. Setup System Predefined Tests
+CREATE TABLE IF NOT EXISTS `leyin-sandpit.config.predefined_tests` (
   test_id STRING NOT NULL,
   test_name STRING NOT NULL,
   test_category STRING NOT NULL,
@@ -152,32 +153,22 @@ CREATE TABLE IF NOT EXISTS `leyin-sandpit.transform_config.predefined_tests` (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
 );
 
-INSERT INTO `leyin-sandpit.transform_config.predefined_tests` 
+INSERT INTO `leyin-sandpit.config.predefined_tests` 
 (test_id, test_name, test_category, severity, description, is_global, is_system)
-VALUES
-('row_count_match', 'Row Count Match', 'completeness', 'HIGH', 'Verify source and target row counts match', true, true),
-('no_nulls_required', 'No NULLs in Required Fields', 'completeness', 'HIGH', 'Check required columns have no NULL values', true, true),
-('no_duplicates_pk', 'No Duplicate Primary Keys', 'integrity', 'HIGH', 'Ensure primary key uniqueness', true, true),
-('referential_integrity', 'Referential Integrity', 'integrity', 'HIGH', 'Validate foreign key relationships', false, true);
+SELECT * FROM (
+  SELECT 'row_count_match' as test_id, 'Row Count Match' as test_name, 'completeness' as test_category, 'HIGH' as severity, 'Verify source and target row counts match' as description, true as is_global, true as is_system
+  UNION ALL
+  SELECT 'no_nulls_required', 'No NULLs in Required Fields', 'completeness', 'HIGH', 'Check required columns have no NULL values', true, true
+  UNION ALL
+  SELECT 'no_duplicates_pk', 'No Duplicate Primary Keys', 'integrity', 'HIGH', 'Ensure primary key uniqueness', true, true
+  UNION ALL
+  SELECT 'referential_integrity', 'Referential Integrity', 'integrity', 'HIGH', 'Validate foreign key relationships', false, true
+) AS t
+WHERE NOT EXISTS (SELECT 1 FROM `leyin-sandpit.config.predefined_tests` WHERE test_id = t.test_id);
 
--- 8. Setup AI Suggested Tests
-CREATE TABLE IF NOT EXISTS `leyin-sandpit.transform_config.suggested_tests` (
-  suggestion_id STRING NOT NULL,
-  mapping_id STRING NOT NULL,
-  test_name STRING NOT NULL,
-  test_category STRING NOT NULL,
-  severity STRING NOT NULL,
-  sql_query STRING NOT NULL,
-  reasoning STRING,
-  status STRING DEFAULT 'pending',
-  suggested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
-);
+-- 7. Setup Test Results History Table
 
-
-
--- 9. Setup Test Results History Table
-
-CREATE TABLE IF NOT EXISTS `leyin-sandpit.qa_agent_metadata.test_results_history` (
+CREATE TABLE IF NOT EXISTS `leyin-sandpit.qa_results.scd_test_history` (
   execution_id STRING NOT NULL,
   execution_timestamp TIMESTAMP NOT NULL,
   project_id STRING NOT NULL,
@@ -198,19 +189,19 @@ CREATE TABLE IF NOT EXISTS `leyin-sandpit.qa_agent_metadata.test_results_history
 PARTITION BY DATE(execution_timestamp)
 CLUSTER BY project_id, target_table, status;
 
--- 10. Setup Latest Results View
+-- 8. Setup Latest Results View
 
-CREATE OR REPLACE VIEW `leyin-sandpit.qa_agent_metadata.latest_test_results_by_table` AS
+CREATE OR REPLACE VIEW `leyin-sandpit.qa_results.latest_scd_results_by_table` AS
 SELECT 
   t.*
-FROM `leyin-sandpit.qa_agent_metadata.test_results_history` t
+FROM `leyin-sandpit.qa_results.scd_test_history` t
 INNER JOIN (
   SELECT 
     project_id,
     target_dataset,
     target_table,
     MAX(execution_timestamp) as latest_execution
-  FROM `leyin-sandpit.qa_agent_metadata.test_results_history`
+  FROM `leyin-sandpit.qa_results.scd_test_history`
   WHERE target_table IS NOT NULL
   GROUP BY project_id, target_dataset, target_table
 ) latest
@@ -218,3 +209,22 @@ ON t.project_id = latest.project_id
   AND t.target_dataset = latest.target_dataset
   AND t.target_table = latest.target_table
   AND t.execution_timestamp = latest.latest_execution;
+
+-- 9. Setup Detailed Reporting View
+
+CREATE OR REPLACE VIEW `leyin-sandpit.qa_results.v_scd_validation_report` AS
+SELECT 
+    FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', execution_timestamp) as execution_time,
+    target_table,
+    executed_by,
+    STRING(test.test_name) as test_name,
+    STRING(test.status) as status,
+    CASE 
+        WHEN STRING(test.test_id) = 'table_exists' AND STRING(test.status) = 'PASS' 
+            THEN 'Table is online and accessible'
+        WHEN JSON_VALUE(test.rows_affected) = '0' 
+            THEN 'Check passed - no issues found'
+        ELSE TO_JSON_STRING(test.sample_data)
+    END as validation_findings
+FROM `leyin-sandpit.qa_results.scd_test_history`,
+UNNEST(JSON_QUERY_ARRAY(test_results)) AS test;

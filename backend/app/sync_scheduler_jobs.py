@@ -1,6 +1,19 @@
 """
 Utility script to synchronize BigQuery configurations with Cloud Scheduler.
-Run this script after enabling the Cloud Scheduler API or adding manual entries to BigQuery.
+
+Purpose:
+- This script bridges the gap between BigQuery configuration tables and Cloud Scheduler jobs.
+- While the UI automatically creates scheduler jobs when you add a config via the Dashboard, 
+  manual SQL INSERTs into BigQuery do not automatically trigger the backend to create a schedule.
+- Run this script to "catch up" and create/update Cloud Scheduler jobs for any configurations added manually via SQL.
+
+When to run:
+1. After manually inserting rows into `config.scd_validation_config` via BigQuery Console.
+2. During initial deployment if Cloud Scheduler jobs were not created.
+3. To repair or resync jobs if they were accidentally deleted from Cloud Scheduler.
+
+Usage:
+    python scripts/src/sync_scheduler_jobs.py
 """
 import os
 import sys
@@ -62,7 +75,7 @@ async def sync_all():
     print("\n--- Syncing SCD Configurations ---")
     try:
         scd_configs = await bigquery_service.read_scd_config_table(
-            project_id, "transform_config", "scd_validation_config"
+            project_id, "config", "scd_validation_config"
         )
         
         for config in scd_configs:
@@ -79,7 +92,7 @@ async def sync_all():
                 cron_schedule=cron,
                 target_dataset=config['target_dataset'],
                 target_table=config['target_table'],
-                config_dataset="transform_config",
+                config_dataset="config",
                 config_table="scd_validation_config"
             )
             if success:

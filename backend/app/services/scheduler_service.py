@@ -124,7 +124,7 @@ class SchedulerService:
             # 1. Sync SCD Configs
             try:
                 scd_configs = await bigquery_service.read_scd_config_table(
-                    self.project, "transform_config", "scd_validation_config"
+                    self.project, "config", "scd_validation_config"
                 )
                 logger.info(f"Found {len(scd_configs)} SCD configurations")
                 
@@ -142,7 +142,7 @@ class SchedulerService:
                         cron_schedule=cron,
                         target_dataset=config.get('target_dataset', ''),
                         target_table=config.get('target_table', ''),
-                        config_dataset="transform_config",
+                        config_dataset="config",
                         config_table="scd_validation_config"
                     )
                     

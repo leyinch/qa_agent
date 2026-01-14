@@ -167,7 +167,7 @@ class BigQueryService:
     async def ensure_config_tables(
         self,
         project_id: str,
-        config_dataset: str = "transform_config"
+        config_dataset: str = "config"
     ) -> None:
         """Ensure all configuration tables exist."""
         try:

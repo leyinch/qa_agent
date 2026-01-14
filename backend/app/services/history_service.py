@@ -20,8 +20,8 @@ logger = logging.getLogger(__name__)
 
 # Configuration
 HISTORY_PROJECT_ID = settings.google_cloud_project
-HISTORY_DATASET = "qa_agent_metadata"
-HISTORY_TABLE = "test_results_history"
+HISTORY_DATASET = "qa_results"
+HISTORY_TABLE = "scd_test_history"
 HISTORY_TABLE_FQN = f"{HISTORY_PROJECT_ID}.{HISTORY_DATASET}.{HISTORY_TABLE}"
 
 

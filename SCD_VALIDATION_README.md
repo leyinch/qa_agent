@@ -59,9 +59,10 @@ The QA Agent now supports **SCD Type 1 and Type 2 Validation**. This feature val
 - **New Feature**: Added **"Schedule Frequency"** dropdown (Daily, Weekly, Monthly) for easier cron setup.
 - **Layout Fixes**: Improved alignment and width of all form fields (Project ID, Dataset, etc.) for a premium UI feel.
 - **Add New Configuration**: Native support for adding new SCD tables to the configuration table directly from the UI.
+- **Config Defaults**: Now points to `config` dataset by default.
 
 **File**: `src/components/HistoryList.tsx`
-- Refactored to display unified history data from the new `test_results_history` table.
+- Refactored to display unified history data from the new `scd_test_history` table in `qa_results`.
 - Added display for `cron_schedule` with ⏰ icon.
 
 **File**: `src/app/page.tsx` & `src/app/dashboard/page.tsx`
@@ -96,15 +97,17 @@ The results page now provides deep insight into test failures:
 
 2. **Run the Master Setup SQL**:  
    Copy and paste the entire contents of [`setup_scd_resources.sql`](file:///c:/Users/LeyinChen/Documents/Client%20-%20Crown/Antigravity/qa_agent/setup_scd_resources.sql) into the query editor and click **Run**. This single script sets up:
-   - ✅ SCD validation configuration tables
+   - ✅ SCD validation configuration tables in `config` dataset
    - ✅ Mock datasets and tables for testing
-   - ✅ Unified execution history table and views
+   - ✅ Unified execution history table `scd_test_history` in `qa_results` dataset
+   - ✅ Reporting view `v_scd_validation_report`
 
 3. **Verify Resources Created**:
    - `[YOUR_PROJECT_ID].crown_scd_mock.D_Seat_WD` (SCD1 Mock)
    - `[YOUR_PROJECT_ID].crown_scd_mock.D_Employee_WD` (SCD2 Mock)
-   - `[YOUR_PROJECT_ID].transform_config.scd_validation_config` (SCD Config)
-   - `[YOUR_PROJECT_ID].qa_agent_metadata.test_results_history` (Audit Trail)
+   - `[YOUR_PROJECT_ID].config.scd_validation_config` (SCD Config)
+   - `[YOUR_PROJECT_ID].qa_results.scd_test_history` (Audit Trail)
+   - `[YOUR_PROJECT_ID].qa_results.v_scd_validation_report` (Reporting View)
 
 ### Step 2: Test SCD Type 1 Validation
 
@@ -224,7 +227,7 @@ The results page now provides deep insight into test failures:
 ## 📝 Notes
 
 ### About the Config Table
-The `transform_config.scd_validation_config` table can now be used for **batch validation** of multiple dimension tables.
+The `config.scd_validation_config` table can now be used for **batch validation** of multiple dimension tables.
 
 **Two ways to use SCD Validation:**
 1. **Direct Input** (for testing individual tables): Manually enter dataset, table, and key information
@@ -234,7 +237,7 @@ The `transform_config.scd_validation_config` table can now be used for **batch v
 1. Navigate to SCD Validation in the UI
 2. Toggle to "Config Table" mode
 3. Enter:
-   - **Config Dataset**: `transform_config`
+   - **Config Dataset**: `config`
    - **Config Table**: `scd_validation_config`
 4. Click "Generate & Run Tests"
 5. The app will validate ALL tables defined in the config table
@@ -258,7 +261,7 @@ The system is now **fully resilient**. Here is how it handles both cases:
 > ```bash
 > gcloud app create --region=[YOUR_REGION_BASE] --project=[YOUR_PROJECT_ID]
 > ```
-     *(In PowerShell: `Invoke-RestMethod -Method Post -Uri "https://[your-backend-url]/api/sync-scheduler"`)*
+>      *(In PowerShell: `Invoke-RestMethod -Method Post -Uri "https://[your-backend-url]/api/sync-scheduler"`)*
 
 **Monitoring**: Scheduled runs are identifiable in the "Execution History" tab by the ⏰ icon.
 
@@ -267,13 +270,22 @@ The system is now **fully resilient**. Here is how it handles both cases:
 - `crown_scd_mock.D_Employee_WD` (SCD Type 2) - Employee mock data with intentional errors
 
 > [!NOTE]
-> The mock tables use production naming convention. These tables contain test data with intentional errors for validation testing.
+> The mock tables use production naming convention for demonstration.
 
 ### Service Account Permissions
 Ensure the Cloud Run service account has these BigQuery permissions:
 - `BigQuery Data Viewer`
 - `BigQuery Job User`
-- `BigQuery Data Editor` (Required for adding new configurations)
+- `BigQuery Data Editor` (Required for adding new configurations and writing to `qa_results`)
+
+---
+
+## 📄 Related Files
+- [DashboardForm.tsx](file:///c:/Users/LeyinChen/Documents/Client%20-%20Crown/Antigravity/qa_agent/src/components/DashboardForm.tsx) - Frontend form
+- [ResultsView.tsx](file:///c:/Users/LeyinChen/Documents/Client%20-%20Crown/Antigravity/qa_agent/src/components/ResultsView.tsx) - Results dashboard
+- [test_executor.py](file:///c:/Users/LeyinChen/Documents/Client%20-%20Crown/Antigravity/qa_agent/backend/app/services/test_executor.py) - Backend logic
+- [history_service.py](file:///c:/Users/LeyinChen/Documents/Client%20-%20Crown/Antigravity/qa_agent/backend/app/services/history_service.py) - History management
+- [setup_scd_resources.sql](file:///c:/Users/LeyinChen/Documents/Client%20-%20Crown/Antigravity/qa_agent/setup_scd_resources.sql) - Database setup script
 
 ---
 
