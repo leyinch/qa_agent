@@ -611,6 +611,8 @@ async def run_scheduled_tests(request: ScheduledTestRunRequest):
                 "failed": len([t for t in results if t.get('status') == 'FAIL'])
             }
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error running scheduled tests: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
