@@ -545,9 +545,6 @@ async def get_table_metadata(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
 @app.post("/api/run-scheduled-tests")
 async def run_scheduled_tests(request: ScheduledTestRunRequest):
     """Endpoint triggered by Cloud Scheduler to run tests for a single table."""
@@ -608,3 +605,8 @@ async def run_scheduled_tests(request: ScheduledTestRunRequest):
     except Exception as e:
         logger.error(f"Error running scheduled tests: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
