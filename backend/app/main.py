@@ -201,7 +201,7 @@ async def generate_tests(request: GenerateTestsRequest):
                         test_results=[r.dict() for r in result.predefined_results],
                         target_dataset=request.target_dataset,
                         target_table=request.target_table,
-                        executed_by="UI User",
+                        executed_by="Manual Run",
                         metadata={
                             "summary": summary.dict(),
                             "mapping_info": result.mapping_info.dict() if result.mapping_info else None,
@@ -234,7 +234,7 @@ async def generate_tests(request: GenerateTestsRequest):
                         comparison_mode="schema_validation",
                         test_results=result_data, # Schema validation returns a dict
                         target_dataset=",".join(request.datasets or []),
-                        executed_by="UI User",
+                        executed_by="Manual Run",
                         metadata={
                             "summary": summary,
                             "source": "ERD Description",
@@ -580,7 +580,7 @@ async def run_scheduled_tests(request: ScheduledTestRunRequest):
             target_table=request.target_table,
             mapping_id=request.config_id,
             cron_schedule=request.cron_schedule,
-            executed_by="Cloud Scheduler"
+            executed_by="Scheduled Run"
         )
         
         return {
