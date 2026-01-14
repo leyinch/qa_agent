@@ -179,27 +179,28 @@ async def generate_tests(request: GenerateTestsRequest):
                 'ai_suggestions': result.ai_suggestions
             }
 
-                # Log execution
-                try:
-                    # Note: error_message in history is for system/engine errors, 
-                    # while data validation failures are tracked in summary stats.
-                    history_service.save_test_results(
-                        project_id=request.project_id,
-                        comparison_mode="gcs_single_file",
-                        test_results=[r.dict() for r in result.predefined_results],
-                        target_dataset=request.target_dataset,
-                        target_table=request.target_table,
-                        executed_by="Manual Run",
-                        metadata={
-                            "summary": summary.dict(),
-                            "mapping_info": result.mapping_info.dict() if result.mapping_info else None,
-                            "ai_suggestions": [s.dict() for s in result.ai_suggestions],
-                            "source": f"gs://{request.gcs_bucket}/{request.gcs_file_path}",
-                            "status": "FAIL" if summary.failed > 0 or summary.errors > 0 else "PASS"
-                        }
-                    )
-                except Exception as e:
-                    logger.error(f"Failed to log execution: {e}")
+            # Log execution
+            try:
+                # Note: error_message in history is for system/engine errors, 
+                # while data validation failures are tracked in summary stats.
+                history_service.save_test_results(
+                    project_id=request.project_id,
+                    comparison_mode="gcs_single_file",
+                    test_results=[r.dict() for r in result.predefined_results],
+                    target_dataset=request.target_dataset,
+                    target_table=request.target_table,
+                    executed_by="Manual Run",
+                    metadata={
+                        "summary": summary.dict(),
+                        "mapping_info": result.mapping_info.dict() if result.mapping_info else None,
+                        "ai_suggestions": [s.dict() for s in result.ai_suggestions],
+                        "source": f"gs://{request.gcs_bucket}/{request.gcs_file_path}",
+                        "status": "FAIL" if summary.failed > 0 or summary.errors > 0 else "PASS"
+                    }
+                )
+            except Exception as e:
+                logger.error(f"Failed to log execution: {e}")
+
             
             return response_data
         
