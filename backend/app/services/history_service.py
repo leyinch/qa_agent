@@ -11,6 +11,7 @@ import uuid
 import json
 import logging
 from typing import List, Dict, Optional, Any
+from datetime import datetime, timedelta, date
 
 from app.config import settings
 
@@ -114,6 +115,12 @@ class TestHistoryService:
             failed_tests = 1 if status == "FAIL" else 0
             error_message = None
 
+        def json_serial(obj):
+            """JSON serializer for objects not serializable by default json code"""
+            if isinstance(obj, (datetime, date)):
+                return obj.isoformat()
+            return str(obj)
+
         row = {
             "execution_id": execution_id,
             "execution_timestamp": execution_timestamp.isoformat(),
@@ -128,9 +135,9 @@ class TestHistoryService:
             "failed_tests": failed_tests,
             "error_message": error_message,
             "cron_schedule": cron_schedule,
-            "test_results": json.dumps(test_results),
-            "executed_by": None,  # TODO: Add auth
-            "metadata": json.dumps(metadata) if metadata else None
+            "test_results": json.dumps(test_results, default=json_serial),
+            "executed_by": None,
+            "metadata": json.dumps(metadata, default=json_serial) if metadata else None
         }
         
         # Insert into BigQuery
