@@ -324,11 +324,8 @@ export default function ResultsView() {
                                     </div>
                                 )}
                             </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
-                                <div>
-                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>Source Dataset/Table</div>
-                                    <div style={{ fontWeight: '600', fontSize: '0.9375rem' }}>{mappingResults[activeTab].mapping_info?.source || 'N/A'}</div>
-                                </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '2rem' }}>
+
                                 <div>
                                     <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>Target Dataset/Table</div>
                                     <div style={{ fontWeight: '600', fontSize: '0.9375rem' }}>{mappingResults[activeTab].mapping_info?.target || 'N/A'}</div>
