@@ -111,8 +111,11 @@ class TestHistoryService:
         execution_id = str(uuid.uuid4())
         
         # Get execution timestamp and localize to scheduler timezone if possible
+        # Get execution timestamp and localize to scheduler timezone if possible
         try:
-            tz = pytz.timezone(settings.scheduler_timezone)
+            from zoneinfo import ZoneInfo
+            # zoneinfo comes with python 3.9+
+            tz = ZoneInfo(settings.scheduler_timezone)
             # Get current time in target timezone, then strip tzinfo to make it naive
             # This forces BigQuery to store the "face value" of the local time
             execution_timestamp = datetime.now(tz).replace(tzinfo=None)
