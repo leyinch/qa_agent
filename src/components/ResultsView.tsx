@@ -608,6 +608,21 @@ export default function ResultsView() {
         <div style={{ padding: '2rem', maxWidth: '1400px', margin: '0 auto', animation: 'fadeIn 0.5s ease-out' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '2rem' }}>
                 <div>
+                    <button
+                        onClick={() => window.location.href = '/'} // Simple navigation back to home/history
+                        className="btn btn-outline"
+                        style={{
+                            marginBottom: '1rem',
+                            border: 'none',
+                            padding: '0',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            color: 'var(--secondary-foreground)'
+                        }}
+                    >
+                        <span>←</span> Back to History
+                    </button>
                     <div style={{ color: 'var(--primary)', fontWeight: '700', fontSize: '0.875rem', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '0.5rem' }}>
                         Validation Report
                     </div>

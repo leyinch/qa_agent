@@ -291,3 +291,24 @@ class TestHistoryService:
         results = query_job.result()
         
         return [dict(row) for row in results]
+
+    def clear_history(self, project_id: str) -> None:
+        """
+        Delete all execution history for a specific project.
+        
+        Args:
+            project_id: Project ID to clear history for
+        """
+        try:
+            query = f"DELETE FROM `{HISTORY_TABLE_FQN}` WHERE project_id = @project_id"
+            job_config = bigquery.QueryJobConfig(
+                query_parameters=[
+                    bigquery.ScalarQueryParameter("project_id", "STRING", project_id)
+                ]
+            )
+            query_job = self.client.query(query, job_config=job_config)
+            query_job.result()  # Wait for completion
+            logger.info(f"Cleared history for project {project_id}")
+        except Exception as e:
+            logger.error(f"Failed to clear history: {e}")
+            raise

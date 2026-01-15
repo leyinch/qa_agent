@@ -53,8 +53,35 @@ export default function HistoryList({ projectId, onViewResult }: HistoryListProp
         fetchHistory();
     }, []);
 
+    // Clear history handler
+    const handleClearHistory = async () => {
+        if (!projectId) return;
+        if (!confirm("Are you sure you want to clear the ENTIRE execution history for this project? This action cannot be undone.")) {
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const res = await fetch(`/api/history?project_id=${projectId}`, {
+                method: 'DELETE'
+            });
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.detail || "Failed to clear history");
+            }
+            // Refresh list
+            fetchHistory();
+        } catch (err: any) {
+            alert(`Error clearing history: ${err.message}`);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const handleViewClick = (run: HistoryItem) => {
         let results = run.test_results || run.details;
+
+        // Parse if string
         if (typeof results === 'string') {
             try {
                 results = JSON.parse(results);
@@ -66,19 +93,32 @@ export default function HistoryList({ projectId, onViewResult }: HistoryListProp
         }
 
         // Normalize for ResultsView
-        const normalized = {
+        const isBatchMode = run.comparison_mode === 'scd_config_table' || run.comparison_mode === 'gcs_config';
+
+        const normalized: any = {
             summary: {
                 total_tests: run.total_tests,
                 passed: run.passed_tests,
                 failed: run.failed_tests,
                 errors: (run.total_tests - run.passed_tests - run.failed_tests)
             },
-            predefined_results: Array.isArray(results) ? results : [],
             comparison_mode: run.comparison_mode,
             project_id: run.project_id,
             target_table: run.target_table || run.target,
             cron_schedule: run.cron_schedule
         };
+
+        // If batch mode, put results in 'results_by_mapping' so ResultsView renders tabs
+        if (isBatchMode) {
+            normalized.results_by_mapping = Array.isArray(results) ? results : [results];
+            // Ensure summary has total_mappings if missing
+            if (!normalized.summary.total_mappings && normalized.results_by_mapping) {
+                normalized.summary.total_mappings = normalized.results_by_mapping.length;
+            }
+        } else {
+            // Single mode
+            normalized.predefined_results = Array.isArray(results) ? results : [];
+        }
 
         onViewResult(normalized);
     };
@@ -140,6 +180,7 @@ export default function HistoryList({ projectId, onViewResult }: HistoryListProp
                 Error: {error}
                 <br />
                 <button
+                    type="button"
                     onClick={fetchHistory}
                     className="btn btn-outline"
                     style={{ marginTop: '1rem' }}
@@ -154,14 +195,27 @@ export default function HistoryList({ projectId, onViewResult }: HistoryListProp
         <div style={{ width: '100%' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                 <h3 style={{ fontSize: '1.25rem', fontWeight: '600', margin: 0 }}>Execution History</h3>
-                <button
-                    onClick={fetchHistory}
-                    className="btn btn-outline"
-                    style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}
-                    disabled={loading}
-                >
-                    {loading ? 'Refreshing...' : '🔄 Refresh'}
-                </button>
+                <div style={{ display: 'flex', gap: '0.75rem' }}>
+                    <button
+                        type="button"
+                        onClick={handleClearHistory}
+                        className="btn btn-outline"
+                        style={{ padding: '0.5rem 1rem', fontSize: '0.875rem', color: 'var(--error-text)', borderColor: 'var(--error-text)' }}
+                        disabled={loading}
+                        title="Clear all history for this project"
+                    >
+                        🗑️ Clear History
+                    </button>
+                    <button
+                        type="button"
+                        onClick={fetchHistory}
+                        className="btn btn-outline"
+                        style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}
+                        disabled={loading}
+                    >
+                        {loading ? 'Refreshing...' : '🔄 Refresh'}
+                    </button>
+                </div>
             </div>
 
             {history.length === 0 ? (

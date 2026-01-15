@@ -384,6 +384,19 @@ async def get_test_history(project_id: str = settings.google_cloud_project, limi
         return []
 
 
+@app.delete("/api/history")
+async def clear_test_history(project_id: str):
+    """Clear all test execution history for a project."""
+    try:
+        from app.services.history_service import TestHistoryService
+        history_service = TestHistoryService()
+        history_service.clear_history(project_id)
+        return {"status": "success", "message": f"History cleared for {project_id}"}
+    except Exception as e:
+        logger.error(f"Error clearing history: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/history-details")
 async def get_history_details(
     execution_id: str,
