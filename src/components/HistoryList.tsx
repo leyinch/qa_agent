@@ -11,6 +11,7 @@ interface HistoryItem {
     comparison_mode: string;
     source?: string;
     target?: string;
+    target_dataset?: string; // New schema
     target_table?: string; // New schema
     status: string;
     total_tests: number;
@@ -229,7 +230,7 @@ export default function HistoryList({ projectId, onViewResult }: HistoryListProp
                             <tr style={{ background: 'var(--secondary)', borderBottom: '1px solid var(--border)', textAlign: 'left' }}>
                                 <th style={{ padding: '0.75rem 1rem' }}>Time</th>
                                 <th style={{ padding: '0.75rem 1rem' }}>Mode</th>
-                                <th style={{ padding: '0.75rem 1rem' }}>Source / Target</th>
+                                <th style={{ padding: '0.75rem 1rem' }}>Target Table</th>
                                 <th style={{ padding: '0.75rem 1rem' }}>Status</th>
                                 <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Distribution</th>
                                 <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Action</th>
@@ -260,8 +261,9 @@ export default function HistoryList({ projectId, onViewResult }: HistoryListProp
                                             )}
                                         </td>
                                         <td style={{ padding: '0.75rem 1rem' }}>
-                                            <div style={{ fontSize: '0.75rem', color: 'var(--secondary-foreground)' }}>Src: <span style={{ color: 'var(--foreground)' }}>{run.source || (run as any).metadata?.source || '-'}</span></div>
-                                            <div style={{ fontSize: '0.75rem', color: 'var(--secondary-foreground)' }}>Tgt: <span style={{ color: 'var(--foreground)' }}>{run.target_table || run.target || (run as any).metadata?.target || '-'}</span></div>
+                                            <div style={{ color: 'var(--foreground)', fontWeight: '500' }}>
+                                                {run.target_dataset ? `${run.target_dataset}.` : ''}{run.target_table || run.target || (run as any).metadata?.target || '-'}
+                                            </div>
                                         </td>
                                         <td style={{ padding: '0.75rem 1rem' }}>
                                             {getStatusBadge(run.status)}
