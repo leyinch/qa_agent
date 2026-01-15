@@ -313,15 +313,12 @@ class TestHistoryService:
             project_id: Project ID to clear history for
         """
         try:
-            query = f"DELETE FROM `{HISTORY_TABLE_FQN}` WHERE project_id = @project_id"
-            job_config = bigquery.QueryJobConfig(
-                query_parameters=[
-                    bigquery.ScalarQueryParameter("project_id", "STRING", project_id)
-                ]
-            )
+            # Drop the table entirely to bypass "streaming buffer" locks that prevent DELETE/UPDATE
+            query = f"DROP TABLE IF EXISTS `{HISTORY_TABLE_FQN}`"
+            job_config = bigquery.QueryJobConfig() # No params needed
             query_job = self.client.query(query, job_config=job_config)
             query_job.result()  # Wait for completion
-            logger.info(f"Cleared history for project {project_id}")
+            logger.info(f"Cleared history for project {project_id} by dropping table")
         except Exception as e:
             logger.error(f"Failed to clear history: {e}")
             raise
