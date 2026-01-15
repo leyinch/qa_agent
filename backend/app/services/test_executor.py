@@ -337,7 +337,7 @@ class TestExecutor:
                 mapping_id=mapping_id,
                 mapping_info=MappingInfo(
                     source="SCD Validation",
-                    target=full_table_name,
+                    target=f"{target_dataset}.{target_table}",
                     file_row_count=0,
                     table_row_count=bq_row_count
                 ),

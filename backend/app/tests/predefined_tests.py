@@ -234,7 +234,7 @@ PREDEFINED_TESTS = {
         is_global=False,
         generate_sql=lambda config: (
             f"""
-            SELECT {' , '.join(config['primary_keys'])}, {config['begin_date_column']}, COUNT(*)
+            SELECT {' , '.join(config['primary_keys'])}, {config['begin_date_column']}, COUNT(*) as duplicate_count
             FROM `{config['full_table_name']}`
             GROUP BY {' , '.join(config['primary_keys'])}, {config['begin_date_column']}
             HAVING COUNT(*) > 1
@@ -252,7 +252,7 @@ PREDEFINED_TESTS = {
         is_global=False,
         generate_sql=lambda config: (
             f"""
-            SELECT {' , '.join(config['primary_keys'])}, {config['end_date_column']}, COUNT(*)
+            SELECT {' , '.join(config['primary_keys'])}, {config['end_date_column']}, COUNT(*) as duplicate_count
             FROM `{config['full_table_name']}`
             GROUP BY {' , '.join(config['primary_keys'])}, {config['end_date_column']}
             HAVING COUNT(*) > 1
