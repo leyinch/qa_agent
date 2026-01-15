@@ -115,25 +115,9 @@ async def generate_tests(request: GenerateTestsRequest):
                 config_table=request.config_table
             )
             
-            try:
-                summary_data = result['summary']
-                # Convert results objects to dicts for JSON serialization
-                results_by_mapping_dicts = [r.dict() for r in result['results_by_mapping']]
-
-                history_service.save_test_results(
-                    project_id=request.project_id,
-                    comparison_mode="gcs_config_table",
-                    test_results=results_by_mapping_dicts,
-                    target_dataset=request.config_dataset,
-                    target_table=request.config_table,
-                    metadata={
-                        "summary": summary_data,
-                        "source": f"{request.config_dataset}.{request.config_table}",
-                        "status": "AT_RISK" if summary_data['failed'] > 0 else "PASS"
-                    }
-                )
-            except Exception as e:
-                logger.error(f"Failed to log config execution: {e}")
+            # History logging disabled for non-SCD tests per user request
+            # if needed in future, enable it or write to a different table
+            pass
 
             return ConfigTableResponse(
                 summary=ConfigTableSummary(**result['summary']),
@@ -180,24 +164,10 @@ async def generate_tests(request: GenerateTestsRequest):
             }
 
             # Log execution
+            # History logging disabled for non-SCD tests per user request
             try:
-                # Note: error_message in history is for system/engine errors, 
-                # while data validation failures are tracked in summary stats.
-                history_service.save_test_results(
-                    project_id=request.project_id,
-                    comparison_mode="gcs_single_file",
-                    test_results=[r.dict() for r in result.predefined_results],
-                    target_dataset=request.target_dataset,
-                    target_table=request.target_table,
-                    executed_by="Manual Run",
-                    metadata={
-                        "summary": summary.dict(),
-                        "mapping_info": result.mapping_info.dict() if result.mapping_info else None,
-                        "ai_suggestions": [s.dict() for s in result.ai_suggestions],
-                        "source": f"gs://{request.gcs_bucket}/{request.gcs_file_path}",
-                        "status": "FAIL" if summary.failed > 0 or summary.errors > 0 else "PASS"
-                    }
-                )
+                # Log execution - disabled
+                pass 
             except Exception as e:
                 logger.error(f"Failed to log execution: {e}")
 
@@ -214,24 +184,8 @@ async def generate_tests(request: GenerateTestsRequest):
                 )
                 
                 # Log Schema Validation
-                try:
-                    summary = result_data.get('summary', {})
-                    issues = result_data.get('summary', {}).get('total_issues', 0)
-                    
-                    history_service.save_test_results(
-                        project_id=request.project_id,
-                        comparison_mode="schema_validation",
-                        test_results=result_data, # Schema validation returns a dict
-                        target_dataset=",".join(request.datasets or []),
-                        executed_by="Manual Run",
-                        metadata={
-                            "summary": summary,
-                            "source": "ERD Description",
-                            "status": "AT_RISK" if issues > 0 else "PASS"
-                        }
-                    )
-                except Exception as log_err:
-                    logger.error(f"Failed to log schema execution: {log_err}")
+                # History logging disabled for non-SCD tests per user request
+                pass
 
                 return result_data
             except Exception as e:
