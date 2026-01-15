@@ -372,6 +372,19 @@ async def clear_test_history(project_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/api/history/migrate")
+async def migrate_history_schema():
+    """Migrate history table schema from TIMESTAMP to DATETIME."""
+    try:
+        from app.services.history_service import TestHistoryService
+        history_service = TestHistoryService()
+        result = history_service.migrate_to_datetime()
+        return result
+    except Exception as e:
+        logger.error(f"Error migrating history schema: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/history-details")
 async def get_history_details(
     execution_id: str,

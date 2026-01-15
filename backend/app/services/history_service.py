@@ -65,7 +65,7 @@ class TestHistoryService:
                 # Schema definition matching backend/create_history_table.sql
                 schema = [
                     bigquery.SchemaField("execution_id", "STRING", mode="REQUIRED"),
-                    bigquery.SchemaField("execution_timestamp", "TIMESTAMP", mode="REQUIRED"),
+                    bigquery.SchemaField("execution_timestamp", "DATETIME", mode="REQUIRED"),
                     bigquery.SchemaField("project_id", "STRING", mode="REQUIRED"),
                     bigquery.SchemaField("comparison_mode", "STRING", mode="REQUIRED"),
                     bigquery.SchemaField("target_dataset", "STRING", mode="NULLABLE"),
@@ -110,12 +110,10 @@ class TestHistoryService:
 
         execution_id = str(uuid.uuid4())
         
-        # Get execution timestamp and localize to scheduler timezone if possible
-        # Store true UTC timestamp
-        # The frontend will handle localization to the user's timezone.
-        # Storing naive local time in a TIMESTAMP column causes BigQuery to treat it as UTC,
-        # leading to "double localization" (e.g. +11h became +22h) when read back.
-        execution_timestamp = datetime.utcnow()
+        # Get execution timestamp in Melbourne time (wall-clock time)
+        # We store as DATETIME (local time) so it appears correct in BigQuery
+        tz = pytz.timezone('Australia/Melbourne')
+        execution_timestamp = datetime.now(tz).replace(tzinfo=None)
         
         # Aggregate stats
         if isinstance(test_results, list):
@@ -192,9 +190,6 @@ class TestHistoryService:
             start_date: Filter results after this date (optional)
             end_date: Filter results before this date (optional)
             limit: Maximum number of results to return
-        
-        Returns:
-            List of test execution records
         """
         # Select columns based on whether we need full details (execution_id provided) or just summary
         select_columns = [
@@ -230,11 +225,11 @@ class TestHistoryService:
         
         if start_date:
             query_parts.append("AND execution_timestamp >= @start_date")
-            params.append(bigquery.ScalarQueryParameter("start_date", "TIMESTAMP", start_date))
+            params.append(bigquery.ScalarQueryParameter("start_date", "DATETIME", start_date))
         
         if end_date:
             query_parts.append("AND execution_timestamp <= @end_date")
-            params.append(bigquery.ScalarQueryParameter("end_date", "TIMESTAMP", end_date))
+            params.append(bigquery.ScalarQueryParameter("end_date", "DATETIME", end_date))
         
         query_parts.append("ORDER BY execution_timestamp DESC")
         query_parts.append(f"LIMIT {limit}")
@@ -272,7 +267,8 @@ class TestHistoryService:
         Returns:
             Chronological list of test executions for the table
         """
-        start_date = datetime.utcnow() - timedelta(days=days_back)
+        tz = pytz.timezone('Australia/Melbourne')
+        start_date = datetime.now(tz).replace(tzinfo=None) - timedelta(days=days_back)
         
         query = f"""
         SELECT 
@@ -296,7 +292,7 @@ class TestHistoryService:
                 bigquery.ScalarQueryParameter("project_id", "STRING", project_id),
                 bigquery.ScalarQueryParameter("target_dataset", "STRING", target_dataset),
                 bigquery.ScalarQueryParameter("target_table", "STRING", target_table),
-                bigquery.ScalarQueryParameter("start_date", "TIMESTAMP", start_date)
+                bigquery.ScalarQueryParameter("start_date", "DATETIME", start_date)
             ]
         )
         
@@ -321,4 +317,73 @@ class TestHistoryService:
             logger.info(f"Cleared history for project {project_id} by truncating table")
         except Exception as e:
             logger.error(f"Failed to clear history: {e}")
+            raise
+
+    def migrate_to_datetime(self) -> Dict[str, Any]:
+        """
+        Migrate the history table schema from TIMESTAMP to DATETIME to support local time.
+        """
+        try:
+            table = self.client.get_table(HISTORY_TABLE_FQN)
+            ts_field = next((f for f in table.schema if f.name == "execution_timestamp"), None)
+            
+            if not ts_field:
+                return {"status": "skipped", "reason": "execution_timestamp field not found"}
+            
+            if ts_field.field_type == 'DATETIME':
+                return {"status": "skipped", "reason": "Already using DATETIME"}
+
+            logger.info(f"Field is {ts_field.field_type}. Starting migration to DATETIME...")
+            
+            # 1. Create temp table with new schema
+            new_schema = []
+            for field in table.schema:
+                if field.name == "execution_timestamp":
+                    new_schema.append(bigquery.SchemaField("execution_timestamp", "DATETIME", mode=field.mode))
+                else:
+                    new_schema.append(field)
+            
+            new_table_ref = f"{HISTORY_TABLE_FQN}_new"
+            new_table = bigquery.Table(new_table_ref, schema=new_schema)
+            new_table.partitioning_type = "DAY"
+            new_table.time_partitioning = bigquery.TimePartitioning(field="execution_timestamp")
+            
+            self.client.delete_table(new_table_ref, not_found_ok=True)
+            self.client.create_table(new_table)
+            
+            # 2. Copy data with conversion
+            cols = [f.name for f in new_schema]
+            select_cols = []
+            for col in cols:
+                if col == "execution_timestamp":
+                    # Convert UTC TIMESTAMP to Melbourne DATETIME
+                    select_cols.append("DATETIME(execution_timestamp, 'Australia/Melbourne') as execution_timestamp")
+                else:
+                    select_cols.append(col)
+                    
+            query = f"""
+            INSERT INTO `{new_table_ref}` ({', '.join(cols)})
+            SELECT {', '.join(select_cols)}
+            FROM `{HISTORY_TABLE_FQN}`
+            """
+            self.client.query(query).result()
+            
+            # Verify row counts
+            old_count = list(self.client.query(f"SELECT count(*) as c FROM `{HISTORY_TABLE_FQN}`").result())[0].get('c')
+            new_count = list(self.client.query(f"SELECT count(*) as c FROM `{new_table_ref}`").result())[0].get('c')
+            
+            if old_count != new_count:
+                raise Exception(f"Migration mismatch: Old={old_count}, New={new_count}")
+
+            # 3. Swap tables
+            backup_table_ref = f"{HISTORY_TABLE_FQN}_backup"
+            self.client.delete_table(backup_table_ref, not_found_ok=True)
+            
+            self.client.query(f"ALTER TABLE `{HISTORY_TABLE_FQN}` RENAME TO `{HISTORY_TABLE}_backup`").result()
+            self.client.query(f"ALTER TABLE `{new_table_ref}` RENAME TO `{HISTORY_TABLE}`").result()
+            
+            return {"status": "success", "migrated_rows": new_count}
+            
+        except Exception as e:
+            logger.error(f"Migration failed: {e}")
             raise
