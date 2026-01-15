@@ -257,18 +257,39 @@ async def generate_tests(request: GenerateTestsRequest):
                 # Convert results objects to dicts for JSON serialization
                 results_by_mapping_dicts = [r.dict() for r in result['results_by_mapping']]
 
-                history_service.save_test_results(
-                    project_id=request.project_id,
-                    comparison_mode="scd_config_table",
-                    test_results=results_by_mapping_dicts,
-                    target_dataset=request.config_dataset,
-                    target_table=request.config_table,
-                    metadata={
-                        "summary": summary_data,
-                        "source": f"{request.config_dataset}.{request.config_table}",
-                        "status": "AT_RISK" if summary_data['failed'] > 0 else "PASS"
-                    }
-                )
+                # Log each individual table result instead of the config table itself
+                for mapping_result in result['results_by_mapping']:
+                    try:
+                        # Calculate summary for this specific table
+                        table_results = mapping_result.predefined_results
+                        table_summary = {
+                            "total": len(table_results),
+                            "passed": len([t for t in table_results if t.status == 'PASS']),
+                            "failed": len([t for t in table_results if t.status == 'FAIL']),
+                            "errors": len([t for t in table_results if t.status == 'ERROR'])
+                        }
+                        
+                        # Extract target info from mapping info
+                        target_ds = mapping_result.mapping_info.target.split('.')[0] if mapping_result.mapping_info and '.' in mapping_result.mapping_info.target else request.config_dataset
+                        target_tbl = mapping_result.mapping_info.target.split('.')[1] if mapping_result.mapping_info and '.' in mapping_result.mapping_info.target else mapping_result.mapping_id
+
+                        history_service.save_test_results(
+                            project_id=request.project_id,
+                            comparison_mode="scd",  # Log as standard SCD run
+                            test_results=[r.dict() for r in table_results],
+                            target_dataset=target_ds,
+                            target_table=target_tbl,
+                            mapping_id=mapping_result.mapping_id,
+                            cron_schedule=mapping_result.cron_schedule,
+                            executed_by="Batch Run",
+                            metadata={
+                                "summary": table_summary,
+                                "source": f"Batch SCD: {target_tbl}",
+                                "status": "FAIL" if table_summary['failed'] > 0 or table_summary['errors'] > 0 else "PASS"
+                            }
+                        )
+                    except Exception as inner_e:
+                        logger.error(f"Failed to log individual result for {mapping_result.mapping_id}: {inner_e}")
             except Exception as e:
                 logger.error(f"Failed to log scd config execution: {e}")
 
