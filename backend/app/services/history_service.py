@@ -35,13 +35,10 @@ class TestHistoryService:
 
     @property
     def client(self):
-        """Lazy load BigQuery client and ensure table exists."""
+        """Lazy load BigQuery client."""
         if not self._client:
             try:
                 self._client = bigquery.Client(project=HISTORY_PROJECT_ID)
-                if not self._table_checked:
-                    self._ensure_table_exists()
-                    self._table_checked = True
             except Exception as e:
                 logger.error(f"Failed to initialize TestHistoryService client: {e}")
                 raise
@@ -108,6 +105,9 @@ class TestHistoryService:
         """
         Save test execution results to BigQuery history table (one row per table).
         """
+        # Ensure table exists before writing
+        self._ensure_table_exists()
+
         execution_id = str(uuid.uuid4())
         
         # Get execution timestamp and localize to scheduler timezone if possible
@@ -248,10 +248,16 @@ class TestHistoryService:
         query = " ".join(query_parts)
         job_config = bigquery.QueryJobConfig(query_parameters=params)
         
-        query_job = self.client.query(query, job_config=job_config)
-        results = query_job.result()
-        
-        return [dict(row) for row in results]
+        try:
+            query_job = self.client.query(query, job_config=job_config)
+            results = query_job.result()
+            return [dict(row) for row in results]
+        except Exception as e:
+            if "Not found" in str(e):
+                logger.info("History table not found, returning empty list")
+                return []
+            logger.error(f"Error querying history: {e}")
+            raise
     
     def get_table_timeline(
         self,
