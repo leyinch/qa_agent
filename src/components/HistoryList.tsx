@@ -68,7 +68,7 @@ export default function HistoryList({ projectId, onViewResult }: HistoryListProp
             });
             if (!res.ok) {
                 const err = await res.json();
-                throw new Error(err.detail || "Failed to clear history");
+                throw new Error(err.error || err.detail || "Failed to clear history");
             }
             // Refresh list
             fetchHistory();
