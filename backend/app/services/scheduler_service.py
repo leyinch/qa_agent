@@ -122,23 +122,26 @@ class SchedulerService:
     async def sync_all_from_config(self) -> Dict[str, Any]:
         """
         Read all configurations from BigQuery and ensure Cloud Scheduler jobs exist.
+        Also deletes jobs that are no longer in the configuration (Source of Truth).
         Returns a summary of the sync operation.
         """
         # Lazy import to avoid circular dependency
         from app.services.bigquery_service import bigquery_service
         
-        summary = {"total": 0, "synced": 0, "failed": 0, "skipped": 0, "details": []}
+        summary = {"total": 0, "synced": 0, "failed": 0, "skipped": 0, "deleted": 0, "details": []}
         
         try:
             logger.info(f"Starting Cloud Scheduler sync for project {self.project}")
             
-            # 1. Sync SCD Configs
+            # 1. Fetch Active Configs from BigQuery
+            valid_job_names = set()
             try:
                 scd_configs = await bigquery_service.read_scd_config_table(
                     self.project, "config", "scd_validation_config"
                 )
                 logger.info(f"Found {len(scd_configs)} SCD configurations")
                 
+                # Sync Upserts
                 for config in scd_configs:
                     summary["total"] += 1
                     config_id = config.get('config_id')
@@ -148,6 +151,9 @@ class SchedulerService:
                         summary["skipped"] += 1
                         continue
                     
+                    # Track valid job names for cleanup phase
+                    valid_job_names.add(self._get_job_name(config_id))
+
                     success, message = await self.upsert_job(
                         config_id=config_id,
                         cron_schedule=cron,
@@ -167,8 +173,29 @@ class SchedulerService:
                 logger.error(f"Failed to read SCD configs: {e}")
                 summary["details"].append(f"Error reading SCD configs: {str(e)}")
 
-            # GCS Config Syncing removed as it is not required at this stage
-                    
+            # 2. Cleanup Obsolete Jobs
+            try:
+                # List all jobs in the location
+                # valid_job_names contains full resource names: projects/.../locations/.../jobs/name
+                all_jobs = self.client.list_jobs(parent=self.parent)
+                
+                for job in all_jobs:
+                    # Check if it's a QA Agent job (managed by us)
+                    if "/jobs/qa-agent-" in job.name:
+                        if job.name not in valid_job_names:
+                            logger.info(f"Found obsolete job: {job.name}. Deleting...")
+                            try:
+                                self.client.delete_job(name=job.name)
+                                summary["deleted"] += 1
+                                summary["details"].append(f"Deleted obsolete job: {job.name.split('/')[-1]}")
+                            except Exception as del_err:
+                                logger.error(f"Failed to delete {job.name}: {del_err}")
+                                summary["details"].append(f"Failed to delete {job.name}: {str(del_err)}")
+                                
+            except Exception as cleanup_err:
+                logger.error(f"Error during job cleanup: {cleanup_err}")
+                summary["details"].append(f"Cleanup error: {str(cleanup_err)}")
+
             logger.info(f"Scheduler sync complete. Summary: {summary}")
             return summary
         except Exception as e:
