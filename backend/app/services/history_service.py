@@ -113,7 +113,9 @@ class TestHistoryService:
         # Get execution timestamp and localize to scheduler timezone if possible
         try:
             tz = pytz.timezone(settings.scheduler_timezone)
-            execution_timestamp = datetime.now(tz)
+            # Get current time in target timezone, then strip tzinfo to make it naive
+            # This forces BigQuery to store the "face value" of the local time
+            execution_timestamp = datetime.now(tz).replace(tzinfo=None)
         except Exception as e:
             logger.warning(f"Could not localize timestamp to {settings.scheduler_timezone}: {e}")
             execution_timestamp = datetime.utcnow()
