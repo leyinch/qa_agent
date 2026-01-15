@@ -5,7 +5,7 @@ This is a Next.js application for testing data quality using AI. It uses Google 
 ## Prerequisites
 
 - Google Cloud Project: `[YOUR_PROJECT_ID]`
-- BigQuery Dataset: `transform_config`, `qa_agent_metadata`, `crown_scd_mock`
+- BigQuery Dataset: `config`, `qa_results`, `crown_scd_mock`
 - Vertex AI API enabled
 - BigQuery API enabled
 

@@ -16,7 +16,7 @@ This guide explains how to set up the configuration tables for the Data QA Agent
 2. **Verify tables were created**:
    ```sql
    SELECT table_name 
-   FROM `[YOUR_PROJECT_ID].transform_config.INFORMATION_SCHEMA.TABLES`;
+   FROM `[YOUR_PROJECT_ID].config.INFORMATION_SCHEMA.TABLES`;
    ```
 
 ## Config Tables
@@ -38,13 +38,13 @@ Stores SCD validation settings for each target table.
 
 **Example:**
 ```sql
-SELECT * FROM `[YOUR_PROJECT_ID].transform_config.scd_validation_config` 
+SELECT * FROM `[YOUR_PROJECT_ID].config.scd_validation_config` 
 WHERE config_id = 'employee_scd2';
 ```
 
-### 2. `test_results_history` - Audit Trail
+### 2. `scd_test_history` - Test Execution History
 
-Tracks all test executions for monitoring and auditing. This table is located in the `qa_agent_metadata` dataset.
+Tracks all SCD test executions (both scheduled and manual runs) for monitoring and auditing. This table is located in the `qa_results` dataset.
 
 ## Managing Configurations
 
@@ -52,7 +52,7 @@ Tracks all test executions for monitoring and auditing. This table is located in
 You can add new tables via the UI dashboard or directly in SQL:
 
 ```sql
-INSERT INTO `[YOUR_PROJECT_ID].transform_config.scd_validation_config`
+INSERT INTO `[YOUR_PROJECT_ID].config.scd_validation_config`
 (config_id, target_dataset, target_table, scd_type, primary_keys, cron_schedule)
 VALUES
 ('my_new_table', 'my_dataset', 'my_table', 'scd1', ['id'], '0 9 * * *');
@@ -62,6 +62,8 @@ VALUES
 
 ### View Test History
 ```sql
-SELECT * FROM `[YOUR_PROJECT_ID].qa_agent_metadata.v_validation_report`
+SELECT * FROM `[YOUR_PROJECT_ID].qa_results.scd_test_history`
+WHERE execution_timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 7 DAY)
+ORDER BY execution_timestamp DESC
 LIMIT 100;
 ```

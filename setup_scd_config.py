@@ -3,7 +3,7 @@ from google.cloud import bigquery
 client = bigquery.Client(project='leyin-sandpit')
 
 # Create Dataset
-dataset_id = "transform_config"
+dataset_id = "config"
 dataset_ref = client.dataset(dataset_id)
 dataset = bigquery.Dataset(dataset_ref)
 dataset.location = "US"
