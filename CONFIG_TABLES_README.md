@@ -44,7 +44,9 @@ WHERE config_id = 'employee_scd2';
 
 ### 2. `scd_test_history` - Test Execution History
 
-Tracks all SCD test executions (both scheduled and manual runs) for monitoring and auditing. This table is located in the `qa_results` dataset.
+Tracks **SCD test executions only** (both scheduled and manual runs). GCS and Schema Validation tests are not logged here.
+- **Location**: `[YOUR_PROJECT_ID].qa_results.scd_test_history`
+- **Maintenance**: Use the "Clear History" button in the frontend to truncate this table if needed.
 
 ## Managing Configurations
 
