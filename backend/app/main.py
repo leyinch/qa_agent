@@ -586,6 +586,23 @@ async def run_scheduled_tests(request: ScheduledTestRunRequest):
             "errors": len([r for r in results if r.get("status") == "ERROR"])
         }
         
+        # Determine execution source based on time
+        # If running close to scheduled time (09:00 Melbourne), it's Scheduled. Otherwise Manual.
+        import pytz
+        from datetime import datetime
+        
+        executed_by = "Manual Run"
+        try:
+            tz = pytz.timezone("Australia/Melbourne")
+            now = datetime.now(tz)
+            
+            # Check if within 5 minutes of 09:00 AM
+            if now.hour == 9 and now.minute <= 5:
+                 executed_by = "Scheduled Run"
+        except Exception:
+            # Fallback if timezone conversion fails
+            executed_by = "Scheduled Run"
+
         history_service.save_test_results(
             project_id=request.project_id,
             comparison_mode="scd",
@@ -594,7 +611,7 @@ async def run_scheduled_tests(request: ScheduledTestRunRequest):
             target_table=request.target_table,
             mapping_id=request.config_id,
             cron_schedule=request.cron_schedule,
-            executed_by="Scheduled Run",
+            executed_by=executed_by,
             metadata={
                 "summary": summary,
                 "source": f"Scheduled SCD: {request.target_table}",
