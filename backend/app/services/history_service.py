@@ -313,12 +313,12 @@ class TestHistoryService:
             project_id: Project ID to clear history for
         """
         try:
-            # Drop the table entirely to bypass "streaming buffer" locks that prevent DELETE/UPDATE
-            query = f"DROP TABLE IF EXISTS `{HISTORY_TABLE_FQN}`"
+            # Use TRUNCATE TABLE as requested
+            query = f"TRUNCATE TABLE `{HISTORY_TABLE_FQN}`"
             job_config = bigquery.QueryJobConfig() # No params needed
             query_job = self.client.query(query, job_config=job_config)
             query_job.result()  # Wait for completion
-            logger.info(f"Cleared history for project {project_id} by dropping table")
+            logger.info(f"Cleared history for project {project_id} by truncating table")
         except Exception as e:
             logger.error(f"Failed to clear history: {e}")
             raise
