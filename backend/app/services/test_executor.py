@@ -327,8 +327,20 @@ class TestExecutor:
                         error_message=str(e)
                     ))
             
+            # Get row count for info
+            try:
+                bq_row_count = await bigquery_service.get_row_count(full_table_name)
+            except:
+                bq_row_count = 0
+
             return MappingResult(
                 mapping_id=mapping_id,
+                mapping_info=MappingInfo(
+                    source="SCD Validation",
+                    target=full_table_name,
+                    file_row_count=0,
+                    table_row_count=bq_row_count
+                ),
                 predefined_results=predefined_results,
                 ai_suggestions=[],
                 cron_schedule=mapping.get('cron_schedule')
