@@ -214,6 +214,8 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (comparisonMode === 'history') return;
+
         setLoading(true);
 
         try {
