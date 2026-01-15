@@ -269,29 +269,33 @@ export default function HistoryList({ projectId, onViewResult }: HistoryListProp
                                             {getStatusBadge(run.status)}
                                         </td>
                                         <td style={{ padding: '0.75rem 1rem', textAlign: 'center', minWidth: '100px' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
-                                                <PieChart width={50} height={50}>
-                                                    <Pie
-                                                        data={chartData}
-                                                        cx={25}
-                                                        cy={25}
-                                                        innerRadius={10}
-                                                        outerRadius={25}
-                                                        paddingAngle={2}
-                                                        dataKey="value"
-                                                        stroke="none"
-                                                    >
-                                                        {chartData.map((entry, index) => (
-                                                            <Cell key={`cell-${index}`} fill={entry.color} />
-                                                        ))}
-                                                    </Pie>
-                                                    <RechartsTooltip />
-                                                </PieChart>
-                                                <div style={{ fontSize: '0.75rem', color: 'var(--secondary-foreground)', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                                                    <span style={{ color: '#10b981' }}>Pass: {passed}</span>
-                                                    {(failed > 0) && <span style={{ color: '#ef4444' }}>Fail: {failed}</span>}
+                                            {run.total_tests > 0 ? (
+                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                                                    <PieChart width={50} height={50}>
+                                                        <Pie
+                                                            data={chartData}
+                                                            cx={25}
+                                                            cy={25}
+                                                            innerRadius={10}
+                                                            outerRadius={25}
+                                                            paddingAngle={2}
+                                                            dataKey="value"
+                                                            stroke="none"
+                                                        >
+                                                            {chartData.map((entry, index) => (
+                                                                <Cell key={`cell-${index}`} fill={entry.color} />
+                                                            ))}
+                                                        </Pie>
+                                                        <RechartsTooltip />
+                                                    </PieChart>
+                                                    <div style={{ fontSize: '0.75rem', color: 'var(--secondary-foreground)', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                                                        <span style={{ color: '#10b981' }}>Pass: {passed}</span>
+                                                        {(failed > 0) && <span style={{ color: '#ef4444' }}>Fail: {failed}</span>}
+                                                    </div>
                                                 </div>
-                                            </div>
+                                            ) : (
+                                                <span style={{ color: 'var(--secondary-foreground)', fontSize: '0.875rem' }}>-</span>
+                                            )}
                                         </td>
                                         <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
                                             <button
