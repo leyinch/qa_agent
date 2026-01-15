@@ -1,86 +1,31 @@
 # SCD Validation Testing Guide
 
 ## 🚀 Overview
+
 The QA Agent now supports **SCD Type 1 and Type 2 Validation**. This feature validates the integrity of dimension tables by checking:
-- **SCD Type 1**: Primary Key uniqueness and null checks
-- **SCD Type 2**: Historical tracking validity (no overlaps, gaps, or invalid flags)
+- **SCD Type 1**: Standard dimension tables (Overwrites old data). Validation checks for Primary Key uniqueness and nulls.
+- **SCD Type 2**: Historical dimension tables (Tracks history). Validation checks for chronological consistency, active flags, and gaps/overlaps.
 
-## 🛠️ What Was Implemented
+---
 
-### Backend Changes
-**File**: `backend/app/services/test_executor.py`
-- Added `process_scd()` method to handle SCD validation requests
-- Auto-selects appropriate tests based on SCD type (Type 1 or Type 2)
+## 🧠 System Logic & Architecture
 
-**File**: `backend/app/main.py`
-- Added SCD mode handling in `/api/generate-tests` endpoint
-- Added `/api/scd-config` endpoint to support adding new configurations
-- **Consolidated History**: Now uses a single backend-driven logging system for all test modes
+### 1. Scheduler Logic
+The system includes a robust integration with **Google Cloud Scheduler** to automate testing.
+- **Timezone**: All schedules run in **Melbourne Time (Australia/Melbourne)**.
+- **Sync Mechanism**: The backend automatically keeps Cloud Scheduler in sync with your BigQuery config table.
+  - **Auto-Sync**: Occurs on backend startup.
+  - **Manual Sync**: Can be triggered via the UI or API (`/api/sync-scheduler`).
+  - **Cleanup**: Obsolete jobs (configs deleted from BQ) are automatically removed from Cloud Scheduler.
+- **Execution Source**: The history table distinguishes how a test was triggered:
+  - `Scheduled Run`: Triggered automatically at the configured cron time (e.g., 9:00 AM).
+  - `Manual Run`: Triggered manually via the UI or "Force Run" in Console.
 
-**File**: `backend/app/services/history_service.py` [NEW LOCATION]
-- Moved and refactored to `backend/app/services/`
-- Handles automatic creation of the history table and dataset
-- Provides a unified source of truth for both summary and detailed results
-
-**File**: `backend/app/services/scheduler_service.py`
-- Added support for Google Cloud Scheduler integration
-- Manually triggers tests based on `cron_schedule` stored in config
-
-**File**: `backend/app/tests/predefined_tests.py`
-- Added 16 data quality test templates:
-  - **SCD1 Validation Suite (5 Tests)**:
-    - ✅ Table exists (smoke)
-    - ✅ Primary Key NOT NULL
-    - ✅ Primary Key uniqueness
-    - ✅ Surrogate key NOT NULL
-    - ✅ Surrogate key uniqueness
-  - **SCD2 Validation Suite (15 Tests)**:
-    - ✅ Table exists (smoke)
-    - ✅ Primary Key NOT NULL
-    - ✅ Surrogate key NOT NULL
-    - ✅ Surrogate key uniqueness
-    - ✅ Begin effective datetime NOT NULL
-    - ✅ End effective datetime NOT NULL
-    - ✅ Current row flag NOT NULL
-    - ✅ One current row per Primary Key
-    - ✅ Current rows end on 2099-12-31
-    - ✅ No invalid current-row combinations
-    - ✅ Begin < End datetime
-    - ✅ Unique begin datetime per Primary Key
-    - ✅ Unique end datetime per Primary Key
-    - ✅ Continuous history (no gaps) (Using DATE_ADD with 1-second intervals)
-    - ✅ No record after current row
-
-### Frontend Changes
-**File**: `src/components/Sidebar.tsx`
-- Added "SCD Validation" navigation option with 🔄 icon
-
-**File**: `src/components/DashboardForm.tsx` (Major Update)
-- **New Feature**: Added **"Schedule Frequency"** dropdown (Daily, Weekly, Monthly) for easier cron setup.
-- **Layout Fixes**: Improved alignment and width of all form fields (Project ID, Dataset, etc.) for a premium UI feel.
-- **Add New Configuration**: Native support for adding new SCD tables to the configuration table directly from the UI.
-- **Config Defaults**: Now points to `config` dataset by default.
-
-**File**: `src/components/HistoryList.tsx`
-- Refactored to display unified history data from the new `scd_test_history` table in `qa_results`.
-- Added display for `cron_schedule` with ⏰ icon.
-
-**File**: `src/app/page.tsx` & `src/app/dashboard/page.tsx`
-- Updated `ComparisonMode` type to include `'scd'`
-
-**File**: `src/components/ResultsView.tsx` (Major Update)
-- **Tabbed UI**: Batch results are now organized into selectable tabs by mapping ID
-- **Bad Data Preview**: Added "View Bad Data" button to display actual problematic rows from BigQuery
-- **SQL Transparency**: Added "Show SQL" button for every test to view the underlying BQ query
-- **AI Integration**: Added display and one-click saving for AI-suggested custom tests
-- **Comprehensive Typing**: Fully refactored with strict TypeScript interfaces for all data structures
-
-### Advanced Result Analysis
-The results page now provides deep insight into test failures:
-- **Status Badges**: Color-coded badges for PASS (Green), FAIL (Red), and ERROR (Amber)
-- **Summary Cards**: At-a-glance mapping counts and success rates
-- **Sample Data Grid**: Inline tables showing the specific values that triggered validation failures
-- **AI Recommendation Engine**: "🤖 AI Suggested Tests" section providing context-aware testing improvements
+### 2. History & Reporting
+All test results—whether run manually via the frontend or automatically via the scheduler—are logged to a **single source of truth**:
+- **Table**: `[YOUR_PROJECT_ID].qa_results.scd_test_history`
+- **Timestamps**: Stored in **Melbourne Local Time** for easy readability.
+- **Partitioning**: The table is partitioned by day for performance.
 
 ---
 
@@ -92,208 +37,106 @@ The results page now provides deep insight into test failures:
 
 ### Step 1: Create Mock Data in BigQuery
 
-1. **Open BigQuery Console**:  
-   https://console.cloud.google.com/bigquery?project=[YOUR_PROJECT_ID]
+If you haven't already, run the master setup script to populate your environment with test data and tables.
 
-2. **Run the Master Setup SQL**:  
-   Copy and paste the entire contents of [`setup_scd_resources.sql`](file:///c:/Users/LeyinChen/Documents/Client%20-%20Crown/Antigravity/qa_agent/setup_scd_resources.sql) into the query editor and click **Run**. This single script sets up:
-   - ✅ SCD validation configuration tables in `config` dataset
-   - ✅ Mock datasets and tables for testing
-   - ✅ Unified execution history table `scd_test_history` in `qa_results` dataset
-   - ✅ Reporting view `v_scd_validation_report`
+1. **Open BigQuery Console**: [Link](https://console.cloud.google.com/bigquery)
+2. **Run Script**: Copy and run the contents of [`setup_scd_resources.sql`](setup_scd_resources.sql).
+3. **Verify Resources**:
+   - `crown_scd_mock.D_Seat_WD` (SCD1 Mock)
+   - `crown_scd_mock.D_Employee_WD` (SCD2 Mock)
+   - `crown_scd_mock.D_Player_WD` (SCD2 Mock)
+   - `config.scd_validation_config` (Config Table)
+   - `qa_results.scd_test_history` (History Table)
 
-3. **Verify Resources Created**:
-   - `[YOUR_PROJECT_ID].crown_scd_mock.D_Seat_WD` (SCD1 Mock)
-   - `[YOUR_PROJECT_ID].crown_scd_mock.D_Employee_WD` (SCD2 Mock)
-   - `[YOUR_PROJECT_ID].config.scd_validation_config` (SCD Config)
-   - `[YOUR_PROJECT_ID].qa_results.scd_test_history` (Audit Trail)
-   - `[YOUR_PROJECT_ID].qa_results.v_scd_validation_report` (Reporting View)
+### Step 2: Test SCD Type 1 Validation (Manual)
 
-### Step 2: Test SCD Type 1 Validation
-
-1. **Open the Frontend**:  
-   Navigate to your Cloud Run frontend URL (e.g., `https://data-qa-agent-frontend-xxxxx.[YOUR_REGION].run.app`)
-
-2. **Select SCD Validation**:  
-   Click "SCD Validation" in the sidebar (🔄 icon)
-
-3. **Fill in the Form**:
-   - **Project ID**: `[YOUR_PROJECT_ID]`
+1. Navigate to **SCD Validation** in the Frontend (🔄 icon).
+2. Enter the following details:
    - **Target Dataset**: `crown_scd_mock`
    - **Target Table**: `D_Seat_WD`
-   - **SCD Type**: Select **Type 1**
+   - **SCD Type**: `Type 1`
    - **Primary Keys**: `TableId, PositionIDX`
-   - **Surrogate Key** (optional): `DWSeatID`
+   - **Surrogate Key**: `DWSeatID`
+3. Click **Generate & Run Tests**.
+4. **Expected Results**:
+   - ✅ `table_exists`, `surrogate_key_null/unique` -> **PASS**
+   - ❌ `scd1_primary_key_unique` -> **FAIL** (Duplicate detected)
+   - ❌ `scd1_primary_key_null` -> **FAIL** (Null detected)
 
-4. **Run Tests**:  
-   Click "Generate & Run Tests"
+### Step 3: Test SCD Type 2 Validation (Manual)
 
-5. **Expected Results (5 Tests)**:
-   - ✅ **PASS**: `table_exists` (Smoke test)
-   - ✅ **PASS**: `surrogate_key_null` (all rows have DWSeatID)
-   - ✅ **PASS**: `surrogate_key_unique` (all DWSeatID values are unique)
-   - ❌ **FAIL**: `scd1_primary_key_unique` - Should detect **1 duplicate** (TableId=101, PositionIDX=1 appears twice)
-   - ❌ **FAIL**: `scd1_primary_key_null` - Should detect **1 null** (TableId=103 has NULL PositionIDX)
-
-### Step 3: Test SCD Type 2 Validation
-
-1. **Fill in the Form**:
-   - **Project ID**: `[YOUR_PROJECT_ID]`
+1. In the same form, verify **Type 2** settings:
    - **Target Dataset**: `crown_scd_mock`
    - **Target Table**: `D_Employee_WD`
-   - **SCD Type**: Select **Type 2**
+   - **SCD Type**: `Type 2`
    - **Primary Keys**: `UserId`
-   - **Surrogate Key** (optional): `DWEmployeeID`
-   - **Begin Date Column**: `DWBeginEffDateTime` (default)
-   - **End Date Column**: `DWEndEffDateTime` (default)
-   - **Active Flag Column**: `DWCurrentRowFlag` (default)
-
-2. **Run Tests**:  
-   Click "Generate & Run Tests"
-
+   - **Surrogate Key**: `DWEmployeeID`
+   - **Columns**: Default settings (`DWBeginEffDateTime`, etc.)
+2. Click **Generate & Run Tests**.
 3. **Expected Results**:
-   - ✅ **PASS**: `scd2_begin_date_null`, `scd2_end_date_null`, `scd2_flag_null` (no nulls)
-   - ✅ **PASS**: `surrogate_key_null`, `surrogate_key_unique`
-   - ❌ **FAIL**: `scd2_continuity` - Should detect **Primary Key='U2'** (overlap) and **Primary Key='U5'** (gap)
-   - ❌ **FAIL**: `scd2_one_current_row` - Should detect **Primary Key='U3'** (has 2 rows with DWCurrentRowFlag='Y')
-   - ❌ **FAIL**: `scd2_date_order` - Should detect **Primary Key='U4'** (Begin Date > End Date)
-   - ❌ **FAIL**: `scd2_current_date_check` - Should detect **Primary Key='U4'** (active flag 'Y' but end date not 2099)
+   - ✅ Null/Unique Checks -> **PASS**
+   - ❌ `scd2_continuity` -> **FAIL** (Overlaps/Gaps detected)
+   - ❌ `scd2_one_current_row` -> **FAIL** (Multiple active flags)
 
-### Step 4: Add New Configuration (New Feature)
+### Step 4: Add New Configuration (Saved for Automation)
 
-1. **Toggle "Add New Configuration"**:
-   - In "Config Table" mode, flip the toggle switch to enable adding a new configuration.
+You can add a table to the permanent configuration so it runs automatically.
 
-2. **Fill in details**:
-   - **Config ID**: `temp_test_config`
-   - **Target Dataset**: `crown_scd_mock`
-   - **Target Table**: `D_Seat_WD` (reusing for demo)
-   - **Primary Keys**: `TableId`
-   - **Description**: `Temporary test config added from UI`
-
-3. **Click "Add Configuration"**:
-   - Verify success message: "Configuration added successfully"
-
-4. **Run Config Tests**:
-   - Turn off the toggle.
-   - Click "Generate & Run Tests" again.
-   - Verify that your new `temp_test_config` is now included in the batch run results.
-
-### Step 5: Analyze Failures with Bad Data Preview
-1. **Find a Failed Test**:
-   - Locate a test with a ❌ **FAIL** status (e.g., `scd2_continuity`).
-2. **View Problematic Rows**:
-   - Click the **"View Bad Data"** button.
-   - A grid will appear showing the specific rows in BigQuery that caused the failure.
-3. **Compare with SQL**:
-   - Click **"Show SQL"** to see the exact query generated. You can copy this into the BigQuery console for further debugging.
-
-### Step 6: Expand Coverage with AI Suggestions
-1. **Scroll to AI Section**:
-   - At the bottom of each mapping's results, find the **"🤖 AI Suggested Tests"** section.
-2. **Review Reasoning**:
-   - Read the AI's logic for why it suggested specific tests like `outlier_value_check` or `cross_column_consistency`.
-3. **Save to Custom Tests**:
-   - Click **"+ Add to Custom"**.
-   - The test is now registered in your custom test suite and will run in future batch executions.
+1. Toggle **"Config Table Mode"** switch.
+2. Toggle **"Add New Configuration"** switch.
+3. Fill in the form (e.g., for `D_Seat_WD` or a new table).
+4. Select **Schedule Frequency** (e.g., Daily).
+5. Click **Add Configuration**.
+   - **Result**: The config is saved to BQ, and a Cloud Scheduler job is **instantly created**.
 
 ---
 
 ## 🔍 Understanding the Mock Data
 
-### SCD1 Mock Table (`crown_scd_mock.D_Seat_WD`)
-| TableId | PositionIDX | PositionCode | DWSeatID | Issue |
-|---------|-------------|--------------|----------|-------|
-| 101 | 1 | P1 | 1001 | ✅ Valid |
-| 101 | 1 | P1_DUPE | 1002 | ❌ Duplicate primary key |
-| 102 | 2 | P2 | 1003 | ✅ Valid |
-| 103 | NULL | P3 | 1004 | ❌ NULL in primary key |
+The mock tables are designed to fail specific tests to demonstrate validity.
 
-### SCD2 Mock Table (`crown_scd_mock.D_Employee_WD`)
-| UserId | UserName | Begin Date | End Date | Flag | Issue |
-|--------|----------|------------|----------|------|-------|
-| U1 | User 1 Old | 2023-01-01 | 2023-06-01 | N | ✅ Valid |
-| U1 | User 1 New | 2023-06-01 | 2099-12-31 | Y | ✅ Valid |
-| U2 | User 2 A | 2023-01-01 | 2023-08-01 | N | ❌ Overlaps with next row |
-| U2 | User 2 B | 2023-07-01 | 2099-12-31 | Y | ❌ Overlaps with previous row |
-| U3 | User 3 A | 2023-01-01 | 2099-12-31 | Y | ❌ Multiple active flags |
-| U3 | User 3 B | 2023-06-01 | 2099-12-31 | Y | ❌ Multiple active flags |
-| U4 | User 4 | 2023-12-01 | 2023-01-01 | Y | ❌ Begin > End |
-| U5 | User 5 A | 2023-01-01 | 2023-03-01 | N | ❌ Gap before next row |
-| U5 | User 5 B | 2023-05-01 | 2099-12-31 | Y | ❌ Gap after previous row |
+### SCD1 Mock Table (`D_Seat_WD`)
+| TableId | PositionIDX | Issue |
+|---------|-------------|-------|
+| 101 | 1 | ✅ Valid |
+| 101 | 1 | ❌ Duplicate PK |
+| 103 | NULL | ❌ NULL PK |
+
+### SCD2 Mock Table (`D_Employee_WD`)
+| UserId | Begin | End | Flag | Issue |
+|--------|-------|-----|------|-------|
+| U2 | Jan 1 | Aug 1 | N | ❌ Overlaps with next row |
+| U2 | Jul 1 | Dec 31| Y | ❌ Overlaps with prev row |
+| U4 | Dec 1 | Jan 1 | Y | ❌ Begin Date > End Date |
+| U5 | Jan 1 | Mar 1 | N | ❌ Gap before next row (May 1) |
 
 ---
 
-## 📝 Notes
+## �️ Troubleshooting & Notes
 
-### About the Config Table
-The `config.scd_validation_config` table can now be used for **batch validation** of multiple dimension tables.
-
-**Two ways to use SCD Validation:**
-1. **Direct Input** (for testing individual tables): Manually enter dataset, table, and key information
-2. **Config Table** (for batch validation): Read configurations from `scd_validation_config` and validate all tables at once
-
-**Using Config Table Mode:**
-1. Navigate to SCD Validation in the UI
-2. Toggle to "Config Table" mode
-3. Enter:
-   - **Config Dataset**: `config`
-   - **Config Table**: `scd_validation_config`
-4. Click "Generate & Run Tests"
-5. The app will validate ALL tables defined in the config table
-
-### Automated Scheduling & Infrastructure Resilience
-The system is now **fully resilient**. Here is how it handles both cases:
-
-1. **If you add via the UI**: 
-   The backend creates or updates the Cloud Scheduler job **immediately** the moment you click "Save". This is the fastest way.
-
-2. **If you add via manual SQL**: 
-   Since the backend doesn't "watch" BigQuery for changes every second, it handles it in two ways:
-   - **Automatically**: Every time the backend service starts (e.g., after redeployment or cold start), it runs a full scan of the config table and registers any missing/updated jobs.
-   - **Manual Trigger**: You can force a synchronization at any time by calling the sync endpoint:
-     ```bash
-     Invoke-RestMethod -Method Post -Uri "https://[your-backend-url]/api/sync-scheduler"
-     ```
-
-> [!IMPORTANT]
-> **Cloud Scheduler Requirement**: If Cloud Scheduler is not active in your project, it must be initialized. The `deploy-all.sh` script handles this automatically, but you can also run this **once** manually if needed:
-> ```bash
-> gcloud app create --region=[YOUR_REGION_BASE] --project=[YOUR_PROJECT_ID]
-> ```
->      *(In PowerShell: `Invoke-RestMethod -Method Post -Uri "https://[your-backend-url]/api/sync-scheduler"`)*
-
-**Monitoring**: Scheduled runs are identifiable in the "Execution History" tab by the ⏰ icon.
-
-**Current Config Table Contents:**
-- `crown_scd_mock.D_Seat_WD` (SCD Type 1) - Gaming Seats mock data with intentional errors
-- `crown_scd_mock.D_Employee_WD` (SCD Type 2) - Employee mock data with intentional errors
-
-> [!NOTE]
-> The mock tables use production naming convention for demonstration.
+### Bad Data Preview
+If a test fails, click the **"View Bad Data"** button in the results to see the exact rows causing the failure. You can also click **"Show SQL"** to debug the query in BigQuery.
 
 ### Service Account Permissions
-Ensure the Cloud Run service account has these BigQuery permissions:
-- `BigQuery Data Viewer`
+Ensure your Cloud Run service account has:
+- `BigQuery Data Viewer` & `BigQuery Data Editor`
 - `BigQuery Job User`
-- `BigQuery Data Editor` (Required for adding new configurations and writing to `qa_results`)
+- `Cloud Scheduler Admin` (for creating jobs)
+
+### Managing Configs via SQL
+You can also manage configs directly in BigQuery:
+```sql
+INSERT INTO `[PROJECT].config.scd_validation_config`
+(config_id, target_dataset, target_table, scd_type, primary_keys, cron_schedule)
+VALUES
+('my_new_table', 'my_ds', 'my_table', 'scd1', ['id'], '0 9 * * *');
+```
+*Note: Run `/api/sync-scheduler` after manual SQL inserts if you want the job created immediately.*
 
 ---
 
 ## 📄 Related Files
-- [DashboardForm.tsx](file:///c:/Users/LeyinChen/Documents/Client%20-%20Crown/Antigravity/qa_agent/src/components/DashboardForm.tsx) - Frontend form
-- [ResultsView.tsx](file:///c:/Users/LeyinChen/Documents/Client%20-%20Crown/Antigravity/qa_agent/src/components/ResultsView.tsx) - Results dashboard
-- [test_executor.py](file:///c:/Users/LeyinChen/Documents/Client%20-%20Crown/Antigravity/qa_agent/backend/app/services/test_executor.py) - Backend logic
-- [history_service.py](file:///c:/Users/LeyinChen/Documents/Client%20-%20Crown/Antigravity/qa_agent/backend/app/services/history_service.py) - History management
-- [setup_scd_resources.sql](file:///c:/Users/LeyinChen/Documents/Client%20-%20Crown/Antigravity/qa_agent/setup_scd_resources.sql) - Database setup script
-
----
-
-## 📄 Related Files
-- [DashboardForm.tsx](file:///c:/Users/LeyinChen/Documents/Client%20-%20Crown/Antigravity/qa_agent/src/components/DashboardForm.tsx) - Frontend form with SCD fields
-- [ResultsView.tsx](file:///c:/Users/LeyinChen/Documents/Client%20-%20Crown/Antigravity/qa_agent/src/components/ResultsView.tsx) - Advanced results dashboard with tabs, data previews, and AI
-- [env.d.ts](file:///c:/Users/LeyinChen/Documents/Client%20-%20Crown/Antigravity/qa_agent/src/types/env.d.ts) - Global environment and module declarations
-- [Sidebar.tsx](file:///c:/Users/LeyinChen/Documents/Client%20-%20Crown/Antigravity/qa_agent/src/components/Sidebar.tsx) - Navigation with SCD option
-- [test_executor.py](file:///c:/Users/LeyinChen/Documents/Client%20-%20Crown/Antigravity/qa_agent/backend/app/services/test_executor.py) - Backend SCD processing logic
-- [predefined_tests.py](file:///c:/Users/LeyinChen/Documents/Client%20-%20Crown/Antigravity/qa_agent/backend/app/tests/predefined_tests.py) - SCD test definitions
-- [setup_scd_resources.sql](file:///c:/Users/LeyinChen/Documents/Client%20-%20Crown/Antigravity/qa_agent/setup_scd_resources.sql) - BigQuery setup script
+- **Frontend**: [`DashboardForm.tsx`](src/components/DashboardForm.tsx), [`ResultsView.tsx`](src/components/ResultsView.tsx)
+- **Backend Logic**: [`test_executor.py`](backend/app/services/test_executor.py), [`scheduler_service.py`](backend/app/services/scheduler_service.py)
+- **Test Definitions**: [`predefined_tests.py`](backend/app/tests/predefined_tests.py)
+- **Setup**: [`setup_scd_resources.sql`](setup_scd_resources.sql)
