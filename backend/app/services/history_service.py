@@ -202,7 +202,20 @@ class TestHistoryService:
         Returns:
             List of test execution records
         """
-        query_parts = [f"SELECT * FROM `{HISTORY_TABLE_FQN}` WHERE 1=1"]
+        # Select columns based on whether we need full details (execution_id provided) or just summary
+        select_columns = [
+            "execution_id", "execution_timestamp", "project_id", "comparison_mode",
+            "target_dataset", "target_table", "mapping_id", "status",
+            "total_tests", "passed_tests", "failed_tests", "error_message",
+            "cron_schedule", "executed_by", "metadata"
+        ]
+        
+        if execution_id:
+            select_columns.append("test_results")
+            
+        columns_str = ", ".join(select_columns)
+        
+        query_parts = [f"SELECT {columns_str} FROM `{HISTORY_TABLE_FQN}` WHERE 1=1"]
         params = []
         
         if project_id:
