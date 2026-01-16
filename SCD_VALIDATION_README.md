@@ -14,9 +14,10 @@ The QA Agent now supports **SCD Type 1 and Type 2 Validation**. This feature val
 The system includes a robust integration with **Google Cloud Scheduler** to automate testing.
 - **Timezone**: All schedules run in **Melbourne Time (Australia/Melbourne)**.
 - **Sync Mechanism**: The backend automatically keeps Cloud Scheduler in sync with your BigQuery config table.
-  - **Auto-Sync**: Occurs on backend startup.
-  - **Manual Sync**: Can be triggered via the UI or API (`/api/sync-scheduler`).
-  - **Cleanup**: Obsolete jobs (configs deleted from BQ) are automatically removed from Cloud Scheduler.
+  - **Auto-Sync**: Occurs internally to ensure system integrity.
+  - **Manual Sync**: Triggered via the **🔄 Sync Jobs** button in the UI or via API (`/api/sync-scheduler`). Use this after making manual deletions or changes directly in BigQuery.
+  - **Self-Healing**: The system automatically maintains a `qa-agent-master-sync` job that triggers a full sync hourly. This job is self-healing and will be recreated if deleted.
+  - **Cleanup**: Obsolete jobs (configs deleted from BQ) are automatically removed during any sync operation.
 - **Execution Source**: The history table distinguishes how a test was triggered:
   - `Scheduled Run`: Triggered automatically at the configured cron time (e.g., 9:00 AM).
   - `Manual Run`: Triggered manually via the UI or "Force Run" in Console.
@@ -88,6 +89,13 @@ You can add a table to the permanent configuration so it runs automatically.
 4. Select **Schedule Frequency** (e.g., Daily).
 5. Click **Add Configuration**.
    - **Result**: The config is saved to BQ, and a Cloud Scheduler job is **instantly created**.
+
+### Step 5: Synchronizing External Changes
+
+If you delete a configuration record manually via the BigQuery Console:
+1. Navigate to the **Config Table** mode in the UI.
+2. Click the **🔄 Sync Jobs** button.
+3. **Expected Result**: Any orphaned Cloud Scheduler jobs will be deleted, and the master sync job will be verified/recreated.
 
 ---
 
