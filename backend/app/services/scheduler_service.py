@@ -182,6 +182,10 @@ class SchedulerService:
                 for job in all_jobs:
                     # Check if it's a QA Agent job (managed by us)
                     if "/jobs/qa-agent-" in job.name:
+                        # EXEMPTION: Do not delete the master sync job itself!
+                        if "qa-agent-master-sync" in job.name:
+                            continue
+                            
                         if job.name not in valid_job_names:
                             logger.info(f"Found obsolete job: {job.name}. Deleting...")
                             try:
