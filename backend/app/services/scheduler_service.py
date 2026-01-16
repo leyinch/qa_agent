@@ -119,12 +119,58 @@ class SchedulerService:
             logger.error(f"Failed to delete Cloud Scheduler job {job_name}: {str(e)}")
             return False
 
+    async def ensure_master_sync_job(self) -> tuple[bool, str]:
+        """Ensures the master-sync job exists. Self-healing."""
+        if not settings.cloud_run_url:
+            return False, "CLOUD_RUN_URL not set"
+
+        job_id = "master-sync"
+        job_name = self._get_job_name(job_id)
+        cron = "0 * * * *" # Hourly
+        
+        # Target: Calls /api/sync-scheduler
+        http_target = scheduler_v1.HttpTarget(
+            uri=f"{settings.cloud_run_url}/api/sync-scheduler",
+            http_method=scheduler_v1.HttpMethod.POST,
+            body=json.dumps({"project_id": self.project}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            oidc_token=scheduler_v1.OidcToken(
+                service_account_email=f"{self.project}@appspot.gserviceaccount.com",
+                audience=f"{settings.cloud_run_url}/api/sync-scheduler"
+            )
+        )
+
+        job = scheduler_v1.Job(
+            name=job_name,
+            schedule=cron,
+            time_zone=settings.scheduler_timezone,
+            http_target=http_target
+        )
+
+        try:
+            try:
+                self.client.get_job(name=job_name)
+                # Exist: Update it to ensure settings are correct
+                update_mask = field_mask_pb2.FieldMask(paths=["schedule", "time_zone", "http_target"])
+                self.client.update_job(job=job, update_mask=update_mask)
+                return True, "Master sync job updated"
+            except exceptions.NotFound:
+                # Missing: Create it
+                self.client.create_job(parent=self.parent, job=job)
+                return True, "Master sync job created"
+        except Exception as e:
+            logger.error(f"Failed to ensure master sync job: {e}")
+            return False, str(e)
+
     async def sync_all_from_config(self) -> Dict[str, Any]:
         """
         Read all configurations from BigQuery and ensure Cloud Scheduler jobs exist.
         Also deletes jobs that are no longer in the configuration (Source of Truth).
         Returns a summary of the sync operation.
         """
+        # Ensure the master sync job itself exists (Self-healing)
+        await self.ensure_master_sync_job()
+
         # Lazy import to avoid circular dependency
         from app.services.bigquery_service import bigquery_service
         
