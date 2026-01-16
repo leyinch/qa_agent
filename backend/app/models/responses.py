@@ -38,3 +38,11 @@ class HealthResponse(BaseModel):
     """Health check response."""
     status: str
     version: str = "1.0.0"
+
+
+class TableMetadataResponse(BaseModel):
+    """Response model for table metadata."""
+    full_table_name: str
+    columns: List[str]
+    schema_info: Dict[str, Any]
+

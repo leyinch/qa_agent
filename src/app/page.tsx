@@ -38,7 +38,7 @@ export default function Home() {
                 {/* Main Content Area */}
                 <div className="main-content">
                     <div style={{
-                        maxWidth: '1000px',
+                        maxWidth: '98%',
                         margin: '0 auto',
                     }} className="fade-in">
                         {/* Header */}

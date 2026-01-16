@@ -44,8 +44,8 @@ All deployment parameters are centralized in one file:
 
 ```bash
 # deploy.config
-PROJECT_ID=leyin-sandpit
-REGION=us-central1
+PROJECT_ID=[YOUR_PROJECT_ID]
+REGION=[YOUR_REGION]
 FRONTEND_SERVICE=data-qa-agent-frontend
 BACKEND_SERVICE=data-qa-agent-backend
 ```
@@ -107,8 +107,8 @@ Syncing cloudbuild.yaml files with deploy.config...
 ========================================
 QA Agent Deployment
 ========================================
-Project: leyin-sandpit
-Region: us-central1
+Project: [YOUR_PROJECT_ID]
+Region: [YOUR_REGION]
 
 Service Status:
 Backend:  ✓ Deploy (exists)
@@ -132,7 +132,7 @@ Redeployment detected
 ### OAuth Setup Steps
 
 1. **Create OAuth Credentials**:
-   - Go to [Google Cloud Console - Credentials](https://console.cloud.google.com/apis/credentials?project=leyin-sandpit)
+   - Go to [Google Cloud Console - Credentials](https://console.cloud.google.com/apis/credentials?project=[YOUR_PROJECT_ID])
    - Click "Create Credentials" → "OAuth 2.0 Client ID"
    - Application type: "Web application"
    - Name: "QA Agent Frontend"
@@ -152,7 +152,7 @@ Redeployment detected
 
 ```bash
 gcloud run services update data-qa-agent-frontend \
-  --region us-central1 \
+  --region [YOUR_REGION] \
   --set-env-vars "GOOGLE_CLIENT_ID=...,GOOGLE_CLIENT_SECRET=...,NEXTAUTH_SECRET=$(openssl rand -base64 32),NEXTAUTH_URL=https://..."
 ```
 
@@ -166,7 +166,7 @@ git clone https://github.com/mirunasuresh23/qa_agent.git
 cd qa_agent
 
 # 2. Set gcloud project (IMPORTANT!)
-gcloud config set project leyin-sandpit
+gcloud config set project [YOUR_PROJECT_ID]
 
 # 3. Make scripts executable
 chmod +x deploy-all.sh sync-config.sh
@@ -216,6 +216,14 @@ vim deploy.config
 - YAML files auto-sync with new values
 - Deploys to new project/region/services
 
+### Understanding URL Parameters
+
+The system uses three main URL-related parameters. You **don't** typically need to set these manually as the deployment scripts detect them for you:
+
+1.  **`NEXT_PUBLIC_BACKEND_URL`**: Used by the Frontend to talk to the Backend API.
+2.  **`NEXTAUTH_URL`**: Used for Google OAuth redirection (must match your Frontend URL).
+3.  **`CLOUD_RUN_URL`**: Used by the Backend itself (for Scheduler and internal processing).
+
 ### Scenario 4: CI/CD Deployment
 
 ```bash
@@ -228,6 +236,21 @@ git push origin feature_leyin2
 - Cloud Build trigger detects push
 - Runs `cloudbuild.yaml` (frontend) or `backend/cloudbuild.yaml` (backend)
 - Automatically deploys to Cloud Run
+
+### Scheduler Infrastructure Resilience
+
+The system is designed to keep Google Cloud Scheduler in sync with your BigQuery configurations, regardless of how you update the data:
+
+1. **Native UI Addition**: 
+   When you use the "Add New Configuration" form in the UI, the backend creates or updates the Cloud Scheduler job **instantly**.
+
+2. **Manual SQL Updates**: 
+   If you insert or update records directly in BigQuery (bypassing the UI):
+   - **Auto-Sync on Startup**: The backend scans the entire config table every time it starts (deployment or cold start) and synchronizes all jobs.
+   - **Manual Trigger**: You can force a synchronization at any time by calling the sync endpoint:
+     ```bash
+     Invoke-RestMethod -Method Post -Uri "https://[your-backend-url]/api/sync-scheduler"
+     ```
 
 ## Cloud Build Triggers (Optional)
 
@@ -274,6 +297,21 @@ gcloud builds triggers create github \
 - Integrated into `deploy-all.sh` (runs automatically)
 - Can be run standalone: `./sync-config.sh`
 
+> [!TIP]
+> **Pro Tip: Automate with Git Hooks**
+> To ensure your `cloudbuild.yaml` files are *always* synced before you push code, you can set up a Git pre-commit hook. Run this one-time command in Cloud Shell:
+> ```bash
+> # Create the pre-commit hook
+> cat <<EOF > .git/hooks/pre-commit
+> #!/bin/bash
+> ./sync-config.sh
+> EOF
+> 
+> # Make it executable
+> chmod +x .git/hooks/pre-commit
+> ```
+> Now, every time you run `git commit`, the sync script will run automatically!
+
 ### `cloudbuild.yaml` (Frontend)
 Cloud Build configuration for frontend service.
 - Auto-synced from `deploy.config`
@@ -299,7 +337,7 @@ Cloud Build configuration for backend service.
 **Solution**:
 ```bash
 # Set your gcloud project
-gcloud config set project leyin-sandpit
+gcloud config set project [YOUR_PROJECT_ID]
 
 # Then run deployment again
 ./deploy-all.sh
@@ -311,7 +349,7 @@ This happens when gcloud doesn't have a default project configured. Setting it o
 
 ```bash
 gcloud run services describe data-qa-agent-frontend \
-  --region us-central1 \
+  --region [YOUR_REGION] \
   --format="value(spec.template.spec.containers[0].env)"
 ```
 
@@ -319,7 +357,7 @@ gcloud run services describe data-qa-agent-frontend \
 
 ```bash
 gcloud run services describe data-qa-agent-frontend \
-  --region us-central1 \
+  --region [YOUR_REGION] \
   --format="value(status.url)"
 ```
 
@@ -327,10 +365,10 @@ gcloud run services describe data-qa-agent-frontend \
 
 ```bash
 # Frontend logs
-gcloud run logs tail data-qa-agent-frontend --region us-central1
+gcloud run logs tail data-qa-agent-frontend --region [YOUR_REGION]
 
 # Backend logs
-gcloud run logs tail data-qa-agent-backend --region us-central1
+gcloud run logs tail data-qa-agent-backend --region [YOUR_REGION]
 ```
 
 ### Force OAuth Reconfiguration

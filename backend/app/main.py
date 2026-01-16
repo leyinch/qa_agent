@@ -13,10 +13,13 @@ from app.models import (
     TestSummary,
     ConfigTableSummary,
     CustomTestRequest,
-    AddSCDConfigRequest
+    AddSCDConfigRequest,
+    TableMetadataResponse,
+    SaveHistoryRequest,
+    ScheduledTestRunRequest
 )
-from app.services.test_executor import test_executor
-from app.services.bigquery_service import bigquery_service
+# Services will be imported lazily within endpoints to improve startup time
+
 
 # Configure logging
 logging.basicConfig(
@@ -30,6 +33,8 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """Lifespan context manager for startup/shutdown events."""
     logger.info("Starting Data QA Agent Backend...")
+    # Scheduler sync removed from startup to prevent blocking
+    # Use POST /api/sync-scheduler to manually sync after deployment
     yield
     logger.info("Shutting down Data QA Agent Backend...")
 
@@ -59,6 +64,25 @@ async def health_check():
     return HealthResponse(status="healthy", version="1.0.0")
 
 
+@app.post("/api/sync-scheduler")
+async def sync_scheduler():
+    """Trigger a full synchronization of Cloud Scheduler jobs with BigQuery config."""
+    try:
+        from app.services.scheduler_service import scheduler_service
+        if not settings.cloud_run_url:
+            raise HTTPException(status_code=400, detail="CLOUD_RUN_URL environment variable is not set")
+            
+        summary = await scheduler_service.sync_all_from_config()
+        return {
+            "status": "success",
+            "message": "Cloud Scheduler synchronization completed",
+            "summary": summary
+        }
+    except Exception as e:
+        logger.error(f"Error syncing scheduler: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/api/generate-tests")
 async def generate_tests(request: GenerateTestsRequest):
     """
@@ -70,6 +94,10 @@ async def generate_tests(request: GenerateTestsRequest):
     - gcs-config: Process multiple mappings from config table
     - scd: Validate Slowly Changing Dimension (Type 1 or Type 2)
     """
+    from app.services.test_executor import test_executor
+    from app.services.history_service import TestHistoryService
+    history_service = TestHistoryService()
+
     try:
         logger.info(f"Received test generation request: mode={request.comparison_mode}")
         
@@ -87,29 +115,9 @@ async def generate_tests(request: GenerateTestsRequest):
                 config_table=request.config_table
             )
             
-            try:
-                summary_data = result['summary']
-                # Convert results objects to dicts for JSON serialization
-                results_by_mapping_dicts = [r.dict() for r in result['results_by_mapping']]
-
-                await bigquery_service.log_execution(
-                    project_id=request.project_id,
-                    execution_data={
-                        "comparison_mode": "gcs_config_table",
-                        "source": f"{request.config_dataset}.{request.config_table}",
-                        "target": "Multiple Targets",
-                        "status": "AT_RISK" if summary_data['failed'] > 0 else "PASS",
-                        "total_tests": summary_data['total_tests'],
-                        "passed_tests": summary_data['passed'],
-                        "failed_tests": summary_data['failed'],
-                        "details": {
-                            "summary": summary_data,
-                            "results_by_mapping": results_by_mapping_dicts
-                        }
-                    }
-                )
-            except Exception as e:
-                logger.error(f"Failed to log config execution: {e}")
+            # History logging disabled for non-SCD tests per user request
+            # if needed in future, enable it or write to a different table
+            pass
 
             return ConfigTableResponse(
                 summary=ConfigTableSummary(**result['summary']),
@@ -156,27 +164,13 @@ async def generate_tests(request: GenerateTestsRequest):
             }
 
             # Log execution
+            # History logging disabled for non-SCD tests per user request
             try:
-                await bigquery_service.log_execution(
-                    project_id=request.project_id,
-                    execution_data={
-                        "comparison_mode": "gcs_single_file",
-                        "source": f"gs://{request.gcs_bucket}/{request.gcs_file_path}",
-                        "target": f"{request.target_dataset}.{request.target_table}",
-                        "status": "FAIL" if summary.failed > 0 or summary.errors > 0 else "PASS",
-                        "total_tests": summary.total_tests,
-                        "passed_tests": summary.passed,
-                        "failed_tests": summary.failed,
-                        "details": {
-                            "summary": summary.dict(),
-                            "mapping_info": result.mapping_info.dict() if result.mapping_info else None,
-                            "predefined_results": [r.dict() for r in result.predefined_results],
-                            "ai_suggestions": [s.dict() for s in result.ai_suggestions]
-                        }
-                    }
-                )
+                # Log execution - disabled
+                pass 
             except Exception as e:
                 logger.error(f"Failed to log execution: {e}")
+
             
             return response_data
         
@@ -190,25 +184,8 @@ async def generate_tests(request: GenerateTestsRequest):
                 )
                 
                 # Log Schema Validation
-                try:
-                    summary = result_data.get('summary', {})
-                    issues = result_data.get('summary', {}).get('total_issues', 0)
-                    
-                    await bigquery_service.log_execution(
-                        project_id=request.project_id,
-                        execution_data={
-                            "comparison_mode": "schema_validation",
-                            "source": "ERD Description",
-                            "target": ",".join(request.datasets or []),
-                            "status": "AT_RISK" if issues > 0 else "PASS",
-                            "total_tests": summary.get('total_tables', 0),
-                            "passed_tests": summary.get('total_tables', 0) - (1 if issues > 0 else 0),
-                            "failed_tests": issues,
-                            "details": result_data
-                        }
-                    )
-                except Exception as log_err:
-                    logger.error(f"Failed to log schema execution: {log_err}")
+                # History logging disabled for non-SCD tests per user request
+                pass
 
                 return result_data
             except Exception as e:
@@ -234,22 +211,39 @@ async def generate_tests(request: GenerateTestsRequest):
                 # Convert results objects to dicts for JSON serialization
                 results_by_mapping_dicts = [r.dict() for r in result['results_by_mapping']]
 
-                await bigquery_service.log_execution(
-                    project_id=request.project_id,
-                    execution_data={
-                        "comparison_mode": "scd_config_table",
-                        "source": f"{request.config_dataset}.{request.config_table}",
-                        "target": "Multiple SCD Tables",
-                        "status": "AT_RISK" if summary_data['failed'] > 0 else "PASS",
-                        "total_tests": summary_data['total_tests'],
-                        "passed_tests": summary_data['passed'],
-                        "failed_tests": summary_data['failed'],
-                        "details": {
-                            "summary": summary_data,
-                            "results_by_mapping": results_by_mapping_dicts
+                # Log each individual table result instead of the config table itself
+                for mapping_result in result['results_by_mapping']:
+                    try:
+                        # Calculate summary for this specific table
+                        table_results = mapping_result.predefined_results
+                        table_summary = {
+                            "total": len(table_results),
+                            "passed": len([t for t in table_results if t.status == 'PASS']),
+                            "failed": len([t for t in table_results if t.status == 'FAIL']),
+                            "errors": len([t for t in table_results if t.status == 'ERROR'])
                         }
-                    }
-                )
+                        
+                        # Extract target info from mapping info
+                        target_ds = mapping_result.mapping_info.target.split('.')[0] if mapping_result.mapping_info and '.' in mapping_result.mapping_info.target else request.config_dataset
+                        target_tbl = mapping_result.mapping_info.target.split('.')[1] if mapping_result.mapping_info and '.' in mapping_result.mapping_info.target else mapping_result.mapping_id
+
+                        history_service.save_test_results(
+                            project_id=request.project_id,
+                            comparison_mode="scd",  # Log as standard SCD run
+                            test_results=[r.dict() for r in table_results],
+                            target_dataset=target_ds,
+                            target_table=target_tbl,
+                            mapping_id=mapping_result.mapping_id,
+                            cron_schedule=mapping_result.cron_schedule,
+                            executed_by="Batch Run",
+                            metadata={
+                                "summary": table_summary,
+                                "source": f"Batch SCD: {target_tbl}",
+                                "status": "FAIL" if table_summary['failed'] > 0 or table_summary['errors'] > 0 else "PASS"
+                            }
+                        )
+                    except Exception as inner_e:
+                        logger.error(f"Failed to log individual result for {mapping_result.mapping_id}: {inner_e}")
             except Exception as e:
                 logger.error(f"Failed to log scd config execution: {e}")
 
@@ -279,25 +273,22 @@ async def generate_tests(request: GenerateTestsRequest):
                 
                 # Log execution
                 try:
-                    await bigquery_service.log_execution(
+                    history_service.save_test_results(
                         project_id=request.project_id,
-                        execution_data={
-                            "comparison_mode": "scd",
+                        comparison_mode="scd",
+                        test_results=[r.dict() for r in result.predefined_results],
+                        target_dataset=request.target_dataset,
+                        target_table=request.target_table,
+                        executed_by="Manual Run",
+                        metadata={
+                            "summary": {
+                                "total_tests": len(result.predefined_results),
+                                "passed": len([t for t in result.predefined_results if t.status == 'PASS']),
+                                "failed": len([t for t in result.predefined_results if t.status == 'FAIL']),
+                                "errors": len([t for t in result.predefined_results if t.status == 'ERROR'])
+                            },
                             "source": f"SCD: {request.target_table}",
-                            "target": f"{request.target_dataset}.{request.target_table}",
-                            "status": "FAIL" if any(r.status in ['FAIL', 'ERROR'] for r in result.predefined_results) else "PASS",
-                            "total_tests": len(result.predefined_results),
-                            "passed_tests": len([t for t in result.predefined_results if t.status == 'PASS']),
-                            "failed_tests": len([t for t in result.predefined_results if t.status == 'FAIL']),
-                            "details": {
-                                "summary": {
-                                    "total_tests": len(result.predefined_results),
-                                    "passed": len([t for t in result.predefined_results if t.status == 'PASS']),
-                                    "failed": len([t for t in result.predefined_results if t.status == 'FAIL']),
-                                    "errors": len([t for t in result.predefined_results if t.status == 'ERROR'])
-                                },
-                                "predefined_results": [r.dict() for r in result.predefined_results]
-                            }
+                            "status": "FAIL" if any(r.status in ['FAIL', 'ERROR'] for r in result.predefined_results) else "PASS"
                         }
                     )
                 except Exception as log_err:
@@ -310,7 +301,8 @@ async def generate_tests(request: GenerateTestsRequest):
                         'failed': len([t for t in result.predefined_results if t.status == 'FAIL']),
                         'errors': len([t for t in result.predefined_results if t.status == 'ERROR'])
                     },
-                    'results_by_mapping': [result]
+                    'results_by_mapping': [result.dict()],
+                    'cron_schedule': result.cron_schedule
                 }
             except Exception as e:
                 logger.error(f"Error in scd validation: {str(e)}")
@@ -330,15 +322,98 @@ async def generate_tests(request: GenerateTestsRequest):
 
 
 
+@app.post("/api/save-test-history")
+async def save_test_history(request: SaveHistoryRequest):
+    """Save test execution results to BigQuery history."""
+    from app.services.history_service import TestHistoryService
+    history_service = TestHistoryService()
+
+    try:
+        execution_id = history_service.save_test_results(
+            project_id=request.project_id,
+            comparison_mode=request.comparison_mode,
+            test_results=request.test_results,
+            target_dataset=request.target_dataset,
+            target_table=request.target_table,
+            mapping_id=request.mapping_id,
+            metadata=request.metadata,
+            cron_schedule=request.cron_schedule
+        )
+
+        return {"status": "success", "execution_id": execution_id}
+    except Exception as e:
+        logger.error(f"Error saving test history: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/history")
 async def get_test_history(project_id: str = settings.google_cloud_project, limit: int = 50):
-    """Get previous test runs from BigQuery."""
+    """Get previous test runs (summary level) from BigQuery."""
     try:
-        from app.services.bigquery_service import bigquery_service
-        return await bigquery_service.get_execution_history(project_id=project_id, limit=limit)
+        from app.services.history_service import TestHistoryService
+        history_service = TestHistoryService()
+        return history_service.get_test_history(project_id=project_id, limit=limit)
+
     except Exception as e:
-        logger.error(f"Error fetching history: {e}")
+        logger.error(f"Error fetching execution history: {e}")
         return []
+
+
+@app.delete("/api/history")
+async def clear_test_history(project_id: str):
+    """Clear all test execution history for a project."""
+    try:
+        from app.services.history_service import TestHistoryService
+        history_service = TestHistoryService()
+        history_service.clear_history(project_id)
+        return {"status": "success", "message": f"History cleared for {project_id}"}
+    except Exception as e:
+        logger.error(f"Error clearing history: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/history-details")
+async def get_history_details(
+    execution_id: str,
+    project_id: str = settings.google_cloud_project
+):
+    """Get detailed test results for a specific execution."""
+    try:
+        from app.services.history_service import TestHistoryService
+        history_service = TestHistoryService()
+        
+        # Query detailed results from the new history service
+        results = history_service.get_test_history(
+            project_id=project_id,
+            execution_id=execution_id
+        )
+
+        return results
+    except Exception as e:
+        logger.error(f"Error fetching detailed history: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/table-history")
+async def get_table_history(
+    target_table: str,
+    project_id: str = settings.google_cloud_project,
+    limit: int = 20
+):
+    """Get history for a specific table across all executions."""
+    try:
+        from app.services.history_service import TestHistoryService
+        history_service = TestHistoryService()
+
+        return history_service.get_test_history(
+            project_id=project_id,
+            target_table=target_table,
+            limit=limit
+        )
+
+    except Exception as e:
+        logger.error(f"Error fetching table history: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/api/scd-config")
@@ -356,10 +431,13 @@ async def add_scd_config(request: AddSCDConfigRequest):
             "begin_date_column": request.begin_date_column,
             "end_date_column": request.end_date_column,
             "active_flag_column": request.active_flag_column,
-            "description": request.description
+            "description": request.description,
+            "custom_tests": request.custom_tests,
+            "cron_schedule": request.cron_schedule
         }
         
         # Insert into config table
+        from app.services.bigquery_service import bigquery_service
         success = await bigquery_service.insert_scd_config(
             project_id=request.project_id,
             config_dataset=request.config_dataset,
@@ -371,6 +449,18 @@ async def add_scd_config(request: AddSCDConfigRequest):
             raise HTTPException(
                 status_code=500,
                 detail="Failed to insert SCD configuration into config table"
+            )
+        
+        # Upsert scheduler job if cron_schedule is provided
+        if request.cron_schedule:
+            from app.services.scheduler_service import scheduler_service
+            await scheduler_service.upsert_job(
+                config_id=request.config_id,
+                cron_schedule=request.cron_schedule,
+                target_dataset=request.target_dataset,
+                target_table=request.target_table,
+                config_dataset=request.config_dataset,
+                config_table=request.config_table
             )
         
         return {
@@ -419,6 +509,117 @@ async def save_custom_test(request: CustomTestRequest):
         return {"status": "success", "message": "Custom test saved"}
     except Exception as e:
         logger.error(f"Error saving custom test: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/table-metadata", response_model=TableMetadataResponse)
+async def get_table_metadata(
+    project_id: str = settings.google_cloud_project,
+    dataset_id: str = ...,
+    table_id: str = ...
+):
+    """Get metadata for a specific BigQuery table."""
+    try:
+        from app.services.bigquery_service import bigquery_service
+        metadata = await bigquery_service.get_table_metadata(project_id, dataset_id, table_id)
+        
+        # Extract just column names for easier frontend usage
+        columns = [field['name'] for field in metadata.get('schema', {}).get('fields', [])]
+        
+        return TableMetadataResponse(
+            full_table_name=metadata['full_table_name'],
+            columns=columns,
+            schema_info=metadata
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error fetching table metadata: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/run-scheduled-tests")
+async def run_scheduled_tests(request: ScheduledTestRunRequest):
+    """Endpoint triggered by Cloud Scheduler to run tests for a single table."""
+    try:
+        from app.services.test_executor import TestExecutor
+        from app.services.bigquery_service import bigquery_service
+        from app.services.history_service import TestHistoryService
+        
+        executor = TestExecutor()
+        history_service = TestHistoryService()
+        
+        # Fetch full config details from BigQuery
+        configs = await bigquery_service.read_scd_config_table(
+            request.project_id, 
+            request.config_dataset, 
+            request.config_table
+        )
+
+        
+        table_config = next((c for c in configs if c['config_id'] == request.config_id), None)
+        if not table_config:
+            logger.error(f"Config {request.config_id} not found in {request.config_dataset}.{request.config_table}")
+            raise HTTPException(status_code=404, detail=f"Config {request.config_id} not found")
+            
+        logger.info(f"Running scheduled tests for {request.config_id}")
+        mapping_result = await executor.process_scd(request.project_id, table_config)
+        results = [r.dict() if hasattr(r, 'dict') else r for r in mapping_result.predefined_results]
+        
+        # Save to history (Policy: scheduled runs ALWAYS write to history)
+        summary = {
+            "total": len(results),
+            "passed": len([r for r in results if r.get("status") == "PASS"]),
+            "failed": len([r for r in results if r.get("status") == "FAIL"]),
+            "errors": len([r for r in results if r.get("status") == "ERROR"])
+        }
+        
+        # Determine execution source based on time
+        # If running close to scheduled time (09:00 Melbourne), it's Scheduled. Otherwise Manual.
+        import pytz
+        from datetime import datetime
+        
+        executed_by = "Manual Run"
+        try:
+            tz = pytz.timezone("Australia/Melbourne")
+            now = datetime.now(tz)
+            
+            # Check if within 5 minutes of 09:00 AM
+            if now.hour == 9 and now.minute <= 5:
+                 executed_by = "Scheduled Run"
+        except Exception:
+            # Fallback if timezone conversion fails
+            executed_by = "Scheduled Run"
+
+        history_service.save_test_results(
+            project_id=request.project_id,
+            comparison_mode="scd",
+            test_results=results,
+            target_dataset=request.target_dataset,
+            target_table=request.target_table,
+            mapping_id=request.config_id,
+            cron_schedule=request.cron_schedule,
+            executed_by=executed_by,
+            metadata={
+                "summary": summary,
+                "source": f"Scheduled SCD: {request.target_table}",
+                "status": "FAIL" if summary["failed"] > 0 or summary["errors"] > 0 else "PASS"
+            }
+        )
+        
+        return {
+            "success": True,
+            "message": f"Scheduled tests for {request.config_id} completed and saved to history",
+            "results_summary": {
+                "total": len(results),
+                "passed": len([t for t in results if t.get('status') == 'PASS']),
+                "failed": len([t for t in results if t.get('status') == 'FAIL'])
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error running scheduled tests: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 

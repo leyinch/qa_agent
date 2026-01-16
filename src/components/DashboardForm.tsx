@@ -41,7 +41,7 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
 
     // GCS mode state
     const [gcsMode, setGcsMode] = useState<GCSMode>('single');
-    const [configDataset, setConfigDataset] = useState("");
+    const [configDataset, setConfigDataset] = useState("config");
     const [configTable, setConfigTable] = useState("");
     const [gcsBucket, setGcsBucket] = useState("");
     const [gcsFilePath, setGcsFilePath] = useState("");
@@ -59,6 +59,60 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
     const [activeFlagColumn, setActiveFlagColumn] = useState("DWCurrentRowFlag");
     const [customTests, setCustomTests] = useState<CustomTest[]>([]);
 
+    // Column fetching state
+    const [availableColumns, setAvailableColumns] = useState<string[]>([]);
+    const [scdTargetDataset, setScdTargetDataset] = useState(""); // Track for fetching
+    const [scdTargetTable, setScdTargetTable] = useState("");     // Track for fetching
+
+    // Fetch columns when target changes
+    useEffect(() => {
+        const fetchColumns = async () => {
+            if (!projectId || !scdTargetDataset || !scdTargetTable) {
+                setAvailableColumns([]);
+                return;
+            }
+
+            try {
+                const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://data-qa-agent-backend2-1037417342779.us-central1.run.app';
+                const endpoint = `${backendUrl}/api/table-metadata?project_id=${projectId}&dataset_id=${scdTargetDataset}&table_id=${scdTargetTable}`;
+
+                const response = await fetch(endpoint);
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.columns) {
+                        setAvailableColumns(data.columns);
+                    }
+                } else {
+                    console.warn("Failed to fetch columns");
+                    setAvailableColumns([]);
+                }
+            } catch (err) {
+                console.error("Error fetching columns:", err);
+                setAvailableColumns([]);
+            }
+        };
+
+        const timeoutId = setTimeout(fetchColumns, 1000); // Debounce
+        return () => clearTimeout(timeoutId);
+    }, [projectId, scdTargetDataset, scdTargetTable]);
+
+    const handleInsertColumn = (index: number, columnName: string, isNewConfig: boolean) => {
+        if (!columnName) return;
+
+        if (isNewConfig) {
+            const updated = [...newCustomTests];
+            const currentSql = updated[index].sql || "";
+            updated[index] = { ...updated[index], sql: currentSql + columnName + " " };
+            setNewCustomTests(updated);
+        } else {
+            const updated = [...customTests];
+            const currentSql = updated[index].sql || "";
+            updated[index] = { ...updated[index], sql: currentSql + columnName + " " };
+            setCustomTests(updated);
+        }
+    };
+
+
     // New config form state
     const [showAddConfig, setShowAddConfig] = useState(false);
     const [newConfigId, setNewConfigId] = useState("");
@@ -71,7 +125,28 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
     const [newEndDateColumn, setNewEndDateColumn] = useState("DWEndEffDateTime");
     const [newActiveFlagColumn, setNewActiveFlagColumn] = useState("DWCurrentRowFlag");
     const [newDescription, setNewDescription] = useState("");
+    const [newCronSchedule, setNewCronSchedule] = useState<string>('0 9 * * *');
+    const [scheduleFrequency, setScheduleFrequency] = useState<string>('daily');
+    const [scheduledHour, setScheduledHour] = useState("09");
+    const [scheduledMinute, setScheduledMinute] = useState("00");
+    const [scheduledDayOfWeek, setScheduledDayOfWeek] = useState("1");
+    const [scheduledDayOfMonth, setScheduledDayOfMonth] = useState("1");
     const [newCustomTests, setNewCustomTests] = useState<CustomTest[]>([]);
+
+    // Sync Cron Schedule when granular parts change
+    useEffect(() => {
+        if (scheduleFrequency === 'custom') return;
+
+        let cron = `${parseInt(scheduledMinute)} ${parseInt(scheduledHour)}`;
+        if (scheduleFrequency === 'daily') {
+            cron += ' * * *';
+        } else if (scheduleFrequency === 'weekly') {
+            cron += ` * * ${scheduledDayOfWeek}`;
+        } else if (scheduleFrequency === 'monthly') {
+            cron += ` ${scheduledDayOfMonth} * *`;
+        }
+        setNewCronSchedule(cron);
+    }, [scheduleFrequency, scheduledHour, scheduledMinute, scheduledDayOfWeek, scheduledDayOfMonth]);
 
     const addDataset = () => setDatasets([...datasets, '']);
 
@@ -139,10 +214,12 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (comparisonMode === 'history') return;
+
         setLoading(true);
 
         try {
-            const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://data-qa-agent-backend-1037417342779.us-central1.run.app';
+            const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://data-qa-agent-backend2-1037417342779.us-central1.run.app';
             const endpoint = `${backendUrl}/api/generate-tests`;
 
             let payload: any = {
@@ -221,8 +298,9 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
 
             const data = await response.json();
             localStorage.setItem("projectId", projectId);
-            handleViewResult(data);
 
+            // History is now saved automatically by the backend in the generate-tests endpoint
+            handleViewResult(data);
         } catch (error: any) {
             console.error("Error generating tests:", error);
             alert(error.message || "An error occurred while generating tests.");
@@ -238,7 +316,7 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
                 return;
             }
 
-            const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://data-qa-agent-backend-1037417342779.us-central1.run.app';
+            const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://data-qa-agent-backend2-1037417342779.us-central1.run.app';
             const endpoint = `${backendUrl}/api/scd-config`;
 
             const payload = {
@@ -255,7 +333,8 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
                 end_date_column: newScdType === 'scd2' ? newEndDateColumn : null,
                 active_flag_column: newScdType === 'scd2' ? newActiveFlagColumn : null,
                 description: newDescription,
-                custom_tests: newCustomTests.length > 0 ? newCustomTests : null
+                custom_tests: newCustomTests.length > 0 ? newCustomTests : null,
+                cron_schedule: newCronSchedule || null
             };
 
             const response = await fetch(endpoint, {
@@ -289,7 +368,7 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
     };
 
     return (
-        <form onSubmit={handleSubmit} className="card fade-in" style={{ width: '100%', maxWidth: '800px' }}>
+        <form onSubmit={handleSubmit} className="card fade-in" style={{ width: '100%', maxWidth: '800px', margin: '0 auto' }}>
             {/* Header Removed */}
 
             {/* Comparison Mode Toggle Removed */}
@@ -305,7 +384,7 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
             {/* ... */}
 
             {/* Project ID (common field) */}
-            <div style={{ marginBottom: '1.75rem' }}>
+            <div style={{ marginBottom: '1.75rem', width: '100%' }}>
                 <label className="label" htmlFor="projectId">
                     <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         🔑 Google Cloud Project ID<span className="required">*</span>
@@ -315,12 +394,14 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
                     id="projectId"
                     type="text"
                     className="input"
+                    style={{ width: '100%' }}
                     value={projectId}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setProjectId(e.target.value)}
                     required
                     placeholder="Project with BigQuery data (e.g., miruna-sandpit)"
                 />
             </div>
+
 
             {/* History Mode */}
             {comparisonMode === 'history' ? (
@@ -733,7 +814,7 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
                                             value={configDataset}
                                             onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfigDataset(e.target.value)}
                                             required
-                                            placeholder="e.g., transform_config"
+                                            placeholder="e.g., config"
                                         />
                                     </div>
 
@@ -811,7 +892,12 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
                                                         type="text"
                                                         className="input"
                                                         value={newTargetDataset}
-                                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewTargetDataset(e.target.value)}
+                                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                                                            setNewTargetDataset(e.target.value);
+                                                        }}
+                                                        onBlur={() => {
+                                                            setScdTargetDataset(newTargetDataset); // Reuse fetching logic
+                                                        }}
                                                         placeholder="e.g., DW_Dimensions"
                                                     />
                                                 </div>
@@ -822,7 +908,13 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
                                                         type="text"
                                                         className="input"
                                                         value={newTargetTable}
-                                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewTargetTable(e.target.value)}
+                                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                                                            setNewTargetTable(e.target.value);
+                                                            setScdTargetTable(e.target.value);
+                                                        }}
+                                                        onBlur={() => {
+                                                            setScdTargetTable(newTargetTable); // Trigger fetch
+                                                        }}
                                                         placeholder="e.g., D_MyTable_WD"
                                                     />
                                                 </div>
@@ -1027,6 +1119,24 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
                                                                     rows={3}
                                                                     style={{ marginBottom: 0, resize: 'vertical', fontFamily: 'monospace' }}
                                                                 />
+                                                                {availableColumns.length > 0 && (
+                                                                    <div style={{ marginTop: '0.5rem' }}>
+                                                                        <label className="label" style={{ fontSize: '0.75rem' }}>Insert Column:</label>
+                                                                        <select
+                                                                            className="input"
+                                                                            style={{ padding: '0.25rem', fontSize: '0.8rem', width: 'auto' }}
+                                                                            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+                                                                                handleInsertColumn(index, e.target.value, true);
+                                                                                e.target.value = "";
+                                                                            }}
+                                                                        >
+                                                                            <option value="">-- Select Column --</option>
+                                                                            {availableColumns.map(col => (
+                                                                                <option key={col} value={col}>{col}</option>
+                                                                            ))}
+                                                                        </select>
+                                                                    </div>
+                                                                )}
                                                             </div>
                                                         </div>
                                                     ))}
@@ -1047,6 +1157,121 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
                                                         + Add Business Rule
                                                     </button>
                                                 </div>
+                                                <div style={{ marginBottom: '1.5rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem' }}>
+                                                    <div>
+                                                        <label className="label" htmlFor="scheduleFrequency">
+                                                            <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                                📅 Frequency
+                                                            </span>
+                                                        </label>
+                                                        <select
+                                                            id="scheduleFrequency"
+                                                            className="input"
+                                                            value={scheduleFrequency}
+                                                            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setScheduleFrequency(e.target.value)}
+                                                        >
+                                                            <option value="daily">Daily</option>
+                                                            <option value="weekly">Weekly</option>
+                                                            <option value="monthly">Monthly</option>
+                                                            <option value="custom">Custom Cron</option>
+                                                        </select>
+                                                    </div>
+
+                                                    {scheduleFrequency !== 'custom' && (
+                                                        <>
+                                                            <div>
+                                                                <label className="label">
+                                                                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                                        ⏱️ Time (HH:MM)
+                                                                    </span>
+                                                                </label>
+                                                                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                                                                    <select
+                                                                        className="input"
+                                                                        style={{ marginBottom: 0, padding: '0.55rem' }}
+                                                                        value={scheduledHour}
+                                                                        onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setScheduledHour(e.target.value)}
+                                                                    >
+                                                                        {Array.from({ length: 24 }).map((_, i) => {
+                                                                            const val = i.toString().padStart(2, '0');
+                                                                            return <option key={val} value={val}>{val}</option>;
+                                                                        })}
+                                                                    </select>
+                                                                    <span>:</span>
+                                                                    <select
+                                                                        className="input"
+                                                                        style={{ marginBottom: 0, padding: '0.55rem' }}
+                                                                        value={scheduledMinute}
+                                                                        onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setScheduledMinute(e.target.value)}
+                                                                    >
+                                                                        {Array.from({ length: 60 }).map((_, i) => {
+                                                                            const val = i.toString().padStart(2, '0');
+                                                                            return <option key={val} value={val}>{val}</option>;
+                                                                        })}
+                                                                    </select>
+                                                                </div>
+                                                            </div>
+
+                                                            {scheduleFrequency === 'weekly' && (
+                                                                <div>
+                                                                    <label className="label">Day of Week</label>
+                                                                    <select
+                                                                        className="input"
+                                                                        value={scheduledDayOfWeek}
+                                                                        onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setScheduledDayOfWeek(e.target.value)}
+                                                                    >
+                                                                        <option value="1">Monday</option>
+                                                                        <option value="2">Tuesday</option>
+                                                                        <option value="3">Wednesday</option>
+                                                                        <option value="4">Thursday</option>
+                                                                        <option value="5">Friday</option>
+                                                                        <option value="6">Saturday</option>
+                                                                        <option value="0">Sunday</option>
+                                                                    </select>
+                                                                </div>
+                                                            )}
+
+                                                            {scheduleFrequency === 'monthly' && (
+                                                                <div>
+                                                                    <label className="label">Day of Month</label>
+                                                                    <select
+                                                                        className="input"
+                                                                        value={scheduledDayOfMonth}
+                                                                        onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setScheduledDayOfMonth(e.target.value)}
+                                                                    >
+                                                                        {Array.from({ length: 31 }).map((_, i) => (
+                                                                            <option key={i + 1} value={i + 1}>{i + 1}</option>
+                                                                        ))}
+                                                                    </select>
+                                                                </div>
+                                                            )}
+                                                        </>
+                                                    )}
+                                                </div>
+
+                                                <div style={{ marginBottom: '1.5rem' }}>
+                                                    <label className="label" htmlFor="newCronSchedule">
+                                                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                            ⚙️ Resulting Cron Schedule {scheduleFrequency !== 'custom' ? '(Auto-generated)' : ''}
+                                                        </span>
+                                                    </label>
+                                                    <input
+                                                        id="newCronSchedule"
+                                                        type="text"
+                                                        className="input"
+                                                        style={{ width: '100%', background: scheduleFrequency !== 'custom' ? '#f8fafc' : 'white' }}
+                                                        value={newCronSchedule}
+                                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                                                            setNewCronSchedule(e.target.value);
+                                                            if (scheduleFrequency !== 'custom') setScheduleFrequency('custom');
+                                                        }}
+                                                        placeholder="e.g., 0 2 * * * (Daily at 2 AM)"
+                                                        readOnly={scheduleFrequency !== 'custom'}
+                                                    />
+                                                    <p style={{ fontSize: '0.75rem', color: 'var(--secondary-foreground)', marginTop: '0.25rem' }}>
+                                                        {newCronSchedule ? `Scheduled execution: ${newCronSchedule}` : 'Manual execution only'}
+                                                    </p>
+                                                </div>
                                             </div>
 
                                             {/* Save Button */}
@@ -1065,7 +1290,7 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
                                                     fontSize: '0.875rem'
                                                 }}
                                             >
-                                                💾 Save Configuration
+                                                Add Configuration
                                             </button>
                                         </div>
                                     )}
@@ -1076,7 +1301,7 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
                             {scdMode === 'direct' && (
                                 <>
                                     {/* Target Dataset & Table */}
-                                    <div style={{ display: 'flex', gap: '1.75rem' }}>
+                                    <div style={{ display: 'flex', gap: '1.75rem', width: '100%' }}>
                                         <div style={{ flex: 1, marginBottom: '1.75rem' }}>
                                             <label className="label" htmlFor="targetDatasetScd">
                                                 <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -1087,9 +1312,7 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
                                                 id="targetDatasetScd"
                                                 type="text"
                                                 className="input"
-                                                value={targetDataset}
-                                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTargetDataset(e.target.value)}
-                                                required
+                                                style={{ width: '100%' }}
                                                 placeholder="e.g., DW_Dimensions"
                                             />
                                         </div>
@@ -1103,13 +1326,22 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
                                                 id="targetTableScd"
                                                 type="text"
                                                 className="input"
+                                                style={{ width: '100%' }}
                                                 value={targetTable}
-                                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTargetTable(e.target.value)}
+                                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                                                    setTargetTable(e.target.value);
+                                                    setScdTargetTable(e.target.value);
+                                                }}
+                                                onBlur={() => {
+                                                    setScdTargetDataset(targetDataset);
+                                                    setScdTargetTable(targetTable);
+                                                }}
                                                 required
                                                 placeholder="e.g., D_Employee_WD"
                                             />
                                         </div>
                                     </div>
+
 
                                     {/* SCD Type Toggle */}
                                     <div style={{ marginBottom: '1.75rem' }}>
@@ -1318,6 +1550,24 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
                                                             rows={3}
                                                             style={{ marginBottom: 0, resize: 'vertical', fontFamily: 'monospace' }}
                                                         />
+                                                        {availableColumns.length > 0 && (
+                                                            <div style={{ marginTop: '0.5rem' }}>
+                                                                <label className="label" style={{ fontSize: '0.75rem' }}>Insert Column:</label>
+                                                                <select
+                                                                    className="input"
+                                                                    style={{ padding: '0.25rem', fontSize: '0.8rem', width: 'auto' }}
+                                                                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+                                                                        handleInsertColumn(index, e.target.value, false);
+                                                                        e.target.value = ""; // Reset dropdown
+                                                                    }}
+                                                                >
+                                                                    <option value="">-- Select Column --</option>
+                                                                    {availableColumns.map(col => (
+                                                                        <option key={col} value={col}>{col}</option>
+                                                                    ))}
+                                                                </select>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
                                             ))}

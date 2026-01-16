@@ -3,7 +3,7 @@ from google.cloud import bigquery
 client = bigquery.Client(project='leyin-sandpit')
 
 # Create Dataset
-dataset_id = "transform_config"
+dataset_id = "config"
 dataset_ref = client.dataset(dataset_id)
 dataset = bigquery.Dataset(dataset_ref)
 dataset.location = "US"
@@ -22,7 +22,9 @@ schema = [
     bigquery.SchemaField("begin_date_column", "STRING"),
     bigquery.SchemaField("end_date_column", "STRING"),
     bigquery.SchemaField("active_flag_column", "STRING"),
-    bigquery.SchemaField("description", "STRING")
+    bigquery.SchemaField("description", "STRING"),
+    bigquery.SchemaField("custom_tests", "JSON"),
+    bigquery.SchemaField("cron_schedule", "STRING")
 ]
 
 table = bigquery.Table(f"leyin-sandpit.{table_id}", schema=schema)
@@ -39,8 +41,10 @@ rows_to_insert = [
         "scd_type": "scd1",
         "primary_keys": ["TableId", "PositionIDX"],
         "surrogate_key": "DWSeatID",
-        "description": "SCD1 Mock for Gaming Seats (Test Data)"
+        "description": "SCD1 Mock for Gaming Seats (Test Data)",
+        "cron_schedule": "0 9 * * *"
     },
+
     {
         "config_id": "employee_scd2",
         "target_dataset": "crown_scd_mock",
@@ -51,7 +55,38 @@ rows_to_insert = [
         "begin_date_column": "DWBeginEffDateTime",
         "end_date_column": "DWEndEffDateTime",
         "active_flag_column": "DWCurrentRowFlag",
-        "description": "SCD2 Mock for Employees (Test Data)"
+        "description": "SCD2 Mock for Employees (Test Data)",
+        "cron_schedule": "0 9 * * *"
+    },
+
+    {
+        "config_id": "player_scd2",
+        "target_dataset": "crown_scd_mock",
+        "target_table": "D_Player_WD",
+        "scd_type": "scd2",
+        "primary_keys": ["PlayerId"],
+        "surrogate_key": "DWPlayerID",
+        "begin_date_column": "DWBeginEffDateTime",
+        "end_date_column": "DWEndEffDateTime",
+        "active_flag_column": "DWCurrentRowFlag",
+        "active_flag_column": "DWCurrentRowFlag",
+        "description": "SCD2 Mock for Players (Test Data)",
+        "cron_schedule": "0 9 * * *",
+        "custom_tests": [
+
+            {
+                "name": "CreatedDtm NOT NULL",
+                "sql": "SELECT COUNT(0) = 0 FROM {{target}} WHERE CreatedDtm IS NULL",
+                "severity": "HIGH",
+                "description": "CreatedDtm must not be null"
+            },
+            {
+                "name": "CreatedDtm <= UpdatedDtm",
+                "sql": "SELECT LOGICAL_AND(UpdatedDtm IS NULL OR (CreatedDtm IS NOT NULL AND CreatedDtm <= UpdatedDtm)) FROM {{target}}",
+                "severity": "HIGH",
+                "description": "CreatedDtm must be before or equal to UpdatedDtm"
+            }
+        ]
     },
 
 ]
@@ -61,3 +96,8 @@ if not errors:
     print("Config data inserted successfully.")
 else:
     print(f"Errors inserting config data: {errors}")
+
+# Ensure schema has custom_tests if table already existed without it (idempotency check)
+# Actually, the create_table above recreates the table (delete_table first), so schema is guaranteed.
+# But just in case we change logic later:
+# ... logic removed as we drop/create ...

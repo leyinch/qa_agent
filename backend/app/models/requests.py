@@ -48,6 +48,7 @@ class TestResult(BaseModel):
     rows_affected: int = 0
     sample_data: Optional[List[Dict[str, Any]]] = None
     error_message: Optional[str] = None
+    details: Optional[Dict[str, Any]] = None
 
 
 class MappingInfo(BaseModel):
@@ -73,6 +74,7 @@ class MappingResult(BaseModel):
     mapping_info: Optional[MappingInfo] = None
     predefined_results: List[TestResult]
     ai_suggestions: List[AISuggestion] = []
+    cron_schedule: Optional[str] = None
     error: Optional[str] = None
 
 
@@ -105,4 +107,23 @@ class AddSCDConfigRequest(BaseModel):
     active_flag_column: Optional[str] = Field(None, description="Active flag column (SCD2)")
     description: Optional[str] = Field("", description="Configuration description")
     custom_tests: Optional[List[Dict[str, str]]] = Field(None, description="List of custom business rules (name/sql)")
+    cron_schedule: Optional[str] = Field(None, description="Cron schedule (e.g. '0 2 * * *')")
+class ScheduledTestRunRequest(BaseModel):
+    config_id: str
+    project_id: str
+    config_dataset: str
+    config_table: str
+    target_dataset: str
+    target_table: str
+    cron_schedule: Optional[str] = None
 
+class SaveHistoryRequest(BaseModel):
+    """Request model for saving test history."""
+    project_id: str
+    comparison_mode: str
+    test_results: List[Dict[str, Any]]
+    target_dataset: Optional[str] = None
+    target_table: Optional[str] = None
+    mapping_id: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
+    cron_schedule: Optional[str] = None

@@ -72,6 +72,102 @@ scd2_data = [
     {"UserId": "U5", "UserName": "User 5 B", "DWEmployeeID": 5009, "DWBeginEffDateTime": "2023-05-01T00:00:00Z", "DWEndEffDateTime": "2099-12-31T23:59:59Z", "DWCurrentRowFlag": "Y"}
 ]
 
+# 4. Create SCD2 Mock Table D_Player_WD (with intentional errors + Business Rules)
+player_table_id = f"{dataset_id}.D_Player_WD"
+player_schema = [
+    bigquery.SchemaField("PlayerId", "STRING", mode="REQUIRED"),
+    bigquery.SchemaField("PlayerName", "STRING"),
+    bigquery.SchemaField("DWPlayerID", "INTEGER"),
+    bigquery.SchemaField("DWBeginEffDateTime", "TIMESTAMP"),
+    bigquery.SchemaField("DWEndEffDateTime", "TIMESTAMP"),
+    bigquery.SchemaField("DWCurrentRowFlag", "STRING"),
+    # Business Rule Columns
+    bigquery.SchemaField("CreatedDtm", "TIMESTAMP"),
+    bigquery.SchemaField("UpdatedDtm", "TIMESTAMP")
+]
+
+# Data contains:
+# - Valid chain: Row 1 -> Row 2
+# - SCD2 Errors (inherited from Employee patterns):
+#   - Overlapping dates
+#   - Multiple active flags
+#   - Invalid date order
+#   - Gap in dates
+# - Business Rule Errors:
+#   - CreatedDtm IS NULL
+#   - CreatedDtm > UpdatedDtm
+player_data = [
+    # 1. Valid record chain (P1)
+    {
+        "PlayerId": "P1", "PlayerName": "Player 1 Old", "DWPlayerID": 6001, 
+        "DWBeginEffDateTime": "2023-01-01T00:00:00Z", "DWEndEffDateTime": "2023-06-01T00:00:00Z", "DWCurrentRowFlag": "N",
+        "CreatedDtm": "2023-01-01T00:00:00Z", "UpdatedDtm": "2023-06-01T00:00:00Z"
+    },
+    {
+        "PlayerId": "P1", "PlayerName": "Player 1 New", "DWPlayerID": 6002, 
+        "DWBeginEffDateTime": "2023-06-01T00:00:00Z", "DWEndEffDateTime": "2099-12-31T23:59:59Z", "DWCurrentRowFlag": "Y",
+        "CreatedDtm": "2023-06-01T00:00:00Z", "UpdatedDtm": None # Valid (UpdatedDtm null for current)
+    },
+    
+    # 2. Overlapping Dates (P2) -> SCD2 Error
+    {
+        "PlayerId": "P2", "PlayerName": "Player 2 A", "DWPlayerID": 6003, 
+        "DWBeginEffDateTime": "2023-01-01T00:00:00Z", "DWEndEffDateTime": "2023-08-01T00:00:00Z", "DWCurrentRowFlag": "N",
+        "CreatedDtm": "2023-01-01T00:00:00Z", "UpdatedDtm": "2023-08-01T00:00:00Z"
+    },
+    {
+        "PlayerId": "P2", "PlayerName": "Player 2 B", "DWPlayerID": 6004, 
+        "DWBeginEffDateTime": "2023-07-01T00:00:00Z", "DWEndEffDateTime": "2099-12-31T23:59:59Z", "DWCurrentRowFlag": "Y",
+        "CreatedDtm": "2023-07-01T00:00:00Z", "UpdatedDtm": None
+    },
+    
+    # 3. Multiple Active Flags (P3) -> SCD2 Error
+    {
+        "PlayerId": "P3", "PlayerName": "Player 3 A", "DWPlayerID": 6005, 
+        "DWBeginEffDateTime": "2023-01-01T00:00:00Z", "DWEndEffDateTime": "2099-12-31T23:59:59Z", "DWCurrentRowFlag": "Y",
+        "CreatedDtm": "2023-01-01T00:00:00Z", "UpdatedDtm": None
+    },
+    {
+        "PlayerId": "P3", "PlayerName": "Player 3 B", "DWPlayerID": 6006, 
+        "DWBeginEffDateTime": "2023-06-01T00:00:00Z", "DWEndEffDateTime": "2099-12-31T23:59:59Z", "DWCurrentRowFlag": "Y",
+        "CreatedDtm": "2023-06-01T00:00:00Z", "UpdatedDtm": None
+    },
+    
+    # 4. Invalid Date Order (P4) -> SCD2 Error
+    {
+        "PlayerId": "P4", "PlayerName": "Player 4", "DWPlayerID": 6007, 
+        "DWBeginEffDateTime": "2023-12-01T00:00:00Z", "DWEndEffDateTime": "2023-01-01T00:00:00Z", "DWCurrentRowFlag": "Y",
+        "CreatedDtm": "2023-12-01T00:00:00Z", "UpdatedDtm": None
+    },
+
+    # 5. Gap (P5) -> SCD2 Error
+    {
+        "PlayerId": "P5", "PlayerName": "Player 5 A", "DWPlayerID": 6008, 
+        "DWBeginEffDateTime": "2023-01-01T00:00:00Z", "DWEndEffDateTime": "2023-03-01T00:00:00Z", "DWCurrentRowFlag": "N",
+        "CreatedDtm": "2023-01-01T00:00:00Z", "UpdatedDtm": "2023-03-01T00:00:00Z"
+    },
+    {
+        "PlayerId": "P5", "PlayerName": "Player 5 B", "DWPlayerID": 6009, 
+        "DWBeginEffDateTime": "2023-05-01T00:00:00Z", "DWEndEffDateTime": "2099-12-31T23:59:59Z", "DWCurrentRowFlag": "Y",
+        "CreatedDtm": "2023-05-01T00:00:00Z", "UpdatedDtm": None
+    },
+
+    # 6. Business Rule Failures
+    # P6: CreatedDtm IS NULL
+    {
+        "PlayerId": "P6", "PlayerName": "Player 6 Null Created", "DWPlayerID": 6010, 
+        "DWBeginEffDateTime": "2023-01-01T00:00:00Z", "DWEndEffDateTime": "2099-12-31T23:59:59Z", "DWCurrentRowFlag": "Y",
+        "CreatedDtm": None, "UpdatedDtm": "2023-01-01T00:00:00Z"
+    },
+    
+    # P7: CreatedDtm > UpdatedDtm
+    {
+        "PlayerId": "P7", "PlayerName": "Player 7 Future Created", "DWPlayerID": 6011, 
+        "DWBeginEffDateTime": "2023-01-01T00:00:00Z", "DWEndEffDateTime": "2099-12-31T23:59:59Z", "DWCurrentRowFlag": "Y",
+        "CreatedDtm": "2023-02-01T00:00:00Z", "UpdatedDtm": "2023-01-01T00:00:00Z"
+    }
+]
+
 def create_table_with_data(table_id, schema, data):
     table = bigquery.Table(f"leyin-sandpit.{table_id}", schema=schema)
     client.delete_table(table, not_found_ok=True)
@@ -84,3 +180,4 @@ def create_table_with_data(table_id, schema, data):
 
 create_table_with_data(scd1_table_id, scd1_schema, scd1_data)
 create_table_with_data(scd2_table_id, scd2_schema, scd2_data)
+create_table_with_data(player_table_id, player_schema, player_data)

@@ -6,14 +6,17 @@ from .requests import (
     AISuggestion,
     MappingResult,
     CustomTestRequest,
-    AddSCDConfigRequest
+    AddSCDConfigRequest,
+    SaveHistoryRequest,
+    ScheduledTestRunRequest
 )
 from .responses import (
     TestSummary,
     ConfigTableSummary,
     GenerateTestsResponse,
     ConfigTableResponse,
-    HealthResponse
+    HealthResponse,
+    TableMetadataResponse
 )
 
 __all__ = [
@@ -24,9 +27,12 @@ __all__ = [
     "MappingResult",
     "CustomTestRequest",
     "AddSCDConfigRequest",
+    "SaveHistoryRequest",
+    "ScheduledTestRunRequest",
     "TestSummary",
     "ConfigTableSummary",
     "GenerateTestsResponse",
     "ConfigTableResponse",
-    "HealthResponse"
+    "HealthResponse",
+    "TableMetadataResponse"
 ]

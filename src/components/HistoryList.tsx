@@ -5,16 +5,21 @@ import { PieChart, Pie, Cell, Tooltip as RechartsTooltip } from "recharts";
 
 interface HistoryItem {
     execution_id: string;
-    timestamp: string;
+    execution_timestamp: string;
+    timestamp?: string; // Compatibility
     project_id: string;
     comparison_mode: string;
-    source: string;
-    target: string;
+    source?: string;
+    target?: string;
+    target_dataset?: string; // New schema
+    target_table?: string; // New schema
     status: string;
     total_tests: number;
     passed_tests: number;
     failed_tests: number;
-    details: any;
+    test_results?: any; // New schema
+    details?: any; // Old schema
+    cron_schedule?: string;
 }
 
 interface HistoryListProps {
@@ -49,18 +54,74 @@ export default function HistoryList({ projectId, onViewResult }: HistoryListProp
         fetchHistory();
     }, []);
 
+    // Clear history handler
+    const handleClearHistory = async () => {
+        if (!projectId) return;
+        if (!confirm("Are you sure you want to clear the ENTIRE execution history for this project? This action cannot be undone.")) {
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const res = await fetch(`/api/history?project_id=${projectId}`, {
+                method: 'DELETE'
+            });
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.error || err.detail || "Failed to clear history");
+            }
+            // Refresh list
+            fetchHistory();
+        } catch (err: any) {
+            alert(`Error clearing history: ${err.message}`);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const handleViewClick = (run: HistoryItem) => {
-        let details = run.details;
-        if (typeof details === 'string') {
+        let results = run.test_results || run.details;
+
+        // Parse if string
+        if (typeof results === 'string') {
             try {
-                details = JSON.parse(details);
+                results = JSON.parse(results);
             } catch (e) {
-                console.error("Failed to parse details JSON", e);
+                console.error("Failed to parse results JSON", e);
                 alert("Error parsing result details.");
                 return;
             }
         }
-        onViewResult(details);
+
+        // Normalize for ResultsView
+        const isBatchMode = run.comparison_mode === 'scd_config_table' || run.comparison_mode === 'gcs_config';
+
+        const normalized: any = {
+            summary: {
+                total_tests: run.total_tests,
+                passed: run.passed_tests,
+                failed: run.failed_tests,
+                errors: (run.total_tests - run.passed_tests - run.failed_tests)
+            },
+            comparison_mode: run.comparison_mode,
+            project_id: run.project_id,
+            target_table: run.target_table || run.target,
+            cron_schedule: run.cron_schedule
+        };
+
+        // If batch mode, put results in 'results_by_mapping' so ResultsView renders tabs
+        if (isBatchMode) {
+            normalized.results_by_mapping = Array.isArray(results) ? results : [results];
+            // Ensure summary has total_mappings if missing
+            if (!normalized.summary.total_mappings && normalized.results_by_mapping) {
+                normalized.summary.total_mappings = normalized.results_by_mapping.length;
+            }
+        } else {
+            // Single mode
+            normalized.predefined_results = Array.isArray(results) ? results : [];
+        }
+
+        onViewResult(normalized);
     };
 
     const getStatusColor = (status: string) => {
@@ -120,6 +181,7 @@ export default function HistoryList({ projectId, onViewResult }: HistoryListProp
                 Error: {error}
                 <br />
                 <button
+                    type="button"
                     onClick={fetchHistory}
                     className="btn btn-outline"
                     style={{ marginTop: '1rem' }}
@@ -134,14 +196,27 @@ export default function HistoryList({ projectId, onViewResult }: HistoryListProp
         <div style={{ width: '100%' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                 <h3 style={{ fontSize: '1.25rem', fontWeight: '600', margin: 0 }}>Execution History</h3>
-                <button
-                    onClick={fetchHistory}
-                    className="btn btn-outline"
-                    style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}
-                    disabled={loading}
-                >
-                    {loading ? 'Refreshing...' : '🔄 Refresh'}
-                </button>
+                <div style={{ display: 'flex', gap: '0.75rem' }}>
+                    <button
+                        type="button"
+                        onClick={handleClearHistory}
+                        className="btn btn-outline"
+                        style={{ padding: '0.5rem 1rem', fontSize: '0.875rem', color: 'var(--error-text)', borderColor: 'var(--error-text)' }}
+                        disabled={loading}
+                        title="Clear all history for this project"
+                    >
+                        🗑️ Clear History
+                    </button>
+                    <button
+                        type="button"
+                        onClick={fetchHistory}
+                        className="btn btn-outline"
+                        style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}
+                        disabled={loading}
+                    >
+                        {loading ? 'Refreshing...' : '🔄 Refresh'}
+                    </button>
+                </div>
             </div>
 
             {history.length === 0 ? (
@@ -155,7 +230,7 @@ export default function HistoryList({ projectId, onViewResult }: HistoryListProp
                             <tr style={{ background: 'var(--secondary)', borderBottom: '1px solid var(--border)', textAlign: 'left' }}>
                                 <th style={{ padding: '0.75rem 1rem' }}>Time</th>
                                 <th style={{ padding: '0.75rem 1rem' }}>Mode</th>
-                                <th style={{ padding: '0.75rem 1rem' }}>Source / Target</th>
+                                <th style={{ padding: '0.75rem 1rem' }}>Target Table</th>
                                 <th style={{ padding: '0.75rem 1rem' }}>Status</th>
                                 <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Distribution</th>
                                 <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Action</th>
@@ -175,42 +250,52 @@ export default function HistoryList({ projectId, onViewResult }: HistoryListProp
                                 return (
                                     <tr key={run.execution_id} style={{ borderBottom: '1px solid var(--border)' }}>
                                         <td style={{ padding: '0.75rem 1rem' }}>
-                                            {new Date(run.timestamp).toLocaleString()}
+                                            {new Date(run.execution_timestamp || run.timestamp || '').toLocaleString()}
                                         </td>
                                         <td style={{ padding: '0.75rem 1rem', textTransform: 'capitalize' }}>
                                             {run.comparison_mode?.replace('_', ' ')}
+                                            {run.cron_schedule && (
+                                                <div style={{ fontSize: '0.7rem', color: 'var(--primary)', marginTop: '0.25rem', fontWeight: '600' }}>
+                                                    ⏰ {run.cron_schedule}
+                                                </div>
+                                            )}
                                         </td>
                                         <td style={{ padding: '0.75rem 1rem' }}>
-                                            <div style={{ fontSize: '0.75rem', color: 'var(--secondary-foreground)' }}>Src: <span style={{ color: 'var(--foreground)' }}>{run.source}</span></div>
-                                            <div style={{ fontSize: '0.75rem', color: 'var(--secondary-foreground)' }}>Tgt: <span style={{ color: 'var(--foreground)' }}>{run.target}</span></div>
+                                            <div style={{ color: 'var(--foreground)', fontWeight: '500' }}>
+                                                {run.target_dataset ? `${run.target_dataset}.` : ''}{run.target_table || run.target || (run as any).metadata?.target || '-'}
+                                            </div>
                                         </td>
                                         <td style={{ padding: '0.75rem 1rem' }}>
                                             {getStatusBadge(run.status)}
                                         </td>
                                         <td style={{ padding: '0.75rem 1rem', textAlign: 'center', minWidth: '100px' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
-                                                <PieChart width={50} height={50}>
-                                                    <Pie
-                                                        data={chartData}
-                                                        cx={25}
-                                                        cy={25}
-                                                        innerRadius={10}
-                                                        outerRadius={25}
-                                                        paddingAngle={2}
-                                                        dataKey="value"
-                                                        stroke="none"
-                                                    >
-                                                        {chartData.map((entry, index) => (
-                                                            <Cell key={`cell-${index}`} fill={entry.color} />
-                                                        ))}
-                                                    </Pie>
-                                                    <RechartsTooltip />
-                                                </PieChart>
-                                                <div style={{ fontSize: '0.75rem', color: 'var(--secondary-foreground)', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                                                    <span style={{ color: '#10b981' }}>Pass: {passed}</span>
-                                                    {(failed > 0) && <span style={{ color: '#ef4444' }}>Fail: {failed}</span>}
+                                            {run.total_tests > 0 ? (
+                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                                                    <PieChart width={50} height={50}>
+                                                        <Pie
+                                                            data={chartData}
+                                                            cx={25}
+                                                            cy={25}
+                                                            innerRadius={10}
+                                                            outerRadius={25}
+                                                            paddingAngle={2}
+                                                            dataKey="value"
+                                                            stroke="none"
+                                                        >
+                                                            {chartData.map((entry, index) => (
+                                                                <Cell key={`cell-${index}`} fill={entry.color} />
+                                                            ))}
+                                                        </Pie>
+                                                        <RechartsTooltip />
+                                                    </PieChart>
+                                                    <div style={{ fontSize: '0.75rem', color: 'var(--secondary-foreground)', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                                                        <span style={{ color: '#10b981' }}>Pass: {passed}</span>
+                                                        {(failed > 0) && <span style={{ color: '#ef4444' }}>Fail: {failed}</span>}
+                                                    </div>
                                                 </div>
-                                            </div>
+                                            ) : (
+                                                <span style={{ color: 'var(--secondary-foreground)', fontSize: '0.875rem' }}>-</span>
+                                            )}
                                         </td>
                                         <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
                                             <button

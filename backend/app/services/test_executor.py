@@ -327,10 +327,23 @@ class TestExecutor:
                         error_message=str(e)
                     ))
             
+            # Get row count for info
+            try:
+                bq_row_count = await bigquery_service.get_row_count(full_table_name)
+            except:
+                bq_row_count = 0
+
             return MappingResult(
                 mapping_id=mapping_id,
+                mapping_info=MappingInfo(
+                    source="SCD Validation",
+                    target=f"{target_dataset}.{target_table}",
+                    file_row_count=0,
+                    table_row_count=bq_row_count
+                ),
                 predefined_results=predefined_results,
-                ai_suggestions=[]
+                ai_suggestions=[],
+                cron_schedule=mapping.get('cron_schedule')
             )
             
         except Exception as e:
@@ -381,7 +394,8 @@ class TestExecutor:
                     'begin_date_column': config.get('begin_date_column'),
                     'end_date_column': config.get('end_date_column'),
                     'active_flag_column': config.get('active_flag_column'),
-                    'custom_tests': config.get('custom_tests')
+                    'custom_tests': config.get('custom_tests'),
+                    'cron_schedule': config.get('cron_schedule')
                 }
                 mappings.append(mapping)
             

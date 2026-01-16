@@ -7,25 +7,33 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'gcr.io/$PROJECT_ID/$_SERVICE_NAME:latest']
   
-  # 3. Deploy container image to Cloud Run
+  # 3. Deploy container image to Cloud Run with dynamic URL lookup
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    entrypoint: gcloud
+    entrypoint: 'bash'
     args:
-      - 'run'
-      - 'deploy'
-      - '$_SERVICE_NAME'
-      - '--image'
-      - 'gcr.io/$PROJECT_ID/$_SERVICE_NAME:latest'
-      - '--region'
-      - '$_REGION'
-      - '--platform'
-      - 'managed'
-      - '--allow-unauthenticated' # Ensure public access is maintained if that was the intent, consistent with typical web apps.
+      - '-c'
+      - |
+        # Lookup Backend and Frontend URLs dynamically using service names
+        # This avoids hardcoding the unique hashes in the YAML
+        BACKEND_URL=$(gcloud run services describe $_BACKEND_SERVICE_NAME --region=$_REGION --format='value(status.url)')
+        FRONTEND_URL=$(gcloud run services describe $_SERVICE_NAME --region=$_REGION --format='value(status.url)')
+        
+        echo "Found Backend URL: $$BACKEND_URL"
+        echo "Found Frontend URL: $$FRONTEND_URL"
+        
+        # Deploy with dynamically fetched URLs
+        gcloud run deploy $_SERVICE_NAME \
+          --image gcr.io/$PROJECT_ID/$_SERVICE_NAME:latest \
+          --region $_REGION \
+          --platform managed \
+          --allow-unauthenticated \
+          --set-env-vars "NEXT_PUBLIC_BACKEND_URL=$$BACKEND_URL,NEXTAUTH_URL=$$FRONTEND_URL"
 
 substitutions:
     # These values are read from deploy.config or can be overridden in Cloud Build Trigger
     # To update: Edit deploy.config file
-    _SERVICE_NAME: data-qa-agent-frontend
+    _SERVICE_NAME: data-qa-agent-frontend2
+    _BACKEND_SERVICE_NAME: data-qa-agent-backend2
     _REGION: us-central1
     _PROJECT_ID: leyin-sandpit
 
