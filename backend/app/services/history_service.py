@@ -322,6 +322,7 @@ class TestHistoryService:
     def migrate_to_datetime(self) -> Dict[str, Any]:
         """
         Migrate the history table schema from TIMESTAMP to DATETIME to support local time.
+        Uses CREATE OR REPLACE to handle streaming buffer locks more gracefully than RENAME.
         """
         try:
             table = self.client.get_table(HISTORY_TABLE_FQN)
@@ -333,57 +334,40 @@ class TestHistoryService:
             if ts_field.field_type == 'DATETIME':
                 return {"status": "skipped", "reason": "Already using DATETIME"}
 
-            logger.info(f"Field is {ts_field.field_type}. Starting migration to DATETIME...")
+            logger.info(f"Field is {ts_field.field_type}. Starting migration to DATETIME via CREATE OR REPLACE...")
             
-            # 1. Create temp table with new schema
-            new_schema = []
-            for field in table.schema:
-                if field.name == "execution_timestamp":
-                    new_schema.append(bigquery.SchemaField("execution_timestamp", "DATETIME", mode=field.mode))
-                else:
-                    new_schema.append(field)
-            
-            new_table_ref = f"{HISTORY_TABLE_FQN}_new"
-            new_table = bigquery.Table(new_table_ref, schema=new_schema)
-            new_table.partitioning_type = "DAY"
-            new_table.time_partitioning = bigquery.TimePartitioning(field="execution_timestamp")
-            
-            self.client.delete_table(new_table_ref, not_found_ok=True)
-            self.client.create_table(new_table)
-            
-            # 2. Copy data with conversion
-            cols = [f.name for f in new_schema]
-            select_cols = []
-            for col in cols:
-                if col == "execution_timestamp":
-                    # Convert UTC TIMESTAMP to Melbourne DATETIME
-                    select_cols.append("DATETIME(execution_timestamp, 'Australia/Melbourne') as execution_timestamp")
-                else:
-                    select_cols.append(col)
-                    
+            # Construct the replacement query
+            # We use SELECT * EXCEPT and cast the column
             query = f"""
-            INSERT INTO `{new_table_ref}` ({', '.join(cols)})
-            SELECT {', '.join(select_cols)}
+            CREATE OR REPLACE TABLE `{HISTORY_TABLE_FQN}`
+            PARTITION BY DATE(execution_timestamp)
+            CLUSTER BY project_id, target_table, status
+            AS
+            SELECT 
+                * EXCEPT(execution_timestamp),
+                DATETIME(execution_timestamp, 'Australia/Melbourne') as execution_timestamp
             FROM `{HISTORY_TABLE_FQN}`
             """
-            self.client.query(query).result()
             
-            # Verify row counts
-            old_count = list(self.client.query(f"SELECT count(*) as c FROM `{HISTORY_TABLE_FQN}`").result())[0].get('c')
-            new_count = list(self.client.query(f"SELECT count(*) as c FROM `{new_table_ref}`").result())[0].get('c')
+            query_job = self.client.query(query)
+            query_job.result()  # Wait for completion
             
-            if old_count != new_count:
-                raise Exception(f"Migration mismatch: Old={old_count}, New={new_count}")
-
-            # 3. Swap tables
-            backup_table_ref = f"{HISTORY_TABLE_FQN}_backup"
-            self.client.delete_table(backup_table_ref, not_found_ok=True)
+            # Update the schema object in our client cache if needed
+            self._table_checked = False 
             
-            self.client.query(f"ALTER TABLE `{HISTORY_TABLE_FQN}` RENAME TO `{HISTORY_TABLE}_backup`").result()
-            self.client.query(f"ALTER TABLE `{new_table_ref}` RENAME TO `{HISTORY_TABLE}`").result()
-            
-            return {"status": "success", "migrated_rows": new_count}
+            return {
+                "status": "success", 
+                "message": "Table migrated to DATETIME (Melbourne Time) using CREATE OR REPLACE."
+            }
             
         except Exception as e:
-            logger.error(f"Migration failed: {e}")
+            error_msg = str(e)
+            logger.error(f"Migration failed: {error_msg}")
+            
+            if "streaming data" in error_msg.lower():
+                return {
+                    "status": "failed",
+                    "reason": "Table has active streaming data. Please wait ~30-60 minutes and try again, or run the SQL manually in BigQuery console.",
+                    "sql": f"CREATE OR REPLACE TABLE `{HISTORY_TABLE_FQN}` PARTITION BY DATE(execution_timestamp) CLUSTER BY project_id, target_table, status AS SELECT * EXCEPT(execution_timestamp), DATETIME(execution_timestamp, 'Australia/Melbourne') as execution_timestamp FROM `{HISTORY_TABLE_FQN}`"
+                }
             raise
