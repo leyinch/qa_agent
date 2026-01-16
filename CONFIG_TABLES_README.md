@@ -16,7 +16,7 @@ This guide explains how to set up the configuration tables for the Data QA Agent
 2. **Verify tables were created**:
    ```sql
    SELECT table_name 
-   FROM `[YOUR_PROJECT_ID].config.INFORMATION_SCHEMA.TABLES`;
+   FROM `leyin-sandpit.config.INFORMATION_SCHEMA.TABLES`;
    ```
 
 ## Config Tables
@@ -38,14 +38,14 @@ Stores SCD validation settings for each target table.
 
 **Example:**
 ```sql
-SELECT * FROM `[YOUR_PROJECT_ID].config.scd_validation_config` 
+SELECT * FROM `leyin-sandpit.config.scd_validation_config` 
 WHERE config_id = 'employee_scd2';
 ```
 
 ### 2. `scd_test_history` - Test Execution History
 
 Tracks **SCD test executions only** (both scheduled and manual runs). GCS and Schema Validation tests are not logged here.
-- **Location**: `[YOUR_PROJECT_ID].qa_results.scd_test_history`
+- **Location**: `leyin-sandpit.qa_results.scd_test_history`
 - **Maintenance**: Use the "Clear History" button in the frontend to truncate this table if needed.
 
 ## Managing Configurations
@@ -54,7 +54,7 @@ Tracks **SCD test executions only** (both scheduled and manual runs). GCS and Sc
 You can add new tables via the UI dashboard or directly in SQL:
 
 ```sql
-INSERT INTO `[YOUR_PROJECT_ID].config.scd_validation_config`
+INSERT INTO `leyin-sandpit.config.scd_validation_config`
 (config_id, target_dataset, target_table, scd_type, primary_keys, cron_schedule)
 VALUES
 ('my_new_table', 'my_dataset', 'my_table', 'scd1', ['id'], '0 9 * * *');
@@ -64,8 +64,8 @@ VALUES
 
 ### View Test History
 ```sql
-SELECT * FROM `[YOUR_PROJECT_ID].qa_results.scd_test_history`
-WHERE execution_timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 7 DAY)
+SELECT * FROM `leyin-sandpit.qa_results.scd_test_history`
+WHERE execution_timestamp >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 7 DAY)
 ORDER BY execution_timestamp DESC
 LIMIT 100;
 ```

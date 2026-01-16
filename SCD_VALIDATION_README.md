@@ -23,8 +23,8 @@ The system includes a robust integration with **Google Cloud Scheduler** to auto
 
 ### 2. History & Reporting
 All test results—whether run manually via the frontend or automatically via the scheduler—are logged to a **single source of truth**:
-- **Table**: `[YOUR_PROJECT_ID].qa_results.scd_test_history`
-- **Timestamps**: Stored in **Melbourne Local Time** for easy readability.
+- **Table**: `leyin-sandpit.qa_results.scd_test_history`
+- **Timestamps**: Stored in **Melbourne Local Time** for easy readability (DATETIME).
 - **Partitioning**: The table is partitioned by day for performance.
 
 ---
@@ -32,8 +32,8 @@ All test results—whether run manually via the frontend or automatically via th
 ## 📋 Testing Instructions
 
 ### Prerequisites
-✅ Backend deployed to Cloud Run: `data-qa-agent-backend`  
-✅ Frontend deployed to Cloud Run: `data-qa-agent-frontend`
+✅ Backend deployed to Cloud Run: `data-qa-agent-backend2`  
+✅ Frontend deployed to Cloud Run: `data-qa-agent-frontend2`
 
 ### Step 1: Create Mock Data in BigQuery
 
@@ -126,7 +126,7 @@ Ensure your Cloud Run service account has:
 ### Managing Configs via SQL
 You can also manage configs directly in BigQuery:
 ```sql
-INSERT INTO `[PROJECT].config.scd_validation_config`
+INSERT INTO `leyin-sandpit.config.scd_validation_config`
 (config_id, target_dataset, target_table, scd_type, primary_keys, cron_schedule)
 VALUES
 ('my_new_table', 'my_ds', 'my_table', 'scd1', ['id'], '0 9 * * *');

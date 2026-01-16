@@ -4,7 +4,7 @@ This is a Next.js application for testing data quality using AI. It uses Google 
 
 ## Prerequisites
 
-- Google Cloud Project: `[YOUR_PROJECT_ID]`
+- Google Cloud Project: `leyin-sandpit`
 - BigQuery Dataset: `config`, `qa_results`, `crown_scd_mock`
 - Vertex AI API enabled
 - BigQuery API enabled
@@ -13,9 +13,9 @@ This is a Next.js application for testing data quality using AI. It uses Google 
 
 To set up all required BigQuery datasets and tables in a single step:
 
-1. Open [BigQuery Console](https://console.cloud.google.com/bigquery?project=[YOUR_PROJECT_ID]).
-2. Run the master setup script: [setup_scd_resources.sql](file:///c:/Users/LeyinChen/Documents/Client%20-%20Crown/Antigravity/qa_agent/setup_scd_resources.sql).
-3. Follow the [SCD Validation Guide](file:///c:/Users/LeyinChen/Documents/Client%20-%20Crown/Antigravity/qa_agent/SCD_VALIDATION_README.md) for detailed test instructions.
+1. Open [BigQuery Console](https://console.cloud.google.com/bigquery?project=leyin-sandpit).
+2. Run the master setup script: [setup_scd_resources.sql](setup_scd_resources.sql).
+3. Follow the [SCD Validation Guide](SCD_VALIDATION_README.md) for detailed test instructions.
 
 
 ## Local Development
@@ -36,20 +36,17 @@ Note: Node.js is required for local development.
 
 ## Deployment to Google Cloud Run
 
-1. Build the container image:
-   ```bash
-   gcloud builds submit --tag gcr.io/PROJECT_ID/test-case-generator
-   ```
+We use a unified deployment script for ease of use. All configurations are managed in `deploy.config`.
 
-2. Deploy to Cloud Run:
-   ```bash
-   gcloud run deploy test-case-generator \
-     --image gcr.io/PROJECT_ID/test-case-generator \
-     --platform managed \
-     --region [YOUR_REGION] \
-     --allow-unauthenticated \
-     --set-env-vars GOOGLE_CLIENT_ID=your-client-id,GOOGLE_CLIENT_SECRET=your-client-secret,NEXTAUTH_SECRET=your-secret,NEXTAUTH_URL=https://your-service-url
-   ```
+To deploy the entire application (Frontend + Backend):
+```bash
+./deploy-all.sh
+```
+
+To deploy only the backend:
+```bash
+./deploy-all.sh --backend
+```
 
 ## Environment Variables
 
