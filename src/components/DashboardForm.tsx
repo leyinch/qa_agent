@@ -26,6 +26,7 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
     // Common fields
     const [projectId, setProjectId] = useState("");
     const [loading, setLoading] = useState(false);
+    const [syncLoading, setSyncLoading] = useState(false);
 
     // Persistence: load from localStorage on mount
     useEffect(() => {
@@ -364,6 +365,38 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
         } catch (error: any) {
             console.error("Error adding config:", error);
             alert(error.message || "An error occurred while adding the configuration.");
+        }
+    };
+
+    const handleSyncScheduler = async () => {
+        if (!projectId) {
+            alert("Project ID is required to sync scheduler jobs.");
+            return;
+        }
+
+        setSyncLoading(true);
+        try {
+            const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://data-qa-agent-backend2-1037417342779.us-central1.run.app';
+            const endpoint = `${backendUrl}/api/sync-scheduler`;
+
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ project_id: projectId }) // Note: Endpoint might not strictly require body but good for safety
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.detail || 'Failed to sync scheduler');
+            }
+
+            const data = await response.json();
+            alert(`Sync complete! ${data.summary?.synced} synced, ${data.summary?.deleted} deleted.`);
+        } catch (error: any) {
+            console.error("Error syncing scheduler:", error);
+            alert(error.message || "An error occurred during sync.");
+        } finally {
+            setSyncLoading(false);
         }
     };
 
@@ -839,25 +872,46 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
                                     </div>
 
                                     {/* Add New Table Button */}
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowAddConfig(!showAddConfig)}
-                                        style={{
-                                            marginBottom: '1.5rem',
-                                            padding: '0.75rem 1.25rem',
-                                            backgroundColor: showAddConfig ? 'var(--secondary)' : 'var(--primary)',
-                                            color: showAddConfig ? 'var(--primary)' : 'white',
-                                            border: showAddConfig ? '2px solid var(--primary)' : 'none',
-                                            borderRadius: 'var(--radius)',
-                                            cursor: 'pointer',
-                                            fontWeight: '600',
-                                            fontSize: '0.875rem',
-                                            width: '100%',
-                                            transition: 'all 0.2s ease'
-                                        }}
-                                    >
-                                        {showAddConfig ? '✖️ Cancel' : '➕ Add New Table Configuration'}
-                                    </button>
+                                    <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem' }}>
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowAddConfig(!showAddConfig)}
+                                            style={{
+                                                flex: 2,
+                                                padding: '0.75rem 1.25rem',
+                                                backgroundColor: showAddConfig ? 'var(--secondary)' : 'var(--primary)',
+                                                color: showAddConfig ? 'var(--primary)' : 'white',
+                                                border: showAddConfig ? '2px solid var(--primary)' : 'none',
+                                                borderRadius: 'var(--radius)',
+                                                cursor: 'pointer',
+                                                fontWeight: '600',
+                                                fontSize: '0.875rem',
+                                                transition: 'all 0.2s ease'
+                                            }}
+                                        >
+                                            {showAddConfig ? '✖️ Cancel' : '➕ Add New Table Configuration'}
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            onClick={handleSyncScheduler}
+                                            disabled={syncLoading}
+                                            style={{
+                                                flex: 1,
+                                                padding: '0.75rem 1.25rem',
+                                                backgroundColor: 'var(--secondary)',
+                                                color: 'var(--primary)',
+                                                border: '2px solid var(--primary)',
+                                                borderRadius: 'var(--radius)',
+                                                cursor: 'pointer',
+                                                fontWeight: '600',
+                                                fontSize: '0.875rem',
+                                                transition: 'all 0.2s ease'
+                                            }}
+                                        >
+                                            {syncLoading ? '⏳ Syncing...' : '🔄 Sync Jobs'}
+                                        </button>
+                                    </div>
 
                                     {/* Add New Config Form */}
                                     {showAddConfig && (

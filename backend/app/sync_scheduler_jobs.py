@@ -52,16 +52,13 @@ def load_deploy_config():
 async def sync_all():
     deploy_config = load_deploy_config()
     project_id = deploy_config.get('PROJECT_ID', settings.google_cloud_project)
-    region = deploy_config.get('REGION', settings.google_cloud_region)
-    backend_service = deploy_config.get('BACKEND_SERVICE', 'data-qa-agent-backend2')
     
     print(f"Project: {project_id}")
-    print(f"Region: {region}")
     
     # Try to find Backend URL if not in settings
     if not settings.cloud_run_url:
         print("\nCLOUD_RUN_URL not set in environment.")
-        print(f"Please enter the URL for your backend service ({backend_service}):")
+        print(f"Please enter the URL for your backend service:")
         print("Example: https://data-qa-agent-backend2-xxxxxxx-uc.a.run.app")
         url = input("> ").strip()
         if not url:
@@ -71,39 +68,24 @@ async def sync_all():
     else:
         print(f"Using CLOUD_RUN_URL: {settings.cloud_run_url}")
 
-    # 1. Sync SCD Configurations
-    print("\n--- Syncing SCD Configurations ---")
+    print("\n--- Starting Full Scheduler Synchronization ---")
     try:
-        scd_configs = await bigquery_service.read_scd_config_table(
-            project_id, "config", "scd_validation_config"
-        )
+        summary = await scheduler_service.sync_all_from_config()
         
-        for config in scd_configs:
-            config_id = config.get('config_id')
-            cron = config.get('cron_schedule')
-            
-            if not cron:
-                print(f"Skipping {config_id}: No cron schedule set.")
-                continue
-                
-            print(f"Syncing {config_id} ({cron})...")
-            success = await scheduler_service.upsert_job(
-                config_id=config_id,
-                cron_schedule=cron,
-                target_dataset=config['target_dataset'],
-                target_table=config['target_table'],
-                config_dataset="config",
-                config_table="scd_validation_config"
-            )
-            if success:
-                print(f"  ✓ Success")
-            else:
-                print(f"  ✗ Failed")
+        print(f"\nSync Results:")
+        print(f"  Total Configs Found: {summary.get('total', 0)}")
+        print(f"  Synced/Updated Jobs: {summary.get('synced', 0)}")
+        print(f"  Deleted Obsolete Jobs: {summary.get('deleted', 0)}")
+        print(f"  Failed Ops: {summary.get('failed', 0)}")
+        print(f"  Skipped (no cron): {summary.get('skipped', 0)}")
+        
+        if summary.get('details'):
+            print("\nDetails:")
+            for detail in summary['details']:
+                print(f"  - {detail}")
                 
     except Exception as e:
-        print(f"Error reading SCD config: {e}")
-
-    # GCS Configuration syncing removed as it is not required at this stage
+        print(f"Error during synchronization: {e}")
 
     print("\nSync complete!")
 
