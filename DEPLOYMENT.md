@@ -216,6 +216,14 @@ vim deploy.config
 - YAML files auto-sync with new values
 - Deploys to new project/region/services
 
+### Understanding URL Parameters
+
+The system uses three main URL-related parameters. You **don't** typically need to set these manually as the deployment scripts detect them for you:
+
+1.  **`NEXT_PUBLIC_BACKEND_URL`**: Used by the Frontend to talk to the Backend API.
+2.  **`NEXTAUTH_URL`**: Used for Google OAuth redirection (must match your Frontend URL).
+3.  **`CLOUD_RUN_URL`**: Used by the Backend itself (for Scheduler and internal processing).
+
 ### Scenario 4: CI/CD Deployment
 
 ```bash
@@ -288,6 +296,21 @@ gcloud builds triggers create github \
 - Updates `cloudbuild.yaml` files from `deploy.config`
 - Integrated into `deploy-all.sh` (runs automatically)
 - Can be run standalone: `./sync-config.sh`
+
+> [!TIP]
+> **Pro Tip: Automate with Git Hooks**
+> To ensure your `cloudbuild.yaml` files are *always* synced before you push code, you can set up a Git pre-commit hook. Run this one-time command in Cloud Shell:
+> ```bash
+> # Create the pre-commit hook
+> cat <<EOF > .git/hooks/pre-commit
+> #!/bin/bash
+> ./sync-config.sh
+> EOF
+> 
+> # Make it executable
+> chmod +x .git/hooks/pre-commit
+> ```
+> Now, every time you run `git commit`, the sync script will run automatically!
 
 ### `cloudbuild.yaml` (Frontend)
 Cloud Build configuration for frontend service.
