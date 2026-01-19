@@ -8,7 +8,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - GOOGLE_CLOUD_PROJECT=miruna-sandpit
+      - GOOGLE_CLOUD_PROJECT=your-project-id
     volumes:
       - ~/.config/gcloud:/root/.config/gcloud:ro
     networks:

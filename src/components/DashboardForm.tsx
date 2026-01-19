@@ -381,7 +381,7 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
                     value={projectId}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setProjectId(e.target.value)}
                     required
-                    placeholder="Project with BigQuery data (e.g., miruna-sandpit)"
+                    placeholder="Project with BigQuery data (e.g., your-project-id)"
                 />
             </div>
 

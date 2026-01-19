@@ -147,11 +147,82 @@ VALUES
 ('pattern_validation', 'Pattern Validation', 'quality', 'MEDIUM',
  'Check string patterns (email, phone, etc.)', false, true),
 
+('pattern_validation', 'Pattern Validation', 'quality', 'MEDIUM',
+ 'Check string patterns (email, phone, etc.)', false, true),
+
 ('outlier_detection', 'Statistical Outlier Detection', 'statistical', 'LOW',
  'Detect statistical outliers using standard deviation', false, true);
 
 -- ============================================
--- Sample Data Load Configuration
+-- 3. SCD Validation Configuration
+-- ============================================
+CREATE TABLE IF NOT EXISTS `{{PROJECT_ID}}.config.scd_validation_config` (
+  config_id STRING NOT NULL,
+  target_dataset STRING NOT NULL,
+  target_table STRING NOT NULL,
+  scd_type STRING NOT NULL,         -- 'scd1' or 'scd2'
+  primary_keys ARRAY<STRING>,       -- List of primary key columns
+  surrogate_key STRING,             -- Surrogate key column (SCD2)
+  begin_date_column STRING,         -- Effective begin date (SCD2)
+  end_date_column STRING,           -- Effective end date (SCD2)
+  active_flag_column STRING,        -- Current row flag (SCD2)
+  description STRING,               -- Friendly description
+  custom_tests JSON,                -- Array of custom business rules
+  
+  -- Metadata
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP(),
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
+);
+
+-- ============================================
+-- 4. Test Execution History (Consolidated)
+-- ============================================
+-- This table matches the schema required by the history_service
+CREATE TABLE IF NOT EXISTS `{{PROJECT_ID}}.qa_results.scd_test_history` (
+  execution_id STRING NOT NULL,
+  execution_timestamp DATETIME NOT NULL,
+  project_id STRING NOT NULL,
+  comparison_mode STRING NOT NULL,
+  target_dataset STRING,
+  target_table STRING,
+  mapping_id STRING,
+  status STRING NOT NULL,
+  total_tests INT64,
+  passed_tests INT64,
+  failed_tests INT64,
+  error_message STRING,
+  test_results JSON,
+  executed_by STRING,
+  metadata JSON
+)
+PARTITION BY DATE(execution_timestamp)
+CLUSTER BY project_id, target_table, status;
+
+-- ============================================
+-- 5. Reporting Views
+-- ============================================
+
+CREATE OR REPLACE VIEW `{{PROJECT_ID}}.qa_results.latest_scd_results_by_table` AS
+SELECT 
+  t.*
+FROM `{{PROJECT_ID}}.qa_results.scd_test_history` t
+INNER JOIN (
+  SELECT 
+    project_id,
+    target_dataset,
+    target_table,
+    MAX(execution_timestamp) as latest_execution
+  FROM `{{PROJECT_ID}}.qa_results.scd_test_history`
+  WHERE target_table IS NOT NULL
+  GROUP BY project_id, target_dataset, target_table
+) latest
+ON t.project_id = latest.project_id
+  AND t.target_dataset = latest.target_dataset
+  AND t.target_table = latest.target_table
+  AND t.execution_timestamp = latest.latest_execution;
+
+-- ============================================
+-- 6. Sample Data Load Configuration
 -- ============================================
 INSERT INTO `{{PROJECT_ID}}.config.data_load_config`
 (mapping_id, mapping_name, description, 
