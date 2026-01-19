@@ -39,7 +39,7 @@ class TestHistoryService:
         """Lazy load BigQuery client."""
         if not self._client:
             try:
-                self._client = bigquery.Client(project=HISTORY_PROJECT_ID)
+                self._client = bigquery.Client(project=get_history_project_id())
             except Exception as e:
                 logger.error(f"Failed to initialize TestHistoryService client: {e}")
                 raise
@@ -49,7 +49,7 @@ class TestHistoryService:
         """Ensure the history table exists in BigQuery."""
         try:
             # Check dataset
-            dataset_ref = f"{HISTORY_PROJECT_ID}.{HISTORY_DATASET}"
+            dataset_ref = f"{get_history_project_id()}.qa_results"
             try:
                 self._client.get_dataset(dataset_ref)
             except Exception:
