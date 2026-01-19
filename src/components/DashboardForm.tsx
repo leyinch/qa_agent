@@ -272,8 +272,25 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
             });
 
             if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.detail || 'Failed to generate tests');
+                let errorMessage;
+                try {
+                    const errorData = await response.json();
+                    if (typeof errorData.detail === 'string') {
+                        errorMessage = errorData.detail;
+                    } else if (Array.isArray(errorData.detail)) {
+                        // Handle Pydantic validation errors
+                        errorMessage = errorData.detail.map((e: any) => `${e.loc.join('.')} - ${e.msg}`).join('\n');
+                    } else if (typeof errorData.detail === 'object') {
+                        errorMessage = JSON.stringify(errorData.detail);
+                    } else {
+                        errorMessage = JSON.stringify(errorData);
+                    }
+                } catch (e) {
+                    // Fallback if response is not JSON (e.g. 500 HTML or 504 Gateway Timeout)
+                    const text = await response.text();
+                    errorMessage = text.substring(0, 200) || `Request failed with status ${response.status}`;
+                }
+                throw new Error(errorMessage || 'Failed to generate tests');
             }
 
             const data = await response.json();

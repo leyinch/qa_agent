@@ -206,6 +206,12 @@ class TestExecutor:
             target_table = mapping['target_table']
             scd_type = mapping.get('scd_type', 'scd2')
             
+            logger.info(f"Processing SCD mapping: {mapping_id} type={scd_type} project={project_id}")
+            logger.info(f"Mapping keys: {mapping.keys()}")
+            if 'primary_keys' in mapping:
+                logger.info(f"Primary Keys type: {type(mapping['primary_keys'])} value: {mapping['primary_keys']}")
+            
+            
             full_table_name = f"{project_id}.{target_dataset}.{target_table}"
             table_metadata = await bigquery_service.get_table_metadata(project_id, target_dataset, target_table)
             
