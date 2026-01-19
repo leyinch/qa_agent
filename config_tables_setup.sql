@@ -185,3 +185,21 @@ VALUES
   true,  -- Active
   'admin@example.com'
 );
+
+-- ============================================
+-- Useful Queries
+-- ============================================
+
+-- View all active mappings
+-- SELECT * FROM `{{PROJECT_ID}}.config.data_load_config` WHERE is_active = true;
+
+-- View all predefined tests
+-- SELECT * FROM `{{PROJECT_ID}}.config.predefined_tests` ORDER BY test_category, severity;
+
+-- View pending AI suggestions
+-- SELECT * FROM `{{PROJECT_ID}}.config.suggested_tests` WHERE status = 'pending';
+
+-- View test execution history for a mapping
+-- SELECT * FROM `{{PROJECT_ID}}.config.test_execution_history` 
+-- WHERE mapping_id = 'customers_daily_load' 
+-- ORDER BY executed_at DESC LIMIT 100;
