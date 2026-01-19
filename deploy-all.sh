@@ -148,7 +148,8 @@ if [ "$DEPLOY_FRONTEND" = true ]; then
 fi
 
 # Determine if this is first-time deployment
-if [ "$BACKEND_EXISTS" = false ] || [ "$FRONTEND_EXISTS" = false ]; then
+if ([ "$DEPLOY_BACKEND" = true ] && [ "$BACKEND_EXISTS" = false ]) || \
+   ([ "$DEPLOY_FRONTEND" = true ] && [ "$FRONTEND_EXISTS" = false ]); then
     FIRST_TIME_DEPLOYMENT=true
 fi
 
