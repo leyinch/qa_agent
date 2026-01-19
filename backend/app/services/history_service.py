@@ -114,6 +114,44 @@ class TestHistoryService:
         tz = pytz.timezone('Australia/Melbourne')
         execution_timestamp = datetime.now(tz).replace(tzinfo=None)
         
+    def _prepare_json_for_bq(self, data: Any) -> Any:
+        """
+        Recursively convert objects to BigQuery-compatible JSON formats.
+        BigQuery JSON columns expect Python dicts/lists, but nested
+        datetime/date objects must be converted to strings.
+        """
+        if isinstance(data, (datetime, date)):
+            return data.isoformat()
+        elif isinstance(data, dict):
+            return {k: self._prepare_json_for_bq(v) for k, v in data.items()}
+        elif isinstance(data, list):
+            return [self._prepare_json_for_bq(i) for i in data]
+        return data
+
+    def save_test_results(
+        self,
+        project_id: str,
+        comparison_mode: str,
+        test_results: Any,
+        target_dataset: Optional[str] = None,
+        target_table: Optional[str] = None,
+        mapping_id: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+        executed_by: Optional[str] = None
+    ) -> str:
+        """
+        Save test execution results to BigQuery history table (one row per table).
+        """
+        # Ensure table exists before writing
+        self._ensure_table_exists()
+
+        execution_id = str(uuid.uuid4())
+        
+        # Get execution timestamp in Melbourne time (wall-clock time)
+        # We store as DATETIME (local time) so it appears correct in BigQuery
+        tz = pytz.timezone('Australia/Melbourne')
+        execution_timestamp = datetime.now(tz).replace(tzinfo=None)
+        
         # Aggregate stats
         if isinstance(test_results, list):
             total_tests = len(test_results)
@@ -135,15 +173,9 @@ class TestHistoryService:
             failed_tests = 1 if status == "FAIL" else 0
             error_message = None
 
-        def json_serial(obj):
-            """JSON serializer for objects not serializable by default json code"""
-            if isinstance(obj, (datetime, date)):
-                return obj.isoformat()
-            return str(obj)
-
         row = {
             "execution_id": execution_id,
-            "execution_timestamp": execution_timestamp.isoformat(),
+            "execution_timestamp": execution_timestamp,
             "project_id": project_id,
             "comparison_mode": comparison_mode,
             "target_dataset": target_dataset,
@@ -154,15 +186,16 @@ class TestHistoryService:
             "passed_tests": passed_tests,
             "failed_tests": failed_tests,
             "error_message": error_message,
-            "test_results": json.dumps(test_results, default=json_serial),
+            "test_results": self._prepare_json_for_bq(test_results),
             "executed_by": executed_by or "System",
-            "metadata": json.dumps(metadata, default=json_serial) if metadata else None
+            "metadata": self._prepare_json_for_bq(metadata) if metadata else None
         }
         
         # Insert into BigQuery
         errors = self.client.insert_rows_json(get_history_table_fqn(), [row])
         
         if errors:
+            logger.error(f"BigQuery insertion errors: {errors}")
             raise Exception(f"Failed to insert row into BigQuery: {errors}")
         
         return execution_id
