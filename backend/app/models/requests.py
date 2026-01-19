@@ -117,3 +117,12 @@ class SaveHistoryRequest(BaseModel):
     target_table: Optional[str] = None
     mapping_id: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
+
+
+class ScheduledTestRunRequest(BaseModel):
+    """Request model for scheduled test runs."""
+    project_id: str
+    config_dataset: str
+    config_table: str
+    mapping_id: str
+    cron_schedule: str

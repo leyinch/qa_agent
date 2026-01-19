@@ -25,7 +25,8 @@ steps:
           --image "$$REGISTRY/$$PROJECT_ID/$$BACKEND_SERVICE:latest" \
           --region $$REGION \
           --platform managed \
-          --allow-unauthenticated
+          --allow-unauthenticated \
+          --set-env-vars "GOOGLE_CLOUD_PROJECT=$$PROJECT_ID,GOOGLE_CLOUD_REGION=$$REGION,VERTEX_AI_LOCATION=$$REGION,SCHEDULER_LOCATION=$$REGION"
         
         # Fetch the actual URL and update environment variable
         URL=$(gcloud run services describe $$BACKEND_SERVICE --region=$$REGION --format='value(status.url)')
