@@ -106,9 +106,84 @@ VALUES
     -- P7: CreatedDtm > UpdatedDtm
     ('P7', 'Player 7 Future Created', 6011, '2023-01-01 00:00:00', '2099-12-31 23:59:59', 'Y', '2023-02-01 00:00:00', '2023-01-01 00:00:00');
 
--- 5. Setup Sample SCD Configurations (Optional)
--- These inserts populate the config table with the mock tables created above
+-- 5. Setup SCD Validation Config Table
+CREATE TABLE IF NOT EXISTS `{{PROJECT_ID}}.config.scd_validation_config` (
+  config_id STRING NOT NULL,
+  target_dataset STRING NOT NULL,
+  target_table STRING NOT NULL,
+  scd_type STRING NOT NULL,         -- 'scd1' or 'scd2'
+  primary_keys ARRAY<STRING>,       -- List of primary key columns
+  surrogate_key STRING,             -- Surrogate key column (SCD2)
+  begin_date_column STRING,         -- Effective begin date (SCD2)
+  end_date_column STRING,           -- Effective end date (SCD2)
+  active_flag_column STRING,        -- Current row flag (SCD2)
+  description STRING,               -- Friendly description
+  custom_tests JSON,                -- Array of custom business rules
+  
+  -- Metadata
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP(),
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
+);
 
+-- 6. Setup Test Execution History (SCD Only)
+CREATE TABLE IF NOT EXISTS `{{PROJECT_ID}}.qa_results.scd_test_history` (
+  execution_id STRING NOT NULL,
+  execution_timestamp DATETIME NOT NULL,
+  project_id STRING NOT NULL,
+  comparison_mode STRING NOT NULL,
+  target_dataset STRING,
+  target_table STRING,
+  mapping_id STRING,
+  status STRING NOT NULL,
+  total_tests INT64,
+  passed_tests INT64,
+  failed_tests INT64,
+  error_message STRING,
+  test_results JSON,
+  executed_by STRING,
+  metadata JSON
+)
+PARTITION BY DATE(execution_timestamp)
+CLUSTER BY project_id, target_table, status;
+
+-- 7. Setup Reporting Views
+CREATE OR REPLACE VIEW `{{PROJECT_ID}}.qa_results.latest_scd_results_by_table` AS
+SELECT 
+  t.*
+FROM `{{PROJECT_ID}}.qa_results.scd_test_history` t
+INNER JOIN (
+  SELECT 
+    project_id,
+    target_dataset,
+    target_table,
+    MAX(execution_timestamp) as latest_execution
+  FROM `{{PROJECT_ID}}.qa_results.scd_test_history`
+  WHERE target_table IS NOT NULL
+  GROUP BY project_id, target_dataset, target_table
+) latest
+ON t.project_id = latest.project_id
+  AND t.target_dataset = latest.target_dataset
+  AND t.target_table = latest.target_table
+  AND t.execution_timestamp = latest.latest_execution;
+
+CREATE OR REPLACE VIEW `{{PROJECT_ID}}.qa_results.v_scd_validation_report` AS
+SELECT 
+    FORMAT_DATETIME('%Y-%m-%d %H:%M:%S', execution_timestamp) as execution_time,
+    target_table,
+    executed_by,
+    STRING(test.test_name) as test_name,
+    STRING(test.status) as status,
+    CASE 
+        WHEN STRING(test.test_id) = 'table_exists' AND STRING(test.status) = 'PASS' 
+            THEN 'Table is online and accessible'
+        WHEN JSON_VALUE(test.rows_affected) = '0' 
+            THEN 'Check passed - no issues found'
+        ELSE TO_JSON_STRING(test.sample_data)
+    END as validation_findings
+FROM `{{PROJECT_ID}}.qa_results.scd_test_history`,
+UNNEST(JSON_QUERY_ARRAY(test_results)) AS test;
+
+-- 8. Setup Sample SCD Configurations
 INSERT INTO `{{PROJECT_ID}}.config.scd_validation_config` 
 (config_id, target_dataset, target_table, scd_type, primary_keys, surrogate_key, begin_date_column, end_date_column, active_flag_column, description, custom_tests)
 SELECT * FROM (
