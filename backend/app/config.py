@@ -13,12 +13,12 @@ class Settings(BaseSettings):
     
     # Google Cloud
     google_cloud_project: str = Field("your-project-id", env="GOOGLE_CLOUD_PROJECT")
-    google_cloud_region: str = "your-region"
+    google_cloud_region: str = Field("us-central1", env="GOOGLE_CLOUD_REGION")
     cloud_run_url: Optional[str] = None
-    vertex_ai_location: str = "your-region"
-    vertex_ai_model: str = "gemini-1.5-flash"
-    scheduler_location: str = "your-region"
-    scheduler_timezone: str = "Australia/Melbourne"
+    vertex_ai_location: str = Field("us-central1", env="GOOGLE_CLOUD_REGION")
+    vertex_ai_model: str = Field("gemini-1.5-flash", env="VERTEX_AI_MODEL")
+    scheduler_location: str = Field("us-central1", env="GOOGLE_CLOUD_REGION")
+    scheduler_timezone: str = Field("Australia/Melbourne", env="SCHEDULER_TIMEZONE")
     
     # CORS
     cors_origins: list[str] = ["*"]
