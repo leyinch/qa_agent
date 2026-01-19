@@ -7,6 +7,14 @@ CREATE SCHEMA IF NOT EXISTS `{{PROJECT_ID}}.crown_scd_mock` OPTIONS(location="US
 CREATE SCHEMA IF NOT EXISTS `{{PROJECT_ID}}.config` OPTIONS(location="US");         -- Centralized configuration tables for the QA Agent (SCD, GCS, and system-wide tests)
 CREATE SCHEMA IF NOT EXISTS `{{PROJECT_ID}}.qa_results` OPTIONS(location="US");     -- History and reporting views for test execution results
 
+-- ============================================
+-- CLEANUP: Drop existing tables/views for clean re-deployment
+-- ============================================
+DROP TABLE IF EXISTS `{{PROJECT_ID}}.config.scd_validation_config`;
+DROP TABLE IF EXISTS `{{PROJECT_ID}}.qa_results.scd_test_history`;
+DROP VIEW IF EXISTS `{{PROJECT_ID}}.qa_results.latest_scd_results_by_table`;
+DROP VIEW IF EXISTS `{{PROJECT_ID}}.qa_results.v_scd_validation_report`;
+
 
 
 -- 2. Setup SCD1 Mock Table
