@@ -33,8 +33,6 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """Lifespan context manager for startup/shutdown events."""
     logger.info("Starting Data QA Agent Backend...")
-    # Scheduler sync removed from startup to prevent blocking
-    # Use POST /api/sync-scheduler to manually sync after deployment
     yield
     logger.info("Shutting down Data QA Agent Backend...")
 
@@ -301,8 +299,7 @@ async def generate_tests(request: GenerateTestsRequest):
                         'failed': len([t for t in result.predefined_results if t.status == 'FAIL']),
                         'errors': len([t for t in result.predefined_results if t.status == 'ERROR'])
                     },
-                    'results_by_mapping': [result.dict()],
-                    'cron_schedule': result.cron_schedule
+                    'results_by_mapping': [result.dict()]
                 }
             except Exception as e:
                 logger.error(f"Error in scd validation: {str(e)}")
@@ -336,8 +333,7 @@ async def save_test_history(request: SaveHistoryRequest):
             target_dataset=request.target_dataset,
             target_table=request.target_table,
             mapping_id=request.mapping_id,
-            metadata=request.metadata,
-            cron_schedule=request.cron_schedule
+            metadata=request.metadata
         )
 
         return {"status": "success", "execution_id": execution_id}
@@ -432,8 +428,7 @@ async def add_scd_config(request: AddSCDConfigRequest):
             "end_date_column": request.end_date_column,
             "active_flag_column": request.active_flag_column,
             "description": request.description,
-            "custom_tests": request.custom_tests,
-            "cron_schedule": request.cron_schedule
+            "custom_tests": request.custom_tests
         }
         
         # Insert into config table
@@ -451,17 +446,7 @@ async def add_scd_config(request: AddSCDConfigRequest):
                 detail="Failed to insert SCD configuration into config table"
             )
         
-        # Upsert scheduler job if cron_schedule is provided
-        if request.cron_schedule:
-            from app.services.scheduler_service import scheduler_service
-            await scheduler_service.upsert_job(
-                config_id=request.config_id,
-                cron_schedule=request.cron_schedule,
-                target_dataset=request.target_dataset,
-                target_table=request.target_table,
-                config_dataset=request.config_dataset,
-                config_table=request.config_table
-            )
+
         
         return {
             "success": True,
@@ -538,89 +523,7 @@ async def get_table_metadata(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/api/run-scheduled-tests")
-async def run_scheduled_tests(request: ScheduledTestRunRequest):
-    """Endpoint triggered by Cloud Scheduler to run tests for a single table."""
-    try:
-        from app.services.test_executor import TestExecutor
-        from app.services.bigquery_service import bigquery_service
-        from app.services.history_service import TestHistoryService
-        
-        executor = TestExecutor()
-        history_service = TestHistoryService()
-        
-        # Fetch full config details from BigQuery
-        configs = await bigquery_service.read_scd_config_table(
-            request.project_id, 
-            request.config_dataset, 
-            request.config_table
-        )
 
-        
-        table_config = next((c for c in configs if c['config_id'] == request.config_id), None)
-        if not table_config:
-            logger.error(f"Config {request.config_id} not found in {request.config_dataset}.{request.config_table}")
-            raise HTTPException(status_code=404, detail=f"Config {request.config_id} not found")
-            
-        logger.info(f"Running scheduled tests for {request.config_id}")
-        mapping_result = await executor.process_scd(request.project_id, table_config)
-        results = [r.dict() if hasattr(r, 'dict') else r for r in mapping_result.predefined_results]
-        
-        # Save to history (Policy: scheduled runs ALWAYS write to history)
-        summary = {
-            "total": len(results),
-            "passed": len([r for r in results if r.get("status") == "PASS"]),
-            "failed": len([r for r in results if r.get("status") == "FAIL"]),
-            "errors": len([r for r in results if r.get("status") == "ERROR"])
-        }
-        
-        # Determine execution source based on time
-        # If running close to scheduled time (09:00 Melbourne), it's Scheduled. Otherwise Manual.
-        import pytz
-        from datetime import datetime
-        
-        executed_by = "Manual Run"
-        try:
-            tz = pytz.timezone("Australia/Melbourne")
-            now = datetime.now(tz)
-            
-            # Check if within 5 minutes of 09:00 AM
-            if now.hour == 9 and now.minute <= 5:
-                 executed_by = "Scheduled Run"
-        except Exception:
-            # Fallback if timezone conversion fails
-            executed_by = "Scheduled Run"
-
-        history_service.save_test_results(
-            project_id=request.project_id,
-            comparison_mode="scd",
-            test_results=results,
-            target_dataset=request.target_dataset,
-            target_table=request.target_table,
-            mapping_id=request.config_id,
-            cron_schedule=request.cron_schedule,
-            executed_by=executed_by,
-            metadata={
-                "summary": summary,
-                "source": f"Scheduled SCD: {request.target_table}",
-                "status": "FAIL" if summary["failed"] > 0 or summary["errors"] > 0 else "PASS"
-            }
-        )
-        
-        return {
-            "success": True,
-            "message": f"Scheduled tests for {request.config_id} completed and saved to history",
-            "results_summary": {
-                "total": len(results),
-                "passed": len([t for t in results if t.get('status') == 'PASS']),
-                "failed": len([t for t in results if t.get('status') == 'FAIL'])
-            }
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error running scheduled tests: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 if __name__ == "__main__":

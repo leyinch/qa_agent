@@ -19,7 +19,6 @@ interface HistoryItem {
     failed_tests: number;
     test_results?: any; // New schema
     details?: any; // Old schema
-    cron_schedule?: string;
 }
 
 interface HistoryListProps {
@@ -106,7 +105,6 @@ export default function HistoryList({ projectId, onViewResult }: HistoryListProp
             comparison_mode: run.comparison_mode,
             project_id: run.project_id,
             target_table: run.target_table || run.target,
-            cron_schedule: run.cron_schedule
         };
 
         // If batch mode, put results in 'results_by_mapping' so ResultsView renders tabs
@@ -254,11 +252,6 @@ export default function HistoryList({ projectId, onViewResult }: HistoryListProp
                                         </td>
                                         <td style={{ padding: '0.75rem 1rem', textTransform: 'capitalize' }}>
                                             {run.comparison_mode?.replace('_', ' ')}
-                                            {run.cron_schedule && (
-                                                <div style={{ fontSize: '0.7rem', color: 'var(--primary)', marginTop: '0.25rem', fontWeight: '600' }}>
-                                                    ⏰ {run.cron_schedule}
-                                                </div>
-                                            )}
                                         </td>
                                         <td style={{ padding: '0.75rem 1rem' }}>
                                             <div style={{ color: 'var(--foreground)', fontWeight: '500' }}>

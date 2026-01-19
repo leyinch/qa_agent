@@ -10,20 +10,8 @@ The QA Agent now supports **SCD Type 1 and Type 2 Validation**. This feature val
 
 ## 🧠 System Logic & Architecture
 
-### 1. Scheduler Logic
-The system includes a robust integration with **Google Cloud Scheduler** to automate testing.
-- **Timezone**: All schedules run in **Melbourne Time (Australia/Melbourne)**.
-- **Sync Mechanism**: The backend automatically keeps Cloud Scheduler in sync with your BigQuery config table.
-  - **Auto-Sync**: Occurs internally to ensure system integrity.
-  - **Manual Sync**: Triggered via the **🔄 Sync Jobs** button in the UI or via API (`/api/sync-scheduler`). Use this after making manual deletions or changes directly in BigQuery.
-  - **Self-Healing**: The system automatically maintains a `qa-agent-master-sync` job that triggers a full sync hourly. This job is self-healing and will be recreated if deleted.
-  - **Cleanup**: Obsolete jobs (configs deleted from BQ) are automatically removed during any sync operation.
-- **Execution Source**: The history table distinguishes how a test was triggered:
-  - `Scheduled Run`: Triggered automatically at the configured cron time (e.g., 9:00 AM).
-  - `Manual Run`: Triggered manually via the UI or "Force Run" in Console.
-
-### 2. History & Reporting
-All test results—whether run manually via the frontend or automatically via the scheduler—are logged to a **single source of truth**:
+### 1. History & Reporting
+All test results triggered manually via the frontend are logged to a **single source of truth**:
 - **Table**: `leyin-sandpit.qa_results.scd_test_history`
 - **Timestamps**: Stored in **Melbourne Local Time** for easy readability (DATETIME).
 - **Partitioning**: The table is partitioned by day for performance.
@@ -79,23 +67,14 @@ If you haven't already, run the master setup script to populate your environment
    - ❌ `scd2_continuity` -> **FAIL** (Overlaps/Gaps detected)
    - ❌ `scd2_one_current_row` -> **FAIL** (Multiple active flags)
 
-### Step 4: Add New Configuration (Saved for Automation)
-
-You can add a table to the permanent configuration so it runs automatically.
+### Step 4: Add New Configuration
+You can add a table to the permanent configuration for easy management.
 
 1. Toggle **"Config Table Mode"** switch.
 2. Toggle **"Add New Configuration"** switch.
 3. Fill in the form (e.g., for `D_Seat_WD` or a new table).
-4. Select **Schedule Frequency** (e.g., Daily).
-5. Click **Add Configuration**.
-   - **Result**: The config is saved to BQ, and a Cloud Scheduler job is **instantly created**.
-
-### Step 5: Synchronizing External Changes
-
-If you delete a configuration record manually via the BigQuery Console:
-1. Navigate to the **Config Table** mode in the UI.
-2. Click the **🔄 Sync Jobs** button.
-3. **Expected Result**: Any orphaned Cloud Scheduler jobs will be deleted, and the master sync job will be verified/recreated.
+4. Click **Add Configuration**.
+   - **Result**: The config is saved to BQ.
 
 ---
 
@@ -135,16 +114,16 @@ Ensure your Cloud Run service account has:
 You can also manage configs directly in BigQuery:
 ```sql
 INSERT INTO `leyin-sandpit.config.scd_validation_config`
-(config_id, target_dataset, target_table, scd_type, primary_keys, cron_schedule)
+(config_id, target_dataset, target_table, scd_type, primary_keys)
 VALUES
-('my_new_table', 'my_ds', 'my_table', 'scd1', ['id'], '0 9 * * *');
+('my_new_table', 'my_ds', 'my_table', 'scd1', ['id']);
 ```
-*Note: Run `/api/sync-scheduler` after manual SQL inserts if you want the job created immediately.*
+
 
 ---
 
 ## 📄 Related Files
 - **Frontend**: [`DashboardForm.tsx`](src/components/DashboardForm.tsx), [`ResultsView.tsx`](src/components/ResultsView.tsx)
-- **Backend Logic**: [`test_executor.py`](backend/app/services/test_executor.py), [`scheduler_service.py`](backend/app/services/scheduler_service.py)
+- **Backend Logic**: [`test_executor.py`](backend/app/services/test_executor.py)
 - **Test Definitions**: [`predefined_tests.py`](backend/app/tests/predefined_tests.py)
 - **Setup**: [`setup_scd_resources.sql`](setup_scd_resources.sql)

@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS `miruna-sandpit.config.data_load_config` (
   
   -- Status
   is_active BOOLEAN DEFAULT true,
-  cron_schedule STRING,
+
   
   -- Metadata
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP(),
@@ -184,7 +184,6 @@ VALUES
   ['row_count_match', 'no_nulls_required', 'no_duplicates_pk', 'numeric_range', 'pattern_validation'],
   true,  -- Auto-suggest enabled
   true,  -- Active
-  '0 9 * * *',
   'admin@example.com'
 );
 

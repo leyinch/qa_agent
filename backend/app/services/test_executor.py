@@ -342,8 +342,7 @@ class TestExecutor:
                     table_row_count=bq_row_count
                 ),
                 predefined_results=predefined_results,
-                ai_suggestions=[],
-                cron_schedule=mapping.get('cron_schedule')
+                ai_suggestions=[]
             )
             
         except Exception as e:
@@ -394,8 +393,7 @@ class TestExecutor:
                     'begin_date_column': config.get('begin_date_column'),
                     'end_date_column': config.get('end_date_column'),
                     'active_flag_column': config.get('active_flag_column'),
-                    'custom_tests': config.get('custom_tests'),
-                    'cron_schedule': config.get('cron_schedule')
+                    'custom_tests': config.get('custom_tests')
                 }
                 mappings.append(mapping)
             

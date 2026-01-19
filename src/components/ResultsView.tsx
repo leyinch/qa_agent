@@ -34,7 +34,6 @@ interface MappingResult {
     };
     predefined_results: TestResult[];
     ai_suggestions?: AISuggestion[];
-    cron_schedule?: string;
     error?: string;
 }
 
@@ -64,8 +63,6 @@ export default function ResultsView() {
     const [projectId, setProjectId] = useState<string>("");
     const [expandedSql, setExpandedSql] = useState<{ mappingIdx: number, testIdx: number } | null>(null);
     const [expandedSingleSql, setExpandedSingleSql] = useState<number | null>(null);
-    const [cronSchedule, setCronSchedule] = useState<string | null>(null);
-
     const [activeTab, setActiveTab] = useState<number>(0);
 
     useEffect(() => {
@@ -85,9 +82,7 @@ export default function ResultsView() {
                     // We should modify DashboardForm to save projectId in local storage too or pass it.
                 }
 
-                if (parsed.cron_schedule) {
-                    setCronSchedule(parsed.cron_schedule);
-                }
+
 
                 // Check if it's config table mode (has results_by_mapping)
                 if (parsed.results_by_mapping) {
@@ -197,23 +192,11 @@ export default function ResultsView() {
                         gap: '0.75rem',
                         boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
                     }}>
-                        {cronSchedule ? (
-                            <>
-                                <span style={{ fontSize: '1.25rem' }}>⏰</span>
-                                <div>
-                                    <div style={{ fontSize: '0.75rem', opacity: 0.7, fontWeight: '400' }}>Schedule</div>
-                                    <div>{cronSchedule}</div>
-                                </div>
-                            </>
-                        ) : (
-                            <>
-                                <span style={{ fontSize: '1.25rem' }}>👤</span>
-                                <div>
-                                    <div style={{ fontSize: '0.75rem', opacity: 0.7, fontWeight: '400' }}>Triggered By</div>
-                                    <div>Manual Run</div>
-                                </div>
-                            </>
-                        )}
+                        <span style={{ fontSize: '1.25rem' }}>👤</span>
+                        <div>
+                            <div style={{ fontSize: '0.75rem', opacity: 0.7, fontWeight: '400' }}>Triggered By</div>
+                            <div>Manual Run</div>
+                        </div>
                     </div>
                 </div>
 
@@ -317,12 +300,7 @@ export default function ResultsView() {
                             <div style={{ flex: '1', minWidth: '300px' }}>
                                 <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--primary)', fontWeight: '800', marginBottom: '0.5rem', letterSpacing: '0.05em' }}>Current Mapping</div>
                                 <h3 style={{ fontSize: '1.5rem', fontWeight: '800', margin: 0, color: 'var(--card-foreground)' }}>{mappingResults[activeTab].mapping_id}</h3>
-                                {mappingResults[activeTab].cron_schedule && (
-                                    <div style={{ marginTop: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--secondary-foreground)', fontSize: '0.875rem' }}>
-                                        <span style={{ fontSize: '1rem' }}>⏰</span>
-                                        <strong>Configured Schedule:</strong> {mappingResults[activeTab].cron_schedule}
-                                    </div>
-                                )}
+
                             </div>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '2rem' }}>
 
@@ -641,23 +619,11 @@ export default function ResultsView() {
                     gap: '0.75rem',
                     boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
                 }}>
-                    {cronSchedule ? (
-                        <>
-                            <span style={{ fontSize: '1.25rem' }}>⏰</span>
-                            <div>
-                                <div style={{ fontSize: '0.75rem', opacity: 0.7, fontWeight: '400' }}>Schedule</div>
-                                <div>{cronSchedule}</div>
-                            </div>
-                        </>
-                    ) : (
-                        <>
-                            <span style={{ fontSize: '1.25rem' }}>👤</span>
-                            <div>
-                                <div style={{ fontSize: '0.75rem', opacity: 0.7, fontWeight: '400' }}>Triggered By</div>
-                                <div>Manual Run</div>
-                            </div>
-                        </>
-                    )}
+                    <span style={{ fontSize: '1.25rem' }}>👤</span>
+                    <div>
+                        <div style={{ fontSize: '0.75rem', opacity: 0.7, fontWeight: '400' }}>Triggered By</div>
+                        <div>Manual Run</div>
+                    </div>
                 </div>
             </div>
 

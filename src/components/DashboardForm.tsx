@@ -126,28 +126,9 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
     const [newEndDateColumn, setNewEndDateColumn] = useState("DWEndEffDateTime");
     const [newActiveFlagColumn, setNewActiveFlagColumn] = useState("DWCurrentRowFlag");
     const [newDescription, setNewDescription] = useState("");
-    const [newCronSchedule, setNewCronSchedule] = useState<string>('0 9 * * *');
-    const [scheduleFrequency, setScheduleFrequency] = useState<string>('daily');
-    const [scheduledHour, setScheduledHour] = useState("09");
-    const [scheduledMinute, setScheduledMinute] = useState("00");
-    const [scheduledDayOfWeek, setScheduledDayOfWeek] = useState("1");
-    const [scheduledDayOfMonth, setScheduledDayOfMonth] = useState("1");
     const [newCustomTests, setNewCustomTests] = useState<CustomTest[]>([]);
 
-    // Sync Cron Schedule when granular parts change
-    useEffect(() => {
-        if (scheduleFrequency === 'custom') return;
 
-        let cron = `${parseInt(scheduledMinute)} ${parseInt(scheduledHour)}`;
-        if (scheduleFrequency === 'daily') {
-            cron += ' * * *';
-        } else if (scheduleFrequency === 'weekly') {
-            cron += ` * * ${scheduledDayOfWeek}`;
-        } else if (scheduleFrequency === 'monthly') {
-            cron += ` ${scheduledDayOfMonth} * *`;
-        }
-        setNewCronSchedule(cron);
-    }, [scheduleFrequency, scheduledHour, scheduledMinute, scheduledDayOfWeek, scheduledDayOfMonth]);
 
     const addDataset = () => setDatasets([...datasets, '']);
 
@@ -334,8 +315,7 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
                 end_date_column: newScdType === 'scd2' ? newEndDateColumn : null,
                 active_flag_column: newScdType === 'scd2' ? newActiveFlagColumn : null,
                 description: newDescription,
-                custom_tests: newCustomTests.length > 0 ? newCustomTests : null,
-                cron_schedule: newCronSchedule || null
+                custom_tests: newCustomTests.length > 0 ? newCustomTests : null
             };
 
             const response = await fetch(endpoint, {
@@ -368,37 +348,7 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
         }
     };
 
-    const handleSyncScheduler = async () => {
-        if (!projectId) {
-            alert("Project ID is required to sync scheduler jobs.");
-            return;
-        }
 
-        setSyncLoading(true);
-        try {
-            const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://data-qa-agent-backend2-1037417342779.us-central1.run.app';
-            const endpoint = `${backendUrl}/api/sync-scheduler`;
-
-            const response = await fetch(endpoint, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ project_id: projectId }) // Note: Endpoint might not strictly require body but good for safety
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.detail || 'Failed to sync scheduler');
-            }
-
-            const data = await response.json();
-            alert(`Sync complete! ${data.summary?.synced} synced, ${data.summary?.deleted} deleted.`);
-        } catch (error: any) {
-            console.error("Error syncing scheduler:", error);
-            alert(error.message || "An error occurred during sync.");
-        } finally {
-            setSyncLoading(false);
-        }
-    };
 
     return (
         <form onSubmit={handleSubmit} className="card fade-in" style={{ width: '100%', maxWidth: '800px', margin: '0 auto' }}>
@@ -891,26 +841,6 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
                                         >
                                             {showAddConfig ? '✖️ Cancel' : '➕ Add New Table Configuration'}
                                         </button>
-
-                                        <button
-                                            type="button"
-                                            onClick={handleSyncScheduler}
-                                            disabled={syncLoading}
-                                            style={{
-                                                flex: 1,
-                                                padding: '0.75rem 1.25rem',
-                                                backgroundColor: 'var(--secondary)',
-                                                color: 'var(--primary)',
-                                                border: '2px solid var(--primary)',
-                                                borderRadius: 'var(--radius)',
-                                                cursor: 'pointer',
-                                                fontWeight: '600',
-                                                fontSize: '0.875rem',
-                                                transition: 'all 0.2s ease'
-                                            }}
-                                        >
-                                            {syncLoading ? '⏳ Syncing...' : '🔄 Sync Jobs'}
-                                        </button>
                                     </div>
 
                                     {/* Add New Config Form */}
@@ -1211,121 +1141,7 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
                                                         + Add Business Rule
                                                     </button>
                                                 </div>
-                                                <div style={{ marginBottom: '1.5rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem' }}>
-                                                    <div>
-                                                        <label className="label" htmlFor="scheduleFrequency">
-                                                            <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                                📅 Frequency
-                                                            </span>
-                                                        </label>
-                                                        <select
-                                                            id="scheduleFrequency"
-                                                            className="input"
-                                                            value={scheduleFrequency}
-                                                            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setScheduleFrequency(e.target.value)}
-                                                        >
-                                                            <option value="daily">Daily</option>
-                                                            <option value="weekly">Weekly</option>
-                                                            <option value="monthly">Monthly</option>
-                                                            <option value="custom">Custom Cron</option>
-                                                        </select>
-                                                    </div>
 
-                                                    {scheduleFrequency !== 'custom' && (
-                                                        <>
-                                                            <div>
-                                                                <label className="label">
-                                                                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                                        ⏱️ Time (HH:MM)
-                                                                    </span>
-                                                                </label>
-                                                                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                                                                    <select
-                                                                        className="input"
-                                                                        style={{ marginBottom: 0, padding: '0.55rem' }}
-                                                                        value={scheduledHour}
-                                                                        onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setScheduledHour(e.target.value)}
-                                                                    >
-                                                                        {Array.from({ length: 24 }).map((_, i) => {
-                                                                            const val = i.toString().padStart(2, '0');
-                                                                            return <option key={val} value={val}>{val}</option>;
-                                                                        })}
-                                                                    </select>
-                                                                    <span>:</span>
-                                                                    <select
-                                                                        className="input"
-                                                                        style={{ marginBottom: 0, padding: '0.55rem' }}
-                                                                        value={scheduledMinute}
-                                                                        onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setScheduledMinute(e.target.value)}
-                                                                    >
-                                                                        {Array.from({ length: 60 }).map((_, i) => {
-                                                                            const val = i.toString().padStart(2, '0');
-                                                                            return <option key={val} value={val}>{val}</option>;
-                                                                        })}
-                                                                    </select>
-                                                                </div>
-                                                            </div>
-
-                                                            {scheduleFrequency === 'weekly' && (
-                                                                <div>
-                                                                    <label className="label">Day of Week</label>
-                                                                    <select
-                                                                        className="input"
-                                                                        value={scheduledDayOfWeek}
-                                                                        onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setScheduledDayOfWeek(e.target.value)}
-                                                                    >
-                                                                        <option value="1">Monday</option>
-                                                                        <option value="2">Tuesday</option>
-                                                                        <option value="3">Wednesday</option>
-                                                                        <option value="4">Thursday</option>
-                                                                        <option value="5">Friday</option>
-                                                                        <option value="6">Saturday</option>
-                                                                        <option value="0">Sunday</option>
-                                                                    </select>
-                                                                </div>
-                                                            )}
-
-                                                            {scheduleFrequency === 'monthly' && (
-                                                                <div>
-                                                                    <label className="label">Day of Month</label>
-                                                                    <select
-                                                                        className="input"
-                                                                        value={scheduledDayOfMonth}
-                                                                        onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setScheduledDayOfMonth(e.target.value)}
-                                                                    >
-                                                                        {Array.from({ length: 31 }).map((_, i) => (
-                                                                            <option key={i + 1} value={i + 1}>{i + 1}</option>
-                                                                        ))}
-                                                                    </select>
-                                                                </div>
-                                                            )}
-                                                        </>
-                                                    )}
-                                                </div>
-
-                                                <div style={{ marginBottom: '1.5rem' }}>
-                                                    <label className="label" htmlFor="newCronSchedule">
-                                                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                            ⚙️ Resulting Cron Schedule {scheduleFrequency !== 'custom' ? '(Auto-generated)' : ''}
-                                                        </span>
-                                                    </label>
-                                                    <input
-                                                        id="newCronSchedule"
-                                                        type="text"
-                                                        className="input"
-                                                        style={{ width: '100%', background: scheduleFrequency !== 'custom' ? '#f8fafc' : 'white' }}
-                                                        value={newCronSchedule}
-                                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                                                            setNewCronSchedule(e.target.value);
-                                                            if (scheduleFrequency !== 'custom') setScheduleFrequency('custom');
-                                                        }}
-                                                        placeholder="e.g., 0 2 * * * (Daily at 2 AM)"
-                                                        readOnly={scheduleFrequency !== 'custom'}
-                                                    />
-                                                    <p style={{ fontSize: '0.75rem', color: 'var(--secondary-foreground)', marginTop: '0.25rem' }}>
-                                                        {newCronSchedule ? `Scheduled execution: ${newCronSchedule}` : 'Manual execution only'}
-                                                    </p>
-                                                </div>
                                             </div>
 
                                             {/* Save Button */}

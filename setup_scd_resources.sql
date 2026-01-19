@@ -111,23 +111,16 @@ CREATE TABLE IF NOT EXISTS `leyin-sandpit.config.scd_validation_config` (
     end_date_column STRING,
     active_flag_column STRING,
     description STRING,
-    custom_tests JSON,
-    cron_schedule STRING
+    custom_tests JSON
 );
 
 -- Insert sample configs if not already present
-INSERT INTO `leyin-sandpit.config.scd_validation_config` (config_id, target_dataset, target_table, scd_type, primary_keys, surrogate_key, begin_date_column, end_date_column, active_flag_column, description, custom_tests, cron_schedule)
+INSERT INTO `leyin-sandpit.config.scd_validation_config` (config_id, target_dataset, target_table, scd_type, primary_keys, surrogate_key, begin_date_column, end_date_column, active_flag_column, description, custom_tests)
 SELECT * FROM (
-  SELECT 'seat_scd1' as config_id, 'crown_scd_mock' as target_dataset, 'D_Seat_WD' as target_table, 'scd1' as scd_type, ['TableId', 'PositionIDX'] as primary_keys, 'DWSeatID' as surrogate_key, CAST(NULL AS STRING) as begin_date_column, CAST(NULL AS STRING) as end_date_column, CAST(NULL AS STRING) as active_flag_column, 'SCD1 Mock for Gaming Seats (Test Data)' as description, CAST(NULL AS JSON) as custom_tests, '0 9 * * *' as cron_schedule
+  SELECT 'seat_scd1' as config_id, 'crown_scd_mock' as target_dataset, 'D_Seat_WD' as target_table, 'scd1' as scd_type, ['TableId', 'PositionIDX'] as primary_keys, 'DWSeatID' as surrogate_key, CAST(NULL AS STRING) as begin_date_column, CAST(NULL AS STRING) as end_date_column, CAST(NULL AS STRING) as active_flag_column, 'SCD1 Mock for Gaming Seats (Test Data)' as description, CAST(NULL AS JSON) as custom_tests
   UNION ALL
-  SELECT 'employee_scd2', 'crown_scd_mock', 'D_Employee_WD', 'scd2', ['UserId'], 'DWEmployeeID', 'DWBeginEffDateTime', 'DWEndEffDateTime', 'DWCurrentRowFlag', 'SCD2 Mock for Employees (Test Data)', NULL, '0 9 * * *'
+  SELECT 'employee_scd2', 'crown_scd_mock', 'D_Employee_WD', 'scd2', ['UserId'], 'DWEmployeeID', 'DWBeginEffDateTime', 'DWEndEffDateTime', 'DWCurrentRowFlag', 'SCD2 Mock for Employees (Test Data)', NULL
   UNION ALL
-  SELECT 'player_scd2', 'crown_scd_mock', 'D_Player_WD', 'scd2', ['PlayerId'], 'DWPlayerID', 'DWBeginEffDateTime', 'DWEndEffDateTime', 'DWCurrentRowFlag', 'SCD2 Mock for Players (Test Data)', JSON """[
-    {
-        "name": "CreatedDtm Not Null",
-        "sql": "SELECT * FROM {{target}} WHERE CreatedDtm IS NULL",
-        "description": "CreatedDtm must not be null",
-        "severity": "HIGH"
     },
     {
         "name": "CreatedDtm before UpdatedDtm",
@@ -135,7 +128,7 @@ SELECT * FROM (
         "description": "CreatedDtm must be less than or equal to UpdatedDtm",
         "severity": "HIGH"
     }
-]""", '0 9 * * *'
+]"""
 ) AS t
 WHERE NOT EXISTS (SELECT 1 FROM `leyin-sandpit.config.scd_validation_config` WHERE config_id = t.config_id);
 
@@ -181,7 +174,6 @@ CREATE TABLE IF NOT EXISTS `leyin-sandpit.qa_results.scd_test_history` (
   passed_tests INT64,
   failed_tests INT64,
   error_message STRING,
-  cron_schedule STRING,
   test_results JSON,
   executed_by STRING,
   metadata JSON

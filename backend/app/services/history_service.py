@@ -76,7 +76,6 @@ class TestHistoryService:
                     bigquery.SchemaField("passed_tests", "INTEGER", mode="NULLABLE"),
                     bigquery.SchemaField("failed_tests", "INTEGER", mode="NULLABLE"),
                     bigquery.SchemaField("error_message", "STRING", mode="NULLABLE"),
-                    bigquery.SchemaField("cron_schedule", "STRING", mode="NULLABLE"),
                     bigquery.SchemaField("test_results", "JSON", mode="NULLABLE"),
                     bigquery.SchemaField("executed_by", "STRING", mode="NULLABLE"),
                     bigquery.SchemaField("metadata", "JSON", mode="NULLABLE")
@@ -98,7 +97,6 @@ class TestHistoryService:
         target_dataset: Optional[str] = None,
         target_table: Optional[str] = None,
         mapping_id: Optional[str] = None,
-        cron_schedule: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
         executed_by: Optional[str] = None
     ) -> str:
@@ -155,7 +153,6 @@ class TestHistoryService:
             "passed_tests": passed_tests,
             "failed_tests": failed_tests,
             "error_message": error_message,
-            "cron_schedule": cron_schedule,
             "test_results": json.dumps(test_results, default=json_serial),
             "executed_by": executed_by or "System",
             "metadata": json.dumps(metadata, default=json_serial) if metadata else None
@@ -196,7 +193,7 @@ class TestHistoryService:
             "execution_id", "execution_timestamp", "project_id", "comparison_mode",
             "target_dataset", "target_table", "mapping_id", "status",
             "total_tests", "passed_tests", "failed_tests", "error_message",
-            "cron_schedule", "executed_by", "metadata"
+            "executed_by", "metadata"
         ]
         
         if execution_id:
