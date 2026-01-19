@@ -187,7 +187,8 @@ if [ "$FIRST_TIME_DEPLOYMENT" = true ]; then
         artifactregistry.googleapis.com \
         bigquery.googleapis.com \
         aiplatform.googleapis.com \
-        storage.googleapis.com
+        storage.googleapis.com \
+        --project "$PROJECT_ID"
     echo -e "${GREEN}✓ APIs enabled${NC}"
 
 
