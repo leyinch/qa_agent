@@ -263,14 +263,18 @@ async def generate_tests(request: GenerateTestsRequest):
                 'begin_date_column': request.begin_date_column,
                 'end_date_column': request.end_date_column,
                 'active_flag_column': request.active_flag_column,
-                'enabled_test_ids': request.enabled_test_ids
+                'enabled_test_ids': request.enabled_test_ids,
+                'custom_tests': request.custom_tests
             }
             
             try:
+                logger.info(f"🔍 Starting SCD validation for {request.target_table} in {request.target_dataset}")
                 result = await test_executor.process_scd(request.project_id, mapping)
+                logger.info(f"📋 SCD validation completed. Found {len(result.predefined_results)} tests.")
                 
                 # Log execution
                 try:
+                    logger.info(f"💾 Attempting to save SCD results to history...")
                     history_service.save_test_results(
                         project_id=request.project_id,
                         comparison_mode="scd",
@@ -289,10 +293,11 @@ async def generate_tests(request: GenerateTestsRequest):
                             "status": "FAIL" if any(r.status in ['FAIL', 'ERROR'] for r in result.predefined_results) else "PASS"
                         }
                     )
+                    logger.info(f"✅ SCD history saved successfully.")
                 except Exception as log_err:
-                    logger.error(f"Failed to log scd execution: {log_err}")
+                    logger.error(f"❌ Failed to log scd execution: {log_err}", exc_info=True)
                 
-                return {
+                response_data = {
                     'summary': {
                         'total_tests': len(result.predefined_results),
                         'passed': len([t for t in result.predefined_results if t.status == 'PASS']),
@@ -301,6 +306,8 @@ async def generate_tests(request: GenerateTestsRequest):
                     },
                     'results_by_mapping': [result.dict()]
                 }
+                logger.info(f"🚀 Returning SCD results to frontend.")
+                return response_data
             except Exception as e:
                 logger.error(f"Error in scd validation: {str(e)}")
                 raise HTTPException(status_code=500, detail=str(e))
