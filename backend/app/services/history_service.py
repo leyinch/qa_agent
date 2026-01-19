@@ -90,30 +90,6 @@ class TestHistoryService:
         except Exception as e:
             logger.warning(f"Failed to ensure history table exists: {e}")
     
-    def save_test_results(
-        self,
-        project_id: str,
-        comparison_mode: str,
-        test_results: Any,
-        target_dataset: Optional[str] = None,
-        target_table: Optional[str] = None,
-        mapping_id: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-        executed_by: Optional[str] = None
-    ) -> str:
-        """
-        Save test execution results to BigQuery history table (one row per table).
-        """
-        # Ensure table exists before writing
-        self._ensure_table_exists()
-
-        execution_id = str(uuid.uuid4())
-        
-        # Get execution timestamp in Melbourne time (wall-clock time)
-        # We store as DATETIME (local time) so it appears correct in BigQuery
-        tz = pytz.timezone('Australia/Melbourne')
-        execution_timestamp = datetime.now(tz).replace(tzinfo=None)
-        
     def _prepare_json_for_bq(self, data: Any) -> Any:
         """
         Recursively convert objects to BigQuery-compatible JSON formats.
