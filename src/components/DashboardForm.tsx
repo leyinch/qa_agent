@@ -341,8 +341,15 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
             });
 
             if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.detail || 'Failed to add configuration');
+                const responseText = await response.text();
+                let errorMessage;
+                try {
+                    const errorData = JSON.parse(responseText);
+                    errorMessage = errorData.detail;
+                } catch (e) {
+                    errorMessage = responseText.substring(0, 200) || 'Failed to add configuration';
+                }
+                throw new Error(errorMessage || 'Failed to add configuration');
             }
 
             alert(`Configuration "${newConfigId}" added successfully!`);
