@@ -11,12 +11,12 @@ class Settings(BaseSettings):
     debug: bool = False
     
     # Google Cloud
-    google_cloud_project: str = "leyin-sandpit"
-    google_cloud_region: str = "us-central1"
+    google_cloud_project: str = "your-project-id"
+    google_cloud_region: str = "your-region"
     cloud_run_url: Optional[str] = None
-    vertex_ai_location: str = "us-central1"
+    vertex_ai_location: str = "your-region"
     vertex_ai_model: str = "gemini-1.5-flash"
-    scheduler_location: str = "us-central1"
+    scheduler_location: str = "your-region"
     scheduler_timezone: str = "Australia/Melbourne"
     
     # CORS

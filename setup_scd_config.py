@@ -1,6 +1,9 @@
 from google.cloud import bigquery
 
-client = bigquery.Client(project='leyin-sandpit')
+import os
+client = bigquery.Client()
+project_id = client.project # Automatically detects project from environment or gcloud config
+print(f"Using project: {project_id}")
 
 # Create Dataset
 dataset_id = "config"
@@ -27,7 +30,7 @@ schema = [
     bigquery.SchemaField("cron_schedule", "STRING")
 ]
 
-table = bigquery.Table(f"leyin-sandpit.{table_id}", schema=schema)
+table = bigquery.Table(f"{project_id}.{table_id}", schema=schema)
 client.delete_table(table, not_found_ok=True)
 table = client.create_table(table)
 print(f"Table {table_id} created.")

@@ -149,7 +149,7 @@ export async function POST(req: Request) {
                 const bqSchema = metadata.schema;
 
                 // 3. Initialize Vertex AI
-                const vertex_ai = new VertexAI({ project: projectId, location: "us-central1" });
+                const vertex_ai = new VertexAI({ project: projectId, location: process.env.GOOGLE_CLOUD_REGION || "your-region" });
                 const model = vertex_ai.preview.getGenerativeModel({
                     model: "gemini-2.5-flash",
                 });
@@ -327,7 +327,7 @@ Just return the JSON array. No markdown formatting.
         }
 
         // 2. Initialize Vertex AI
-        const vertex_ai = new VertexAI({ project: projectId, location: "us-central1" });
+        const vertex_ai = new VertexAI({ project: projectId, location: process.env.GOOGLE_CLOUD_REGION || "your-region" });
         const model = vertex_ai.preview.getGenerativeModel({
             model: "gemini-2.5-flash",
         });

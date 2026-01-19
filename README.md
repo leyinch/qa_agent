@@ -4,7 +4,7 @@ This is a Next.js application for testing data quality using AI. It uses Google 
 
 ## Prerequisites
 
-- Google Cloud Project: `leyin-sandpit`
+- Google Cloud Project: `your-project-id`
 - BigQuery Dataset: `config`, `qa_results`, `crown_scd_mock`
 - Vertex AI API enabled
 - BigQuery API enabled
@@ -13,7 +13,7 @@ This is a Next.js application for testing data quality using AI. It uses Google 
 
 To set up all required BigQuery datasets and tables in a single step:
 
-1. Open [BigQuery Console](https://console.cloud.google.com/bigquery?project=leyin-sandpit).
+1. Open [BigQuery Console](https://console.cloud.google.com/bigquery?project=your-project-id).
 2. Run the master setup script: [setup_scd_resources.sql](setup_scd_resources.sql).
 3. Follow the [SCD Validation Guide](SCD_VALIDATION_README.md) for detailed test instructions.
 

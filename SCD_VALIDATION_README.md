@@ -12,7 +12,7 @@ The QA Agent now supports **SCD Type 1 and Type 2 Validation**. This feature val
 
 ### 1. History & Reporting
 All test results triggered manually via the frontend are logged to a **single source of truth**:
-- **Table**: `leyin-sandpit.qa_results.scd_test_history`
+- **Table**: `your-project-id.qa_results.scd_test_history`
 - **Timestamps**: Stored in **Melbourne Local Time** for easy readability (DATETIME).
 - **Partitioning**: The table is partitioned by day for performance.
 
@@ -21,15 +21,15 @@ All test results triggered manually via the frontend are logged to a **single so
 ## 📋 Testing Instructions
 
 ### Prerequisites
-✅ Backend deployed to Cloud Run: `data-qa-agent-backend2`  
-✅ Frontend deployed to Cloud Run: `data-qa-agent-frontend2`
+✅ Backend deployed to Cloud Run: `data-qa-agent-backend`  
+✅ Frontend deployed to Cloud Run: `data-qa-agent-frontend`
 
 ### Step 1: Create Mock Data in BigQuery
 
 If you haven't already, run the master setup script to populate your environment with test data and tables.
 
-1. **Open BigQuery Console**: [Link](https://console.cloud.google.com/bigquery)
-2. **Run Script**: Copy and run the contents of [`setup_scd_resources.sql`](setup_scd_resources.sql).
+1. **Open BigQuery Console**: [Link](https://console.cloud.google.com/bigquery?project=your-project-id)
+2. **Run Script**: Use `parameterize-sql.sh` to create `setup_scd_resources.generated.sql`, then copy and run its contents.
 3. **Verify Resources**:
    - `crown_scd_mock.D_Seat_WD` (SCD1 Mock)
    - `crown_scd_mock.D_Employee_WD` (SCD2 Mock)
@@ -113,7 +113,7 @@ Ensure your Cloud Run service account has:
 ### Managing Configs via SQL
 You can also manage configs directly in BigQuery:
 ```sql
-INSERT INTO `leyin-sandpit.config.scd_validation_config`
+INSERT INTO `your-project-id.config.scd_validation_config`
 (config_id, target_dataset, target_table, scd_type, primary_keys)
 VALUES
 ('my_new_table', 'my_ds', 'my_table', 'scd1', ['id']);

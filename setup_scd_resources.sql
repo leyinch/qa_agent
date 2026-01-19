@@ -3,14 +3,14 @@
 
 
 -- 1. Create Datasets
-CREATE SCHEMA IF NOT EXISTS `leyin-sandpit.crown_scd_mock` OPTIONS(location="US"); -- Mock tables for testing SCD Type 1 and Type 2 validation logic
-CREATE SCHEMA IF NOT EXISTS `leyin-sandpit.config` OPTIONS(location="US");         -- Centralized configuration tables for the QA Agent (SCD, GCS, and system-wide tests)
-CREATE SCHEMA IF NOT EXISTS `leyin-sandpit.qa_results` OPTIONS(location="US");     -- History and reporting views for test execution results
+CREATE SCHEMA IF NOT EXISTS `{{PROJECT_ID}}.crown_scd_mock` OPTIONS(location="US"); -- Mock tables for testing SCD Type 1 and Type 2 validation logic
+CREATE SCHEMA IF NOT EXISTS `{{PROJECT_ID}}.config` OPTIONS(location="US");         -- Centralized configuration tables for the QA Agent (SCD, GCS, and system-wide tests)
+CREATE SCHEMA IF NOT EXISTS `{{PROJECT_ID}}.qa_results` OPTIONS(location="US");     -- History and reporting views for test execution results
 
 
 
 -- 2. Setup SCD1 Mock Table
-CREATE OR REPLACE TABLE `leyin-sandpit.crown_scd_mock.D_Seat_WD` (
+CREATE OR REPLACE TABLE `{{PROJECT_ID}}.crown_scd_mock.D_Seat_WD` (
     TableId INT64 NOT NULL,
     PositionIDX INT64,
     PositionCode STRING,
@@ -19,7 +19,7 @@ CREATE OR REPLACE TABLE `leyin-sandpit.crown_scd_mock.D_Seat_WD` (
     UpdateTimestamp TIMESTAMP
 );
 
-INSERT INTO `leyin-sandpit.crown_scd_mock.D_Seat_WD` (TableId, PositionIDX, PositionCode, PositionLabel, DWSeatID, UpdateTimestamp)
+INSERT INTO `{{PROJECT_ID}}.crown_scd_mock.D_Seat_WD` (TableId, PositionIDX, PositionCode, PositionLabel, DWSeatID, UpdateTimestamp)
 VALUES
     (101, 1, 'P1', 'Label 1', 1001, '2024-01-01 00:00:00'),
     (101, 1, 'P1_DUPE', 'Label 1 Dupe', 1002, '2024-01-02 00:00:00'), -- DUPLICATE PRIMARY KEY (101, 1)
@@ -27,7 +27,7 @@ VALUES
     (103, CAST(NULL AS INT64), 'P3', 'Label 3', 1004, '2024-01-01 00:00:00'); -- NULL PRIMARY KEY
 
 -- 3. Setup SCD2 Mock Table
-CREATE OR REPLACE TABLE `leyin-sandpit.crown_scd_mock.D_Employee_WD` (
+CREATE OR REPLACE TABLE `{{PROJECT_ID}}.crown_scd_mock.D_Employee_WD` (
     UserId STRING NOT NULL,
     UserName STRING,
     DWEmployeeID INT64,
@@ -36,7 +36,7 @@ CREATE OR REPLACE TABLE `leyin-sandpit.crown_scd_mock.D_Employee_WD` (
     DWCurrentRowFlag STRING
 );
 
-INSERT INTO `leyin-sandpit.crown_scd_mock.D_Employee_WD` (UserId, UserName, DWEmployeeID, DWBeginEffDateTime, DWEndEffDateTime, DWCurrentRowFlag)
+INSERT INTO `{{PROJECT_ID}}.crown_scd_mock.D_Employee_WD` (UserId, UserName, DWEmployeeID, DWBeginEffDateTime, DWEndEffDateTime, DWCurrentRowFlag)
 VALUES
     -- Valid record
     ('U1', 'User 1 Old', 5001, '2023-01-01 00:00:00', '2023-06-01 00:00:00', 'N'),
@@ -58,7 +58,7 @@ VALUES
     ('U5', 'User 5 B', 5009, '2023-05-01 00:00:00', '2099-12-31 23:59:59', 'Y');
 
 -- 4. Setup SCD2 Mock Table D_Player_WD (with Business Rules)
-CREATE OR REPLACE TABLE `leyin-sandpit.crown_scd_mock.D_Player_WD` (
+CREATE OR REPLACE TABLE `{{PROJECT_ID}}.crown_scd_mock.D_Player_WD` (
     PlayerId STRING NOT NULL,
     PlayerName STRING,
     DWPlayerID INT64,
@@ -70,7 +70,7 @@ CREATE OR REPLACE TABLE `leyin-sandpit.crown_scd_mock.D_Player_WD` (
     UpdatedDtm TIMESTAMP
 );
 
-INSERT INTO `leyin-sandpit.crown_scd_mock.D_Player_WD` (PlayerId, PlayerName, DWPlayerID, DWBeginEffDateTime, DWEndEffDateTime, DWCurrentRowFlag, CreatedDtm, UpdatedDtm)
+INSERT INTO `{{PROJECT_ID}}.crown_scd_mock.D_Player_WD` (PlayerId, PlayerName, DWPlayerID, DWBeginEffDateTime, DWEndEffDateTime, DWCurrentRowFlag, CreatedDtm, UpdatedDtm)
 VALUES
     -- 1. Valid record chain (P1)
     ('P1', 'Player 1 Old', 6001, '2023-01-01 00:00:00', '2023-06-01 00:00:00', 'N', '2023-01-01 00:00:00', '2023-06-01 00:00:00'),
@@ -100,7 +100,7 @@ VALUES
 
 -- 5. Setup SCD Validation Config Table
 
-CREATE TABLE IF NOT EXISTS `leyin-sandpit.config.scd_validation_config` (
+CREATE TABLE IF NOT EXISTS `{{PROJECT_ID}}.config.scd_validation_config` (
     config_id STRING NOT NULL,
     target_dataset STRING NOT NULL,
     target_table STRING NOT NULL,
@@ -115,7 +115,7 @@ CREATE TABLE IF NOT EXISTS `leyin-sandpit.config.scd_validation_config` (
 );
 
 -- Insert sample configs if not already present
-INSERT INTO `leyin-sandpit.config.scd_validation_config` (config_id, target_dataset, target_table, scd_type, primary_keys, surrogate_key, begin_date_column, end_date_column, active_flag_column, description, custom_tests)
+INSERT INTO `{{PROJECT_ID}}.config.scd_validation_config` (config_id, target_dataset, target_table, scd_type, primary_keys, surrogate_key, begin_date_column, end_date_column, active_flag_column, description, custom_tests)
 SELECT * FROM (
   SELECT 'seat_scd1' as config_id, 'crown_scd_mock' as target_dataset, 'D_Seat_WD' as target_table, 'scd1' as scd_type, ['TableId', 'PositionIDX'] as primary_keys, 'DWSeatID' as surrogate_key, CAST(NULL AS STRING) as begin_date_column, CAST(NULL AS STRING) as end_date_column, CAST(NULL AS STRING) as active_flag_column, 'SCD1 Mock for Gaming Seats (Test Data)' as description, CAST(NULL AS JSON) as custom_tests
   UNION ALL
@@ -130,11 +130,11 @@ SELECT * FROM (
     }
 ]"""
 ) AS t
-WHERE NOT EXISTS (SELECT 1 FROM `leyin-sandpit.config.scd_validation_config` WHERE config_id = t.config_id);
+WHERE NOT EXISTS (SELECT 1 FROM `{{PROJECT_ID}}.config.scd_validation_config` WHERE config_id = t.config_id);
 
 
 -- 6. Setup System Predefined Tests
-CREATE TABLE IF NOT EXISTS `leyin-sandpit.config.predefined_tests` (
+CREATE TABLE IF NOT EXISTS `{{PROJECT_ID}}.config.predefined_tests` (
   test_id STRING NOT NULL,
   test_name STRING NOT NULL,
   test_category STRING NOT NULL,
@@ -146,7 +146,7 @@ CREATE TABLE IF NOT EXISTS `leyin-sandpit.config.predefined_tests` (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
 );
 
-INSERT INTO `leyin-sandpit.config.predefined_tests` 
+INSERT INTO `{{PROJECT_ID}}.config.predefined_tests` 
 (test_id, test_name, test_category, severity, description, is_global, is_system)
 SELECT * FROM (
   SELECT 'row_count_match' as test_id, 'Row Count Match' as test_name, 'completeness' as test_category, 'HIGH' as severity, 'Verify source and target row counts match' as description, true as is_global, true as is_system
@@ -157,11 +157,11 @@ SELECT * FROM (
   UNION ALL
   SELECT 'referential_integrity', 'Referential Integrity', 'integrity', 'HIGH', 'Validate foreign key relationships', false, true
 ) AS t
-WHERE NOT EXISTS (SELECT 1 FROM `leyin-sandpit.config.predefined_tests` WHERE test_id = t.test_id);
+WHERE NOT EXISTS (SELECT 1 FROM `{{PROJECT_ID}}.config.predefined_tests` WHERE test_id = t.test_id);
 
 -- 7. Setup Test Results History Table
 
-CREATE TABLE IF NOT EXISTS `leyin-sandpit.qa_results.scd_test_history` (
+CREATE TABLE IF NOT EXISTS `{{PROJECT_ID}}.qa_results.scd_test_history` (
   execution_id STRING NOT NULL,
   execution_timestamp TIMESTAMP NOT NULL,
   project_id STRING NOT NULL,
@@ -183,17 +183,17 @@ CLUSTER BY project_id, target_table, status;
 
 -- 8. Setup Latest Results View
 
-CREATE OR REPLACE VIEW `leyin-sandpit.qa_results.latest_scd_results_by_table` AS
+CREATE OR REPLACE VIEW `{{PROJECT_ID}}.qa_results.latest_scd_results_by_table` AS
 SELECT 
   t.*
-FROM `leyin-sandpit.qa_results.scd_test_history` t
+FROM `{{PROJECT_ID}}.qa_results.scd_test_history` t
 INNER JOIN (
   SELECT 
     project_id,
     target_dataset,
     target_table,
     MAX(execution_timestamp) as latest_execution
-  FROM `leyin-sandpit.qa_results.scd_test_history`
+  FROM `{{PROJECT_ID}}.qa_results.scd_test_history`
   WHERE target_table IS NOT NULL
   GROUP BY project_id, target_dataset, target_table
 ) latest
@@ -204,7 +204,7 @@ ON t.project_id = latest.project_id
 
 -- 9. Setup Detailed Reporting View
 
-CREATE OR REPLACE VIEW `leyin-sandpit.qa_results.v_scd_validation_report` AS
+CREATE OR REPLACE VIEW `{{PROJECT_ID}}.qa_results.v_scd_validation_report` AS
 SELECT 
     FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', execution_timestamp) as execution_time,
     target_table,
@@ -218,5 +218,5 @@ SELECT
             THEN 'Check passed - no issues found'
         ELSE TO_JSON_STRING(test.sample_data)
     END as validation_findings
-FROM `leyin-sandpit.qa_results.scd_test_history`,
+FROM `{{PROJECT_ID}}.qa_results.scd_test_history`,
 UNNEST(JSON_QUERY_ARRAY(test_results)) AS test;

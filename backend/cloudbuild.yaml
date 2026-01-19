@@ -29,9 +29,9 @@ steps:
 substitutions:
     # These values are read from deploy.config or can be overridden in Cloud Build Trigger
     # To update: Edit deploy.config file
-    _SERVICE_NAME: data-qa-agent-backend2
-    _REGION: us-central1
-    _PROJECT_ID: leyin-sandpit
+    _SERVICE_NAME: data-qa-agent-backend
+    _REGION: your-region
+    _PROJECT_ID: your-project-id
 
 images:
   - 'gcr.io/$PROJECT_ID/$_SERVICE_NAME:latest'

@@ -2,7 +2,9 @@ import os
 from google.cloud import bigquery
 
 # Initialize BigQuery client
-client = bigquery.Client(project='leyin-sandpit')
+client = bigquery.Client()
+project_id = client.project
+print(f"Using project: {project_id}")
 
 # 1. Create Mock Dataset
 dataset_id = "crown_scd_mock"
@@ -169,7 +171,7 @@ player_data = [
 ]
 
 def create_table_with_data(table_id, schema, data):
-    table = bigquery.Table(f"leyin-sandpit.{table_id}", schema=schema)
+    table = bigquery.Table(f"{project_id}.{table_id}", schema=schema)
     client.delete_table(table, not_found_ok=True)
     table = client.create_table(table)
     errors = client.insert_rows_json(table, data)

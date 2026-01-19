@@ -128,6 +128,6 @@ Deploy to Cloud Run:
 gcloud run deploy data-qa-agent-backend \
   --source . \
   --platform managed \
-  --region us-central1 \
+  --region your-region \
   --allow-unauthenticated
 ```

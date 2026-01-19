@@ -3,7 +3,7 @@
 -- ============================================
 
 -- Create config dataset if it doesn't exist
-CREATE SCHEMA IF NOT EXISTS `miruna-sandpit.config`
+CREATE SCHEMA IF NOT EXISTS `{{PROJECT_ID}}.config`
 OPTIONS(
   description="Configuration tables for Data QA Agent"
 );
@@ -11,7 +11,7 @@ OPTIONS(
 -- ============================================
 -- 1. Data Load Mappings Configuration
 -- ============================================
-CREATE TABLE IF NOT EXISTS `miruna-sandpit.config.data_load_config` (
+CREATE TABLE IF NOT EXISTS `{{PROJECT_ID}}.config.data_load_config` (
   -- Mapping identification
   mapping_id STRING NOT NULL,
   mapping_name STRING,
@@ -54,7 +54,7 @@ CREATE TABLE IF NOT EXISTS `miruna-sandpit.config.data_load_config` (
 -- ============================================
 -- 2. Predefined Tests (System-wide)
 -- ============================================
-CREATE TABLE IF NOT EXISTS `miruna-sandpit.config.predefined_tests` (
+CREATE TABLE IF NOT EXISTS `{{PROJECT_ID}}.config.predefined_tests` (
   test_id STRING NOT NULL,
   test_name STRING NOT NULL,
   test_category STRING NOT NULL,      -- 'completeness', 'integrity', 'quality', 'statistical', 'business'
@@ -73,7 +73,7 @@ CREATE TABLE IF NOT EXISTS `miruna-sandpit.config.predefined_tests` (
 -- ============================================
 -- 3. AI Suggested Tests (Pending Approval)
 -- ============================================
-CREATE TABLE IF NOT EXISTS `miruna-sandpit.config.suggested_tests` (
+CREATE TABLE IF NOT EXISTS `{{PROJECT_ID}}.config.suggested_tests` (
   suggestion_id STRING NOT NULL,
   mapping_id STRING NOT NULL,
   
@@ -99,7 +99,7 @@ CREATE TABLE IF NOT EXISTS `miruna-sandpit.config.suggested_tests` (
 -- ============================================
 -- 4. Test Execution History
 -- ============================================
-CREATE TABLE IF NOT EXISTS `miruna-sandpit.config.test_execution_history` (
+CREATE TABLE IF NOT EXISTS `{{PROJECT_ID}}.config.test_execution_history` (
   execution_id STRING NOT NULL,
   mapping_id STRING NOT NULL,
   test_id STRING,
@@ -123,7 +123,7 @@ CREATE TABLE IF NOT EXISTS `miruna-sandpit.config.test_execution_history` (
 -- ============================================
 -- Insert System Predefined Tests
 -- ============================================
-INSERT INTO `miruna-sandpit.config.predefined_tests` 
+INSERT INTO `{{PROJECT_ID}}.config.predefined_tests` 
 (test_id, test_name, test_category, severity, description, is_global, is_system)
 VALUES
 ('row_count_match', 'Row Count Match', 'completeness', 'HIGH', 
@@ -153,7 +153,7 @@ VALUES
 -- ============================================
 -- Sample Data Load Configuration
 -- ============================================
-INSERT INTO `miruna-sandpit.config.data_load_config`
+INSERT INTO `{{PROJECT_ID}}.config.data_load_config`
 (mapping_id, mapping_name, description, 
  source_bucket, source_file_path, source_file_format,
  target_dataset, target_table,
@@ -192,15 +192,15 @@ VALUES
 -- ============================================
 
 -- View all active mappings
--- SELECT * FROM `miruna-sandpit.config.data_load_config` WHERE is_active = true;
+-- SELECT * FROM `{{PROJECT_ID}}.config.data_load_config` WHERE is_active = true;
 
 -- View all predefined tests
--- SELECT * FROM `miruna-sandpit.config.predefined_tests` ORDER BY test_category, severity;
+-- SELECT * FROM `{{PROJECT_ID}}.config.predefined_tests` ORDER BY test_category, severity;
 
 -- View pending AI suggestions
--- SELECT * FROM `miruna-sandpit.config.suggested_tests` WHERE status = 'pending';
+-- SELECT * FROM `{{PROJECT_ID}}.config.suggested_tests` WHERE status = 'pending';
 
 -- View test execution history for a mapping
--- SELECT * FROM `miruna-sandpit.config.test_execution_history` 
+-- SELECT * FROM `{{PROJECT_ID}}.config.test_execution_history` 
 -- WHERE mapping_id = 'customers_daily_load' 
 -- ORDER BY executed_at DESC LIMIT 100;

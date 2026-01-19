@@ -49,7 +49,7 @@ export async function POST(req: Request) {
         const mimeType = imageFile.type;
 
         // Initialize Vertex AI
-        const vertex_ai = new VertexAI({ project: projectId, location: "us-central1" });
+        const vertex_ai = new VertexAI({ project: projectId, location: process.env.GOOGLE_CLOUD_REGION || "your-region" });
         const model = vertex_ai.preview.getGenerativeModel({
             model: "gemini-2.0-flash-exp",
         });

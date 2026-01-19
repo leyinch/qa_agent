@@ -10,30 +10,30 @@ For more detailed server-side logs, you can view the Cloud Run logs:
 
 ### Option 1: Google Cloud Console (Web UI)
 
-1. Go to [Cloud Run Services](https://console.cloud.google.com/run?project=leyin-sandpit)
-2. Click on **data-qa-agent-backend2**
+1. Go to [Cloud Run Services](https://console.cloud.google.com/run?project=your-project-id)
+2. Click on **data-qa-agent-backend**
 3. Click the **LOGS** tab
 4. You'll see all requests and errors
 
 ### Option 2: Command Line
 
 ```bash
-gcloud run services logs read data-qa-agent-backend2 --region us-central1 --project leyin-sandpit --limit 50
+gcloud run services logs read data-qa-agent-backend --region your-region --project your-project-id --limit 50
 ```
 
 To follow logs in real-time:
 ```bash
-gcloud run services logs tail data-qa-agent-backend2 --region us-central1 --project leyin-sandpit
+gcloud run services logs tail data-qa-agent-backend --region your-region --project your-project-id
 ```
 
 ### Option 3: Logs Explorer (Advanced)
 
 For advanced filtering:
-1. Go to [Logs Explorer](https://console.cloud.google.com/logs/query?project=leyin-sandpit)
+1. Go to [Logs Explorer](https://console.cloud.google.com/logs/query?project=your-project-id)
 2. Use this query:
 ```
 resource.type="cloud_run_revision"
-resource.labels.service_name="data-qa-agent-backend2"
+resource.labels.service_name="data-qa-agent-backend"
 severity>=ERROR
 ```
 
