@@ -209,7 +209,8 @@ if [ "$DEPLOY_BACKEND" = true ]; then
         --platform managed \
         --region $REGION \
         --allow-unauthenticated \
-        --project $PROJECT_ID
+        --project $PROJECT_ID \
+        --set-env-vars "GOOGLE_CLOUD_PROJECT=$PROJECT_ID,GOOGLE_CLOUD_REGION=$REGION"
     
     BACKEND_URL=$(gcloud run services describe $BACKEND_SERVICE \
         --platform managed \
