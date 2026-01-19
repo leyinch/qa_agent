@@ -231,6 +231,21 @@ if [ "$DEPLOY_FRONTEND" = true ]; then
     echo -e "${YELLOW}Deploying Frontend Service${NC}"
     echo -e "${YELLOW}========================================${NC}"
     
+    # Ensure BACKEND_URL is set even if backend deployment was skipped
+    if [ -z "$BACKEND_URL" ]; then
+        echo "Looking up Backend URL..."
+        BACKEND_URL=$(gcloud run services describe $BACKEND_SERVICE \
+            --platform managed \
+            --region $REGION \
+            --project $PROJECT_ID \
+            --format 'value(status.url)' 2>/dev/null || echo "")
+        
+        if [ -z "$BACKEND_URL" ]; then
+            echo -e "${RED}Warning: Could not find Backend URL for service: $BACKEND_SERVICE${NC}"
+            echo "Frontend will default to localhost:8000"
+        fi
+    fi
+
     echo "Building and deploying frontend..."
     gcloud run deploy $FRONTEND_SERVICE \
         --source . \
