@@ -118,13 +118,14 @@ class TestHistoryService:
         """
         Save test execution results to BigQuery history table (one row per table).
         """
+        logger.info(f"💾 Saving test results history for {target_dataset}.{target_table} (mode: {comparison_mode})")
+        
         # Ensure table exists before writing
         self._ensure_table_exists()
 
         execution_id = str(uuid.uuid4())
         
         # Get execution timestamp in Melbourne time (wall-clock time)
-        # We store as DATETIME (local time) so it appears correct in BigQuery
         tz = pytz.timezone('Australia/Melbourne')
         execution_timestamp = datetime.now(tz).replace(tzinfo=None)
         
@@ -144,14 +145,15 @@ class TestHistoryService:
         else:
             # Handle non-list results (e.g. schema validation dict)
             total_tests = 1
-            status = metadata.get("status") if metadata else "PASS" # Default or from metadata
+            status = metadata.get("status") if metadata else "PASS" 
             passed_tests = 1 if status == "PASS" else 0
             failed_tests = 1 if status == "FAIL" else 0
             error_message = None
 
+        # Prepare pure JSON-compatible dict
         row = {
             "execution_id": execution_id,
-            "execution_timestamp": execution_timestamp,
+            "execution_timestamp": execution_timestamp.isoformat(), # Use string to ensure serialization success
             "project_id": project_id,
             "comparison_mode": comparison_mode,
             "target_dataset": target_dataset,
@@ -167,14 +169,22 @@ class TestHistoryService:
             "metadata": self._prepare_json_for_bq(metadata) if metadata else None
         }
         
-        # Insert into BigQuery
-        errors = self.client.insert_rows_json(get_history_table_fqn(), [row])
-        
-        if errors:
-            logger.error(f"BigQuery insertion errors: {errors}")
-            raise Exception(f"Failed to insert row into BigQuery: {errors}")
-        
-        return execution_id
+        try:
+            table_id = get_history_table_fqn()
+            logger.info(f"🚀 Inserting row into {table_id}...")
+            
+            errors = self.client.insert_rows_json(table_id, [row])
+            
+            if errors:
+                logger.error(f"❌ BigQuery insertion errors: {errors}")
+                raise Exception(f"Failed to insert row into BigQuery: {errors}")
+            
+            logger.info(f"✅ Successfully saved history record: {execution_id}")
+            return execution_id
+            
+        except Exception as e:
+            logger.error(f"💥 Critical error in save_test_results: {e}")
+            raise
     
     def get_test_history(
         self,
