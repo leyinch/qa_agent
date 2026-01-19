@@ -8,7 +8,7 @@ CREATE SCHEMA IF NOT EXISTS `{{PROJECT_ID}}.config` OPTIONS(location="US");     
 CREATE SCHEMA IF NOT EXISTS `{{PROJECT_ID}}.qa_results` OPTIONS(location="US");     -- History and reporting views for test execution results
 
 -- ============================================
--- CLEANUP: Drop existing tables/views for clean re-deployment
+-- CLEANUP: Drop existing tables/views for SCD clean re-deployment
 -- ============================================
 DROP TABLE IF EXISTS `{{PROJECT_ID}}.config.scd_validation_config`;
 DROP TABLE IF EXISTS `{{PROJECT_ID}}.qa_results.scd_test_history`;

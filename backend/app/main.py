@@ -66,8 +66,7 @@ async def health_check():
 async def sync_scheduler():
     """Trigger a full synchronization of Cloud Scheduler jobs with BigQuery config."""
     try:
-        # scheduler_service removed in previous cleanup
-        # from app.services.scheduler_service import scheduler_service
+        from app.services.scheduler_service import scheduler_service
         if not settings.cloud_run_url:
             raise HTTPException(status_code=400, detail="CLOUD_RUN_URL environment variable is not set")
             

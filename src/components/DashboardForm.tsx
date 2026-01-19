@@ -74,8 +74,7 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
             }
 
             try {
-                const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://data-qa-agent-backend-your-hash.your-region.run.app';
-                const endpoint = `${backendUrl}/api/table-metadata?project_id=${projectId}&dataset_id=${scdTargetDataset}&table_id=${scdTargetTable}`;
+                const endpoint = `/api/python/table-metadata?project_id=${projectId}&dataset_id=${scdTargetDataset}&table_id=${scdTargetTable}`;
 
                 const response = await fetch(endpoint);
                 if (response.ok) {
@@ -201,8 +200,7 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
         setLoading(true);
 
         try {
-            const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://data-qa-agent-backend-your-hash.your-region.run.app';
-            const endpoint = `${backendUrl}/api/generate-tests`;
+            const endpoint = `/api/python/generate-tests`;
 
             let payload: any = {
                 project_id: projectId,
@@ -298,8 +296,7 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
                 return;
             }
 
-            const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://data-qa-agent-backend-your-hash.your-region.run.app';
-            const endpoint = `${backendUrl}/api/scd-config`;
+            const endpoint = `/api/python/scd-config`;
 
             const payload = {
                 project_id: projectId,

@@ -34,7 +34,7 @@ steps:
           --region $$REGION \
           --platform managed \
           --allow-unauthenticated \
-          --set-env-vars "NEXT_PUBLIC_BACKEND_URL=$$BACKEND_URL,NEXTAUTH_URL=$$FRONTEND_URL,GOOGLE_CLOUD_PROJECT=$$PROJECT_ID,GOOGLE_CLOUD_REGION=$$REGION"
+          --set-env-vars "NEXT_PUBLIC_BACKEND_URL=$$BACKEND_URL,BACKEND_URL=$$BACKEND_URL,NEXTAUTH_URL=$$FRONTEND_URL,GOOGLE_CLOUD_PROJECT=$$PROJECT_ID,GOOGLE_CLOUD_REGION=$$REGION"
 
 options:
   logging: CLOUD_LOGGING_ONLY

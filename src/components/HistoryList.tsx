@@ -36,7 +36,7 @@ export default function HistoryList({ projectId, onViewResult }: HistoryListProp
         setLoading(true);
         setError("");
         try {
-            const res = await fetch(`/api/history?project_id=${projectId}&limit=50`);
+            const res = await fetch(`/api/python/history?project_id=${projectId}&limit=50`);
             if (!res.ok) {
                 throw new Error("Failed to fetch history");
             }
@@ -62,7 +62,7 @@ export default function HistoryList({ projectId, onViewResult }: HistoryListProp
 
         setLoading(true);
         try {
-            const res = await fetch(`/api/history?project_id=${projectId}`, {
+            const res = await fetch(`/api/python/history?project_id=${projectId}`, {
                 method: 'DELETE'
             });
             if (!res.ok) {
