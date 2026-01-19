@@ -273,8 +273,9 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
 
             if (!response.ok) {
                 let errorMessage;
+                const responseText = await response.text();
                 try {
-                    const errorData = await response.json();
+                    const errorData = JSON.parse(responseText);
                     if (typeof errorData.detail === 'string') {
                         errorMessage = errorData.detail;
                     } else if (Array.isArray(errorData.detail)) {
@@ -287,8 +288,7 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
                     }
                 } catch (e) {
                     // Fallback if response is not JSON (e.g. 500 HTML or 504 Gateway Timeout)
-                    const text = await response.text();
-                    errorMessage = text.substring(0, 200) || `Request failed with status ${response.status}`;
+                    errorMessage = responseText.substring(0, 200) || `Request failed with status ${response.status}`;
                 }
                 throw new Error(errorMessage || 'Failed to generate tests');
             }
