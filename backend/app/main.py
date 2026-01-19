@@ -232,7 +232,6 @@ async def generate_tests(request: GenerateTestsRequest):
                             target_dataset=target_ds,
                             target_table=target_tbl,
                             mapping_id=mapping_result.mapping_id,
-                            cron_schedule=mapping_result.cron_schedule,
                             executed_by="Batch Run",
                             metadata={
                                 "summary": table_summary,
