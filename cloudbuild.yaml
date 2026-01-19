@@ -1,44 +1,40 @@
 steps:
-  # 1. Build the container image
+  # 1. Build and Push the container image using a shell step to read deploy.config
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', 'gcr.io/$PROJECT_ID/$_SERVICE_NAME:latest', '.']
-  
-  # 2. Push the container image to Container Registry
-  - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'gcr.io/$PROJECT_ID/$_SERVICE_NAME:latest']
-  
-  # 3. Deploy container image to Cloud Run with dynamic URL lookup
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        if [ ! -f "deploy.config" ]; then echo "Error: deploy.config not found"; exit 1; fi
+        source deploy.config
+        echo "Building image for project: $$PROJECT_ID, service: $$FRONTEND_SERVICE"
+        docker build -t "$$REGISTRY/$$PROJECT_ID/$$FRONTEND_SERVICE:latest" .
+        docker push "$$REGISTRY/$$PROJECT_ID/$$FRONTEND_SERVICE:latest"
+
+  # 2. Deploy to Cloud Run using dynamic URL lookup
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'bash'
     args:
       - '-c'
       - |
-        # Lookup Backend and Frontend URLs dynamically using service names
-        # This avoids hardcoding the unique hashes in the YAML
-        BACKEND_URL=$(gcloud run services describe $_BACKEND_SERVICE_NAME --region=$_REGION --format='value(status.url)')
-        FRONTEND_URL=$(gcloud run services describe $_SERVICE_NAME --region=$_REGION --format='value(status.url)')
+        source deploy.config
+        
+        # Lookup Backend and Frontend URLs dynamically
+        echo "Looking up URLs for $$BACKEND_SERVICE and $$FRONTEND_SERVICE in $$REGION..."
+        BACKEND_URL=$(gcloud run services describe $$BACKEND_SERVICE --region=$$REGION --format='value(status.url)' 2>/dev/null || echo "")
+        FRONTEND_URL=$(gcloud run services describe $$FRONTEND_SERVICE --region=$$REGION --format='value(status.url)' 2>/dev/null || echo "")
         
         echo "Found Backend URL: $$BACKEND_URL"
         echo "Found Frontend URL: $$FRONTEND_URL"
         
-        # Deploy with dynamically fetched URLs
-        gcloud run deploy $_SERVICE_NAME \
-          --image gcr.io/$PROJECT_ID/$_SERVICE_NAME:latest \
-          --region $_REGION \
+        # Deploy Frontend
+        echo "Deploying $$FRONTEND_SERVICE to $$REGION..."
+        gcloud run deploy $$FRONTEND_SERVICE \
+          --image "$$REGISTRY/$$PROJECT_ID/$$FRONTEND_SERVICE:latest" \
+          --region $$REGION \
           --platform managed \
           --allow-unauthenticated \
           --set-env-vars "NEXT_PUBLIC_BACKEND_URL=$$BACKEND_URL,NEXTAUTH_URL=$$FRONTEND_URL"
-
-substitutions:
-    # These values are read from deploy.config or can be overridden in Cloud Build Trigger
-    # To update: Edit deploy.config file
-    _SERVICE_NAME: data-qa-agent-frontend
-    _BACKEND_SERVICE_NAME: data-qa-agent-backend
-    _REGION: your-region
-    _PROJECT_ID: your-project-id
-
-images:
-  - 'gcr.io/$PROJECT_ID/$_SERVICE_NAME:latest'
 
 options:
   logging: CLOUD_LOGGING_ONLY
