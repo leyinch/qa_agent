@@ -51,16 +51,16 @@ class TestHistoryService:
             # Check dataset
             dataset_ref = f"{get_history_project_id()}.qa_results"
             try:
-                self._client.get_dataset(dataset_ref)
+                self.client.get_dataset(dataset_ref)
             except Exception:
                 logger.info(f"Creating dataset {dataset_ref}")
                 dataset = bigquery.Dataset(dataset_ref)
                 dataset.location = "US"
-                self._client.create_dataset(dataset)
+                self.client.create_dataset(dataset)
             
             # Check table
             try:
-                self._client.get_table(get_history_table_fqn())
+                self.client.get_table(get_history_table_fqn())
             except Exception:
                 logger.info(f"Creating table {get_history_table_fqn()}")
                 # Schema definition matching backend/create_history_table.sql
@@ -81,12 +81,12 @@ class TestHistoryService:
                     bigquery.SchemaField("executed_by", "STRING", mode="NULLABLE"),
                     bigquery.SchemaField("metadata", "JSON", mode="NULLABLE")
                 ]
-                table = bigquery.Table(HISTORY_TABLE_FQN, schema=schema)
+                table = bigquery.Table(get_history_table_fqn(), schema=schema)
                 table.partitioning_type = "DAY"
                 table.time_partitioning = bigquery.TimePartitioning(field="execution_timestamp")
                 table.clustering_fields = ["project_id", "target_table", "status"]
                 
-                self._client.create_table(table)
+                self.client.create_table(table)
         except Exception as e:
             logger.warning(f"Failed to ensure history table exists: {e}")
     
