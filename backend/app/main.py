@@ -3,6 +3,7 @@ import logging
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+import traceback
 
 from app.config import settings
 from app.models import (
@@ -313,8 +314,9 @@ async def generate_tests(request: GenerateTestsRequest):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error generating tests: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        error_details = traceback.format_exc()
+        logger.error(f"Error generating tests: {str(e)}\n{error_details}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"{str(e)}\n\nTraceback:\n{error_details}")
 
 
 
