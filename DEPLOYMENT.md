@@ -162,16 +162,19 @@ gcloud run services update data-qa-agent-frontend \
 
 ```bash
 # 1. Clone repository
-git clone https://github.com/mirunasuresh23/qa_agent.git
+git clone https://github.com/your-username/qa_agent.git
 cd qa_agent
 
 # 2. Set gcloud project (IMPORTANT!)
 gcloud config set project [YOUR_PROJECT_ID]
 
 # 3. Make scripts executable
-chmod +x deploy-all.sh sync-config.sh
+chmod +x deploy-all.sh sync-config.sh parameterize-sql.sh
 
-# 4. Run deployment (auto-detects first-time)
+# 4. Parameterize SQL (Required before BigQuery setup)
+./parameterize-sql.sh
+
+# 5. Run deployment (auto-detects first-time)
 ./deploy-all.sh
 
 # 5. Follow OAuth prompts for frontend
@@ -260,7 +263,7 @@ The system is designed to keep Google Cloud Scheduler in sync with your BigQuery
 ```bash
 gcloud builds triggers create github \
   --repo-name=qa_agent \
-  --repo-owner=mirunasuresh23 \
+  --repo-owner=your-username \
   --branch-pattern="^feature_leyin2$" \
   --build-config=backend/cloudbuild.yaml \
   --included-files="backend/**"
@@ -270,7 +273,7 @@ gcloud builds triggers create github \
 ```bash
 gcloud builds triggers create github \
   --repo-name=qa_agent \
-  --repo-owner=mirunasuresh23 \
+  --repo-owner=your-username \
   --branch-pattern="^feature_leyin2$" \
   --build-config=cloudbuild.yaml \
   --ignored-files="backend/**"

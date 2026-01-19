@@ -11,11 +11,11 @@ This is a Next.js application for testing data quality using AI. It uses Google 
 
 ## 🚀 Quick Start (Setup)
 
-To set up all required BigQuery datasets and tables in a single step:
+To set up all required BigQuery datasets and tables:
 
-1. Open [BigQuery Console](https://console.cloud.google.com/bigquery?project=your-project-id).
-2. Run the master setup script: [setup_scd_resources.sql](setup_scd_resources.sql).
-3. Follow the [SCD Validation Guide](SCD_VALIDATION_README.md) for detailed test instructions.
+1. **Parameterize SQL**: Run `./parameterize-sql.sh` to generate your project-specific scripts.
+2. **Run Scripts**: Execute `setup_scd_resources.generated.sql` and `config_tables_setup.generated.sql` in the [BigQuery Console](https://console.cloud.google.com/bigquery?project=your-project-id).
+3. **Follow the Guides**: See the [Deployment Guide](DEPLOYMENT.md) and [SCD Validation Guide](SCD_VALIDATION_README.md) for more details.
 
 
 ## Local Development

@@ -24,17 +24,28 @@ All test results triggered manually via the frontend are logged to a **single so
 ✅ Backend deployed to Cloud Run: `data-qa-agent-backend`  
 ✅ Frontend deployed to Cloud Run: `data-qa-agent-frontend`
 
-### Step 1: Create Mock Data in BigQuery
+### Step 1: Initialize BigQuery Environment
 
-If you haven't already, run the master setup script to populate your environment with test data and tables.
+1. **Parameterize SQL Files**: Run this in Cloud Shell to set your project ID in the scripts:
+   ```bash
+   chmod +x parameterize-sql.sh
+   ./parameterize-sql.sh
+   ```
 
-1. **Open BigQuery Console**: [Link](https://console.cloud.google.com/bigquery?project=your-project-id)
-2. **Run Script**: Use `parameterize-sql.sh` to create `setup_scd_resources.generated.sql`, then copy and run its contents.
+2. **Execute Setup Scripts**: Run these in order (using `bq` CLI or BigQuery Console):
+   ```bash
+   # A. Setup SCD Mock Resources (Drops old tables and populates fresh mock data)
+   bq query --use_legacy_sql=false --project_id=your-project-id < setup_scd_resources.generated.sql
+
+   # B. Setup System Configuration (Initial project setup only)
+   bq query --use_legacy_sql=false --project_id=your-project-id < config_tables_setup.generated.sql
+   ```
+
 3. **Verify Resources**:
    - `crown_scd_mock.D_Seat_WD` (SCD1 Mock)
    - `crown_scd_mock.D_Employee_WD` (SCD2 Mock)
    - `crown_scd_mock.D_Player_WD` (SCD2 Mock)
-   - `config.scd_validation_config` (Config Table)
+   - `config.scd_validation_config` (Core SCD Config Table)
    - `qa_results.scd_test_history` (History Table)
 
 ### Step 2: Test SCD Type 1 Validation (Manual)
