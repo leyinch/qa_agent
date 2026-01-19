@@ -19,10 +19,11 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 # Configuration
-HISTORY_PROJECT_ID = settings.google_cloud_project
-HISTORY_DATASET = "qa_results"
-HISTORY_TABLE = "scd_test_history"
-HISTORY_TABLE_FQN = f"{HISTORY_PROJECT_ID}.{HISTORY_DATASET}.{HISTORY_TABLE}"
+def get_history_project_id():
+    return settings.google_cloud_project
+
+def get_history_table_fqn():
+    return f"{get_history_project_id()}.qa_results.scd_test_history"
 
 
 class TestHistoryService:
@@ -59,9 +60,9 @@ class TestHistoryService:
             
             # Check table
             try:
-                self._client.get_table(HISTORY_TABLE_FQN)
+                self._client.get_table(get_history_table_fqn())
             except Exception:
-                logger.info(f"Creating table {HISTORY_TABLE_FQN}")
+                logger.info(f"Creating table {get_history_table_fqn()}")
                 # Schema definition matching backend/create_history_table.sql
                 schema = [
                     bigquery.SchemaField("execution_id", "STRING", mode="REQUIRED"),
@@ -159,7 +160,7 @@ class TestHistoryService:
         }
         
         # Insert into BigQuery
-        errors = self.client.insert_rows_json(HISTORY_TABLE_FQN, [row])
+        errors = self.client.insert_rows_json(get_history_table_fqn(), [row])
         
         if errors:
             raise Exception(f"Failed to insert row into BigQuery: {errors}")
@@ -201,7 +202,7 @@ class TestHistoryService:
             
         columns_str = ", ".join(select_columns)
         
-        query_parts = [f"SELECT {columns_str} FROM `{HISTORY_TABLE_FQN}` WHERE 1=1"]
+        query_parts = [f"SELECT {columns_str} FROM `{get_history_table_fqn()}` WHERE 1=1"]
         params = []
         
         if project_id:
@@ -276,7 +277,7 @@ class TestHistoryService:
             passed_tests,
             failed_tests,
             error_message
-        FROM `{HISTORY_TABLE_FQN}`
+        FROM `{get_history_table_fqn()}`
         WHERE project_id = @project_id
           AND target_dataset = @target_dataset
           AND target_table = @target_table
@@ -307,7 +308,7 @@ class TestHistoryService:
         """
         try:
             # Use TRUNCATE TABLE as requested
-            query = f"TRUNCATE TABLE `{HISTORY_TABLE_FQN}`"
+            query = f"TRUNCATE TABLE `{get_history_table_fqn()}`"
             job_config = bigquery.QueryJobConfig() # No params needed
             query_job = self.client.query(query, job_config=job_config)
             query_job.result()  # Wait for completion
