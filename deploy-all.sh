@@ -244,6 +244,8 @@ if [ "$DEPLOY_FRONTEND" = true ]; then
         if [ -z "$BACKEND_URL" ]; then
             echo -e "${RED}Warning: Could not find Backend URL for service: $BACKEND_SERVICE${NC}"
             echo "Frontend will default to localhost:8000"
+        else
+            echo "Found Backend URL: $BACKEND_URL"
         fi
     fi
 
