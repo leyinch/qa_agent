@@ -237,7 +237,8 @@ if [ "$DEPLOY_FRONTEND" = true ]; then
         --platform managed \
         --region $REGION \
         --allow-unauthenticated \
-        --project $PROJECT_ID
+        --project $PROJECT_ID \
+        --set-env-vars "BACKEND_URL=$BACKEND_URL,NEXT_PUBLIC_GOOGLE_CLOUD_PROJECT=$PROJECT_ID,NEXT_PUBLIC_GOOGLE_CLOUD_REGION=$REGION"
     
     FRONTEND_URL=$(gcloud run services describe $FRONTEND_SERVICE \
         --platform managed \
