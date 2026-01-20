@@ -224,11 +224,8 @@ class TestHistoryService:
             "execution_id", "execution_timestamp", "project_id", "comparison_mode",
             "target_dataset", "target_table", "mapping_id", "status",
             "total_tests", "passed_tests", "failed_tests", "error_message",
-            "executed_by", "metadata"
+            "executed_by", "metadata", "test_results"
         ]
-        
-        if execution_id:
-            select_columns.append("test_results")
             
         columns_str = ", ".join(select_columns)
         
