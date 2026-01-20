@@ -199,11 +199,13 @@ async def generate_tests(request: GenerateTestsRequest):
                     detail="Missing required fields: config_dataset, config_table for scd-config mode"
                 )
             
+            logger.info(f"🔍 Starting Batch SCD validation from config: {request.config_dataset}.{request.config_table}")
             result = await test_executor.process_scd_config_table(
                 project_id=request.project_id,
                 config_dataset=request.config_dataset,
                 config_table=request.config_table
             )
+            logger.info(f"📋 Batch SCD validation completed. Found {len(result['results_by_mapping'])} table mappings.")
             
             try:
                 summary_data = result['summary']
@@ -211,6 +213,7 @@ async def generate_tests(request: GenerateTestsRequest):
                 results_by_mapping_dicts = [r.dict() for r in result['results_by_mapping']]
 
                 # Log each individual table result instead of the config table itself
+                logger.info(f"💾 Attempting to save {len(result['results_by_mapping'])} table results to history...")
                 for mapping_result in result['results_by_mapping']:
                     try:
                         # Calculate summary for this specific table
@@ -241,10 +244,12 @@ async def generate_tests(request: GenerateTestsRequest):
                             }
                         )
                     except Exception as inner_e:
-                        logger.error(f"Failed to log individual result for {mapping_result.mapping_id}: {inner_e}")
+                        logger.error(f"❌ Failed to log individual result for {mapping_result.mapping_id}: {inner_e}")
+                logger.info(f"✅ Batch SCD history saved successfully.")
             except Exception as e:
-                logger.error(f"Failed to log scd config execution: {e}")
+                logger.error(f"💥 Failed to log scd config execution: {e}", exc_info=True)
 
+            logger.info(f"🚀 Returning Batch SCD results to frontend.")
             return ConfigTableResponse(
                 summary=ConfigTableSummary(**result['summary']),
                 results_by_mapping=result['results_by_mapping']
@@ -359,8 +364,9 @@ async def get_test_history(project_id: str = settings.google_cloud_project, limi
         return history_service.get_test_history(project_id=project_id, limit=limit)
 
     except Exception as e:
-        logger.error(f"Error fetching execution history: {e}")
-        return []
+        logger.error(f"Error fetching execution history: {e}", exc_info=True)
+        # Don't return empty list on real error, let frontend show error
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.delete("/api/history")

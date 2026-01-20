@@ -237,7 +237,7 @@ class TestHistoryService:
             params.append(bigquery.ScalarQueryParameter("execution_id", "STRING", execution_id))
         
         if test_status:
-            query_parts.append("AND test_status = @test_status")
+            query_parts.append("AND status = @test_status")
             params.append(bigquery.ScalarQueryParameter("test_status", "STRING", test_status))
         
         if start_date:
