@@ -15,6 +15,16 @@ All test results triggered manually via the frontend are logged to a **single so
 - **Table**: `your-project-id.qa_results.scd_test_history`
 - **Timestamps**: Stored in **Melbourne Local Time** for easy readability (DATETIME).
 - **Partitioning**: The table is partitioned by day for performance.
+- **Reporting**: Use the **History (📜)** tab to view previous runs. Click **"View Result"** to load detailed JSON results for any specific execution.
+
+---
+
+## ✨ Premium Experience
+
+The QA Agent now uses a **Premium Notification System**:
+- **Toast Notifications**: Replaced "ugly" browser alerts with sleek, glassmorphism-styled toasts.
+- **Visual Feedback**: Real-time status updates (✅ Success, ❌ Error, ℹ️ Info) slide in from the bottom-right.
+- **Auto-Fill UX**: Configuration fields auto-fill with a 1-second debounce, making the setup process seamless and responsive.
 
 ---
 
