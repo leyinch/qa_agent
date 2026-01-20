@@ -43,7 +43,7 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
     // GCS mode state
     const [gcsMode, setGcsMode] = useState<GCSMode>('single');
     const [configDataset, setConfigDataset] = useState("config");
-    const [configTable, setConfigTable] = useState("");
+    const [configTable, setConfigTable] = useState("scd_validation_config");
     const [gcsBucket, setGcsBucket] = useState("");
     const [gcsFilePath, setGcsFilePath] = useState("");
     const [fileFormat, setFileFormat] = useState<FileFormat>('csv');
@@ -51,7 +51,7 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
     const [targetTable, setTargetTable] = useState("");
 
     // SCD mode state
-    const [scdMode, setScdMode] = useState<SCDMode>('direct');
+    const [scdMode, setScdMode] = useState<SCDMode>('config');
     const [scdType, setScdType] = useState<'scd1' | 'scd2'>('scd2');
     const [primaryKeys, setPrimaryKeys] = useState("");
     const [surrogateKey, setSurrogateKey] = useState("");
@@ -813,7 +813,7 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
                                             transition: 'all 0.2s ease'
                                         }}
                                     >
-                                        ✏️ Direct Input
+                                        ✏️ Direct Input (One-Time Test)
                                     </button>
                                     <button
                                         type="button"
@@ -830,7 +830,7 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
                                             transition: 'all 0.2s ease'
                                         }}
                                     >
-                                        📋 Config Table
+                                        📋 Config Table (Saved Configurations)
                                     </button>
                                 </div>
                             </div>
