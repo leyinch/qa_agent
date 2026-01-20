@@ -163,10 +163,10 @@ class TestHistoryService:
             "total_tests": total_tests,
             "passed_tests": passed_tests,
             "failed_tests": failed_tests,
-            "error_message": metadata.get("error_message"),
+            "error_message": (metadata or {}).get("error_message") or error_message,
             "test_results": json.dumps(self._prepare_json_for_bq(test_results)),
             "executed_by": executed_by or "System",
-            "metadata": json.dumps(self._prepare_json_for_bq(metadata))
+            "metadata": json.dumps(self._prepare_json_for_bq(metadata or {}))
         }
         
         try:
@@ -255,14 +255,17 @@ class TestHistoryService:
         job_config = bigquery.QueryJobConfig(query_parameters=params)
         
         try:
+            logger.info(f"🔍 Querying history from {get_history_table_fqn()}...")
             query_job = self.client.query(query, job_config=job_config)
             results = query_job.result()
-            return [dict(row) for row in results]
+            records = [dict(row) for row in results]
+            logger.info(f"📋 Found {len(records)} history records.")
+            return records
         except Exception as e:
             if "Not found" in str(e):
                 logger.info("History table not found, returning empty list")
                 return []
-            logger.error(f"Error querying history: {e}")
+            logger.error(f"💥 Error querying history: {e}", exc_info=True)
             raise
     
     def get_table_timeline(
