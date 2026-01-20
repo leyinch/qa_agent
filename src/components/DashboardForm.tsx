@@ -341,10 +341,13 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
 
     const handleAddConfig = async () => {
         try {
-            if (!newConfigId || !newTargetDataset || !newTargetTable || !newPrimaryKeys) {
-                alert("Please fill in all required fields (Config ID, Dataset, Table, Primary Keys)");
+            if (!newTargetDataset || !newTargetTable || !newPrimaryKeys) {
+                alert("Please fill in all required fields (Dataset, Table, Primary Keys)");
                 return;
             }
+
+            // Auto-generate Config ID if not provided
+            const finalConfigId = newConfigId.trim() || `${newTargetTable.toLowerCase()}_${newScdType}`;
 
             const endpoint = `/api/python/scd-config`;
 
@@ -352,7 +355,7 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
                 project_id: projectId,
                 config_dataset: configDataset,
                 config_table: configTable,
-                config_id: newConfigId,
+                config_id: finalConfigId,
                 target_dataset: newTargetDataset,
                 target_table: newTargetTable,
                 scd_type: newScdType,
@@ -385,7 +388,7 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
                 throw new Error(errorMessage || 'Failed to add configuration');
             }
 
-            alert(`Configuration "${newConfigId}" added successfully!`);
+            alert(`Configuration "${finalConfigId}" added successfully!`);
 
             // Reset form
             setShowAddConfig(false);
@@ -912,15 +915,18 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
 
                                             {/* Config ID */}
                                             <div style={{ marginBottom: '1rem' }}>
-                                                <label className="label" htmlFor="newConfigId">Config ID *</label>
+                                                <label className="label" htmlFor="newConfigId">Config ID (Optional)</label>
                                                 <input
                                                     id="newConfigId"
                                                     type="text"
                                                     className="input"
                                                     value={newConfigId}
                                                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewConfigId(e.target.value)}
-                                                    placeholder="e.g., my_table_scd2"
+                                                    placeholder={`Auto-generated: ${newTargetTable ? newTargetTable.toLowerCase() + '_' + newScdType : 'tablename_scd2'}`}
                                                 />
+                                                <p style={{ fontSize: '0.75rem', color: 'var(--secondary-foreground)', marginTop: '0.5rem', fontStyle: 'italic' }}>
+                                                    💡 Leave empty to auto-generate based on table name and SCD type
+                                                </p>
                                             </div>
 
                                             {/* Target Dataset & Table */}
