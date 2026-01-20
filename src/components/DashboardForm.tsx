@@ -146,23 +146,21 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
             if (response.ok) {
                 const config = await response.json();
                 console.log('✅ Found existing config:', config);
-                // Auto-populate all fields
-                if (config.config_id) setNewConfigId(config.config_id);
-                if (config.scd_type) setNewScdType(config.scd_type);
+                // Auto-populate all fields with fallbacks
+                setNewConfigId(config.config_id || '');
+                setNewScdType(config.scd_type || 'scd2');
 
-                if (config.primary_keys) {
-                    const pkString = Array.isArray(config.primary_keys)
-                        ? config.primary_keys.join(',')
-                        : config.primary_keys;
-                    setNewPrimaryKeys(pkString);
-                }
+                const pkString = Array.isArray(config.primary_keys)
+                    ? config.primary_keys.join(',')
+                    : (config.primary_keys || '');
+                setNewPrimaryKeys(pkString);
 
-                if (config.surrogate_key) setNewSurrogateKey(config.surrogate_key);
-                if (config.begin_date_column) setNewBeginDateColumn(config.begin_date_column);
-                if (config.end_date_column) setNewEndDateColumn(config.end_date_column);
-                if (config.active_flag_column) setNewActiveFlagColumn(config.active_flag_column);
-                if (config.description) setNewDescription(config.description);
-                if (config.custom_tests) setNewCustomTests(config.custom_tests);
+                setNewSurrogateKey(config.surrogate_key || '');
+                setNewBeginDateColumn(config.begin_date_column || 'DWBeginEffDateTime');
+                setNewEndDateColumn(config.end_date_column || 'DWEndEffDateTime');
+                setNewActiveFlagColumn(config.active_flag_column || 'DWCurrentRowFlag');
+                setNewDescription(config.description || '');
+                setNewCustomTests(config.custom_tests || []);
 
                 setIsEditingExisting(true);
             } else {
