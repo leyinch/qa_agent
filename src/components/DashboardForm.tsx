@@ -129,9 +129,11 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
     const [isEditingExisting, setIsEditingExisting] = useState(false);
 
     // Auto-fill existing config when dataset and table are entered
+    const [fetchingConfig, setFetchingConfig] = useState(false);
     const fetchExistingConfig = async (dataset: string, table: string) => {
         if (!dataset || !table || !projectId) return;
 
+        setFetchingConfig(true);
         try {
             const response = await fetch(
                 `/api/python/scd-config/${projectId}/config/scd_validation_config/${dataset}/${table}`
@@ -157,6 +159,8 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
         } catch (error) {
             console.log('No existing config found or error fetching:', error);
             setIsEditingExisting(false);
+        } finally {
+            setFetchingConfig(false);
         }
     };
 
@@ -916,57 +920,70 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
                                             {/* Config ID */}
                                             <div style={{ marginBottom: '1rem' }}>
                                                 <label className="label" htmlFor="newConfigId">Config ID (Optional)</label>
-                                                <input
-                                                    id="newConfigId"
-                                                    type="text"
-                                                    className="input"
-                                                    value={newConfigId}
-                                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewConfigId(e.target.value)}
-                                                    placeholder={`Auto-generated: ${newTargetTable ? newTargetTable.toLowerCase() + '_' + newScdType : 'tablename_scd2'}`}
-                                                />
-                                                <p style={{ fontSize: '0.75rem', color: 'var(--secondary-foreground)', marginTop: '0.5rem', fontStyle: 'italic' }}>
-                                                    💡 Leave empty to auto-generate based on table name and SCD type
-                                                </p>
+                                                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                                                    <input
+                                                        id="newConfigId"
+                                                        type="text"
+                                                        className="input"
+                                                        value={newConfigId}
+                                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewConfigId(e.target.value)}
+                                                        placeholder={`Auto-generated: ${newTargetTable ? newTargetTable.toLowerCase() + '_' + newScdType : 'tablename_scd2'}`}
+                                                        style={{ flex: 1, marginBottom: 0 }}
+                                                    />
+                                                    <p style={{ fontSize: '0.75rem', color: 'var(--secondary-foreground)', fontStyle: 'italic', margin: 0, whiteSpace: 'nowrap' }}>
+                                                        💡 Leave empty to auto-generate
+                                                    </p>
+                                                </div>
                                             </div>
 
                                             {/* Target Dataset & Table */}
-                                            <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
-                                                <div style={{ flex: 1 }}>
-                                                    <label className="label" htmlFor="newTargetDataset">Target Dataset *</label>
-                                                    <input
-                                                        id="newTargetDataset"
-                                                        type="text"
-                                                        className="input"
-                                                        value={newTargetDataset}
-                                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                                                            setNewTargetDataset(e.target.value);
-                                                        }}
-                                                        onBlur={() => {
-                                                            if (newTargetDataset && newTargetTable) {
-                                                                fetchExistingConfig(newTargetDataset, newTargetTable);
-                                                            }
-                                                        }}
-                                                        placeholder="e.g., DW_Dimensions"
-                                                    />
+                                            <div style={{ marginBottom: '1rem' }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                                                    <span style={{ fontSize: '0.875rem', fontWeight: '500' }}>Target Configuration</span>
+                                                    {fetchingConfig && (
+                                                        <span style={{ fontSize: '0.75rem', color: 'var(--primary)', fontStyle: 'italic' }}>
+                                                            ⏳ Loading existing config...
+                                                        </span>
+                                                    )}
                                                 </div>
-                                                <div style={{ flex: 1 }}>
-                                                    <label className="label" htmlFor="newTargetTable">Target Table *</label>
-                                                    <input
-                                                        id="newTargetTable"
-                                                        type="text"
-                                                        className="input"
-                                                        value={newTargetTable}
-                                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                                                            setNewTargetTable(e.target.value);
-                                                            setScdTargetTable(e.target.value);
-                                                        }}
-                                                        onBlur={() => {
-                                                            if (newTargetDataset && newTargetTable) {
-                                                                fetchExistingConfig(newTargetDataset, newTargetTable);
-                                                            }
-                                                        }}
-                                                        placeholder="e.g., D_MyTable_WD"
-                                                    />
+                                                <div style={{ display: 'flex', gap: '1rem' }}>
+                                                    <div style={{ flex: 1 }}>
+                                                        <label className="label" htmlFor="newTargetDataset">Target Dataset *</label>
+                                                        <input
+                                                            id="newTargetDataset"
+                                                            type="text"
+                                                            className="input"
+                                                            value={newTargetDataset}
+                                                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                                                                setNewTargetDataset(e.target.value);
+                                                            }}
+                                                            onBlur={() => {
+                                                                if (newTargetDataset && newTargetTable) {
+                                                                    fetchExistingConfig(newTargetDataset, newTargetTable);
+                                                                }
+                                                            }}
+                                                            placeholder="e.g., DW_Dimensions"
+                                                        />
+                                                    </div>
+                                                    <div style={{ flex: 1 }}>
+                                                        <label className="label" htmlFor="newTargetTable">Target Table *</label>
+                                                        <input
+                                                            id="newTargetTable"
+                                                            type="text"
+                                                            className="input"
+                                                            value={newTargetTable}
+                                                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                                                                setNewTargetTable(e.target.value);
+                                                                setScdTargetTable(e.target.value);
+                                                            }}
+                                                            onBlur={() => {
+                                                                if (newTargetDataset && newTargetTable) {
+                                                                    fetchExistingConfig(newTargetDataset, newTargetTable);
+                                                                }
+                                                            }}
+                                                            placeholder="e.g., D_MyTable_WD"
+                                                        />
+                                                    </div>
                                                 </div>
                                             </div>
 
