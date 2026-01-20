@@ -24,9 +24,10 @@ interface HistoryItem {
 interface HistoryListProps {
     projectId: string;
     onViewResult: (details: any) => void;
+    showToast: (message: string, type: 'success' | 'error' | 'info') => void;
 }
 
-export default function HistoryList({ projectId, onViewResult }: HistoryListProps) {
+export default function HistoryList({ projectId, onViewResult, showToast }: HistoryListProps) {
     const [history, setHistory] = useState<HistoryItem[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
@@ -92,7 +93,7 @@ export default function HistoryList({ projectId, onViewResult }: HistoryListProp
         if (!results && run.execution_id) {
             setLoading(true);
             try {
-                const res = await fetch(`/api/python/history?project_id=${projectId}&execution_id=${run.execution_id}`);
+                const res = await fetch(`/api/python/history-details?project_id=${projectId}&execution_id=${run.execution_id}`);
                 if (res.ok) {
                     const data = await res.json();
                     if (data && data.length > 0) {
@@ -112,13 +113,13 @@ export default function HistoryList({ projectId, onViewResult }: HistoryListProp
                 results = JSON.parse(results);
             } catch (e) {
                 console.error("Failed to parse results JSON", e);
-                alert("Error parsing result details.");
+                showToast("Error parsing result details.", "error");
                 return;
             }
         }
 
         if (!results) {
-            alert("No details available for this historical run.");
+            showToast("No details available for this historical run.", "error");
             return;
         }
 
