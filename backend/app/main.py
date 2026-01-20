@@ -16,8 +16,7 @@ from app.models import (
     CustomTestRequest,
     AddSCDConfigRequest,
     TableMetadataResponse,
-    SaveHistoryRequest,
-    ScheduledTestRunRequest
+    SaveHistoryRequest
 )
 # Services will be imported lazily within endpoints to improve startup time
 

@@ -143,7 +143,7 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
     };
 
     const addCustomTest = (isNewConfig: boolean) => {
-        const emptyTest: CustomTest = { name: "", sql: "", description: "", severity: "HIGH" };
+        const emptyTest: CustomTest = { name: "", sql: "SELECT * FROM {{target}} WHERE ", description: "", severity: "HIGH" };
         if (isNewConfig) {
             setNewCustomTests([...newCustomTests, emptyTest]);
         } else {
@@ -1433,17 +1433,9 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
                                                     </div>
                                                     <div>
                                                         <label className="label" style={{ fontSize: '0.75rem' }}>SQL Query (Use {'{{target}}'} for table name)</label>
-                                                        <textarea
-                                                            className="input"
-                                                            value={test.sql}
-                                                            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => handleCustomTestChange(index, 'sql', e.target.value, false)}
-                                                            placeholder="SELECT COUNT(0) = 0 FROM {{target}} WHERE CreatedDtm IS NULL"
-                                                            rows={3}
-                                                            style={{ marginBottom: 0, resize: 'vertical', fontFamily: 'monospace' }}
-                                                        />
                                                         {availableColumns.length > 0 && (
-                                                            <div style={{ marginTop: '0.5rem' }}>
-                                                                <label className="label" style={{ fontSize: '0.75rem' }}>Insert Column:</label>
+                                                            <div style={{ marginBottom: '0.5rem' }}>
+                                                                <label className="label" style={{ fontSize: '0.75rem' }}>💡 Quick Insert Column:</label>
                                                                 <select
                                                                     className="input"
                                                                     style={{ padding: '0.25rem', fontSize: '0.8rem', width: 'auto' }}
@@ -1452,13 +1444,21 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
                                                                         e.target.value = ""; // Reset dropdown
                                                                     }}
                                                                 >
-                                                                    <option value="">-- Select Column --</option>
+                                                                    <option value="">-- Select Column to Insert --</option>
                                                                     {availableColumns.map(col => (
                                                                         <option key={col} value={col}>{col}</option>
                                                                     ))}
                                                                 </select>
                                                             </div>
                                                         )}
+                                                        <textarea
+                                                            className="input"
+                                                            value={test.sql}
+                                                            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => handleCustomTestChange(index, 'sql', e.target.value, false)}
+                                                            placeholder="SELECT * FROM {{target}} WHERE condition"
+                                                            rows={3}
+                                                            style={{ marginBottom: 0, resize: 'vertical', fontFamily: 'monospace' }}
+                                                        />
                                                     </div>
                                                 </div>
                                             ))}

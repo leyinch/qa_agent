@@ -7,8 +7,7 @@ from .requests import (
     MappingResult,
     CustomTestRequest,
     AddSCDConfigRequest,
-    SaveHistoryRequest,
-    ScheduledTestRunRequest
+    SaveHistoryRequest
 )
 from .responses import (
     TestSummary,
@@ -28,7 +27,6 @@ __all__ = [
     "CustomTestRequest",
     "AddSCDConfigRequest",
     "SaveHistoryRequest",
-    "ScheduledTestRunRequest",
     "TestSummary",
     "ConfigTableSummary",
     "GenerateTestsResponse",
