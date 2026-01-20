@@ -133,31 +133,45 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
     const fetchExistingConfig = async (dataset: string, table: string) => {
         if (!dataset || !table || !projectId) return;
 
+        const trimmedDataset = dataset.trim();
+        const trimmedTable = table.trim();
+
         setFetchingConfig(true);
+        console.log(`🔍 Fetching existing config for ${trimmedDataset}.${trimmedTable} in ${projectId}...`);
         try {
             const response = await fetch(
-                `/api/python/scd-config/${projectId}/config/scd_validation_config/${dataset}/${table}`
+                `/api/python/scd-config/${projectId}/config/scd_validation_config/${trimmedDataset}/${trimmedTable}`
             );
 
             if (response.ok) {
                 const config = await response.json();
+                console.log('✅ Found existing config:', config);
                 // Auto-populate all fields
-                setNewConfigId(config.config_id || '');
-                setNewScdType(config.scd_type || 'scd2');
-                setNewPrimaryKeys(Array.isArray(config.primary_keys) ? config.primary_keys.join(',') : '');
-                setNewSurrogateKey(config.surrogate_key || '');
-                setNewBeginDateColumn(config.begin_date_column || 'DWBeginEffDateTime');
-                setNewEndDateColumn(config.end_date_column || 'DWEndEffDateTime');
-                setNewActiveFlagColumn(config.active_flag_column || 'DWCurrentRowFlag');
-                setNewDescription(config.description || '');
-                setNewCustomTests(config.custom_tests || []);
+                if (config.config_id) setNewConfigId(config.config_id);
+                if (config.scd_type) setNewScdType(config.scd_type);
+
+                if (config.primary_keys) {
+                    const pkString = Array.isArray(config.primary_keys)
+                        ? config.primary_keys.join(',')
+                        : config.primary_keys;
+                    setNewPrimaryKeys(pkString);
+                }
+
+                if (config.surrogate_key) setNewSurrogateKey(config.surrogate_key);
+                if (config.begin_date_column) setNewBeginDateColumn(config.begin_date_column);
+                if (config.end_date_column) setNewEndDateColumn(config.end_date_column);
+                if (config.active_flag_column) setNewActiveFlagColumn(config.active_flag_column);
+                if (config.description) setNewDescription(config.description);
+                if (config.custom_tests) setNewCustomTests(config.custom_tests);
+
                 setIsEditingExisting(true);
             } else {
+                console.log(`ℹ️ No existing config found for ${trimmedDataset}.${trimmedTable} (Status: ${response.status})`);
                 // Config doesn't exist, reset edit mode
                 setIsEditingExisting(false);
             }
         } catch (error) {
-            console.log('No existing config found or error fetching:', error);
+            console.error('❌ Error fetching existing config:', error);
             setIsEditingExisting(false);
         } finally {
             setFetchingConfig(false);
@@ -166,14 +180,14 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
 
     // Truly automatic auto-fill with debounce
     useEffect(() => {
-        if (!newTargetDataset || !newTargetTable) return;
+        if (!newTargetDataset || !newTargetTable || !projectId) return;
 
         const timeoutId = setTimeout(() => {
             fetchExistingConfig(newTargetDataset, newTargetTable);
         }, 1000); // 1s debounce
 
         return () => clearTimeout(timeoutId);
-    }, [newTargetDataset, newTargetTable]);
+    }, [newTargetDataset, newTargetTable, projectId]);
 
 
 
