@@ -38,7 +38,14 @@ export default function HistoryList({ projectId, onViewResult }: HistoryListProp
         try {
             const res = await fetch(`/api/python/history?project_id=${projectId}&limit=50`);
             if (!res.ok) {
-                throw new Error("Failed to fetch history");
+                let errorMessage = "Failed to fetch history";
+                try {
+                    const errorData = await res.json();
+                    errorMessage = errorData.detail || errorData.error || errorMessage;
+                } catch (e) {
+                    // Not a JSON error response
+                }
+                throw new Error(errorMessage);
             }
             const data = await res.json();
             setHistory(data);

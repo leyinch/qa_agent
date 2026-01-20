@@ -164,6 +164,17 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
         }
     };
 
+    // Truly automatic auto-fill with debounce
+    useEffect(() => {
+        if (!newTargetDataset || !newTargetTable) return;
+
+        const timeoutId = setTimeout(() => {
+            fetchExistingConfig(newTargetDataset, newTargetTable);
+        }, 1000); // 1s debounce
+
+        return () => clearTimeout(timeoutId);
+    }, [newTargetDataset, newTargetTable]);
+
 
 
     const addDataset = () => setDatasets([...datasets, '']);
@@ -957,11 +968,6 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
                                                             onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                                                                 setNewTargetDataset(e.target.value);
                                                             }}
-                                                            onBlur={() => {
-                                                                if (newTargetDataset && newTargetTable) {
-                                                                    fetchExistingConfig(newTargetDataset, newTargetTable);
-                                                                }
-                                                            }}
                                                             placeholder="e.g., DW_Dimensions"
                                                         />
                                                     </div>
@@ -975,11 +981,6 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
                                                             onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                                                                 setNewTargetTable(e.target.value);
                                                                 setScdTargetTable(e.target.value);
-                                                            }}
-                                                            onBlur={() => {
-                                                                if (newTargetDataset && newTargetTable) {
-                                                                    fetchExistingConfig(newTargetDataset, newTargetTable);
-                                                                }
                                                             }}
                                                             placeholder="e.g., D_MyTable_WD"
                                                         />
