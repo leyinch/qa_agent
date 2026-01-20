@@ -22,8 +22,13 @@ logger = logging.getLogger(__name__)
 def get_history_project_id():
     return settings.google_cloud_project
 
-def get_history_table_fqn():
-    return f"{get_history_project_id()}.qa_results.scd_test_history"
+def get_history_table_fqn(project_id: Optional[str] = None) -> str:
+    """Gets the fully qualified BigQuery table name."""
+    project = project_id or settings.google_cloud_project
+    if not project or project == "your-project-id":
+        # If still missing, we'll let BigQuery client handle it or fail with clearer msg
+        return "qa_results.scd_test_history"
+    return f"{project}.qa_results.scd_test_history"
 
 
 class TestHistoryService:
@@ -33,6 +38,7 @@ class TestHistoryService:
     def __init__(self):
         self._client = None
         self._table_checked = False
+        self.project_id = None # Initialize project_id
 
     @property
     def client(self):
@@ -45,48 +51,53 @@ class TestHistoryService:
                 raise
         return self._client
 
-    def _ensure_table_exists(self):
-        """Ensure the history table exists in BigQuery."""
+    def _ensure_table_exists(self, project_id: Optional[str] = None):
+        """Creates the history table if it doesn't exist."""
+        project = project_id or self.project_id
+        dataset_id = "qa_results"
+        table_id = "scd_test_history"
+        
+        # Dataset check
+        dataset_ref = f"{project}.{dataset_id}" if project else dataset_id
         try:
-            # Check dataset
-            dataset_ref = f"{get_history_project_id()}.qa_results"
+            self.client.get_dataset(dataset_ref)
+        except Exception:
             try:
-                self.client.get_dataset(dataset_ref)
-            except Exception:
                 logger.info(f"Creating dataset {dataset_ref}")
-                dataset = bigquery.Dataset(dataset_ref)
-                dataset.location = "US"
-                self.client.create_dataset(dataset)
-            
-            # Check table
-            try:
-                self.client.get_table(get_history_table_fqn())
-            except Exception:
-                logger.info(f"Creating table {get_history_table_fqn()}")
-                # Schema definition matching backend/create_history_table.sql
-                schema = [
-                    bigquery.SchemaField("execution_id", "STRING", mode="REQUIRED"),
-                    bigquery.SchemaField("execution_timestamp", "DATETIME", mode="REQUIRED"),
-                    bigquery.SchemaField("project_id", "STRING", mode="REQUIRED"),
-                    bigquery.SchemaField("comparison_mode", "STRING", mode="REQUIRED"),
-                    bigquery.SchemaField("target_dataset", "STRING", mode="NULLABLE"),
-                    bigquery.SchemaField("target_table", "STRING", mode="NULLABLE"),
-                    bigquery.SchemaField("mapping_id", "STRING", mode="NULLABLE"),
-                    bigquery.SchemaField("status", "STRING", mode="REQUIRED"),
-                    bigquery.SchemaField("total_tests", "INTEGER", mode="NULLABLE"),
-                    bigquery.SchemaField("passed_tests", "INTEGER", mode="NULLABLE"),
-                    bigquery.SchemaField("failed_tests", "INTEGER", mode="NULLABLE"),
-                    bigquery.SchemaField("error_message", "STRING", mode="NULLABLE"),
-                    bigquery.SchemaField("test_results", "JSON", mode="NULLABLE"),
-                    bigquery.SchemaField("executed_by", "STRING", mode="NULLABLE"),
-                    bigquery.SchemaField("metadata", "JSON", mode="NULLABLE")
-                ]
-                table = bigquery.Table(get_history_table_fqn(), schema=schema)
-                table.partitioning_type = "DAY"
-                table.time_partitioning = bigquery.TimePartitioning(field="execution_timestamp")
-                table.clustering_fields = ["project_id", "target_table", "status"]
+                self.client.create_dataset(dataset_ref, timeout=30)
+            except Exception as e:
+                logger.warning(f"Failed to ensure dataset exists: {e}")
                 
-                self.client.create_table(table)
+        # Table check
+        table_fqn = get_history_table_fqn(project)
+        try:
+            self.client.get_table(table_fqn)
+        except Exception:
+            logger.info(f"Creating table {table_fqn}")
+            # Schema definition matching backend/create_history_table.sql
+            schema = [
+                bigquery.SchemaField("execution_id", "STRING", mode="REQUIRED"),
+                bigquery.SchemaField("execution_timestamp", "DATETIME", mode="REQUIRED"),
+                bigquery.SchemaField("project_id", "STRING", mode="REQUIRED"),
+                bigquery.SchemaField("comparison_mode", "STRING", mode="REQUIRED"),
+                bigquery.SchemaField("target_dataset", "STRING", mode="NULLABLE"),
+                bigquery.SchemaField("target_table", "STRING", mode="NULLABLE"),
+                bigquery.SchemaField("mapping_id", "STRING", mode="NULLABLE"),
+                bigquery.SchemaField("status", "STRING", mode="REQUIRED"),
+                bigquery.SchemaField("total_tests", "INTEGER", mode="NULLABLE"),
+                bigquery.SchemaField("passed_tests", "INTEGER", mode="NULLABLE"),
+                bigquery.SchemaField("failed_tests", "INTEGER", mode="NULLABLE"),
+                bigquery.SchemaField("error_message", "STRING", mode="NULLABLE"),
+                bigquery.SchemaField("test_results", "JSON", mode="NULLABLE"),
+                bigquery.SchemaField("executed_by", "STRING", mode="NULLABLE"),
+                bigquery.SchemaField("metadata", "JSON", mode="NULLABLE")
+            ]
+            table = bigquery.Table(table_fqn, schema=schema)
+            table.partitioning_type = "DAY"
+            table.time_partitioning = bigquery.TimePartitioning(field="execution_timestamp")
+            table.clustering_fields = ["project_id", "target_table", "status"]
+            
+            self.client.create_table(table)
         except Exception as e:
             logger.warning(f"Failed to ensure history table exists: {e}")
     
@@ -108,20 +119,20 @@ class TestHistoryService:
         self,
         project_id: str,
         comparison_mode: str,
-        test_results: Any,
+        test_results: List[Dict[str, Any]],
         target_dataset: Optional[str] = None,
         target_table: Optional[str] = None,
         mapping_id: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-        executed_by: Optional[str] = None
+        executed_by: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None
     ) -> str:
         """
-        Save test execution results to BigQuery history table (one row per table).
+        Saves test results to BigQuery history.
         """
         logger.info(f"💾 Saving test results history for {target_dataset}.{target_table} (mode: {comparison_mode})")
         
         # Ensure table exists before writing
-        self._ensure_table_exists()
+        self._ensure_table_exists(project_id)
 
         execution_id = str(uuid.uuid4())
         
@@ -170,7 +181,7 @@ class TestHistoryService:
         }
         
         try:
-            table_id = get_history_table_fqn()
+            table_id = get_history_table_fqn(project_id)
             logger.info(f"🚀 Inserting row into {table_id}...")
             
             errors = self.client.insert_rows_json(table_id, [row])
@@ -221,7 +232,7 @@ class TestHistoryService:
             
         columns_str = ", ".join(select_columns)
         
-        query_parts = [f"SELECT {columns_str} FROM `{get_history_table_fqn()}` WHERE 1=1"]
+        query_parts = [f"SELECT {columns_str} FROM `{get_history_table_fqn(project_id)}` WHERE 1=1"]
         params = []
         
         if project_id:
@@ -255,7 +266,8 @@ class TestHistoryService:
         job_config = bigquery.QueryJobConfig(query_parameters=params)
         
         try:
-            logger.info(f"🔍 Querying history from {get_history_table_fqn()}...")
+            table_fqn = get_history_table_fqn(project_id)
+            logger.info(f"🔍 Querying history from {table_fqn}...")
             query_job = self.client.query(query, job_config=job_config)
             results = query_job.result()
             records = [dict(row) for row in results]
@@ -276,35 +288,19 @@ class TestHistoryService:
         days_back: int = 30
     ) -> List[Dict[str, Any]]:
         """
-        Get chronological test history for a specific table.
-        
-        Args:
-            project_id: GCP project ID
-            target_dataset: Dataset name
-            target_table: Table name
-            days_back: Number of days to look back
-        
-        Returns:
-            Chronological list of test executions for the table
+        Get pass/fail stats over time for a table.
         """
-        tz = pytz.timezone('Australia/Melbourne')
-        start_date = datetime.now(tz).replace(tzinfo=None) - timedelta(days=days_back)
-        
+        table_fqn = get_history_table_fqn(project_id)
         query = f"""
-        SELECT 
-            execution_id,
-            execution_timestamp,
-            status,
-            total_tests,
-            passed_tests,
-            failed_tests,
-            error_message
-        FROM `{get_history_table_fqn()}`
-        WHERE project_id = @project_id
-          AND target_dataset = @target_dataset
-          AND target_table = @target_table
-          AND execution_timestamp >= @start_date
-        ORDER BY execution_timestamp DESC
+            SELECT 
+                DATE(execution_timestamp) as date,
+                status,
+                COUNT(*) as count
+            FROM `{table_fqn}`
+            WHERE project_id = @project_id
+              AND target_table = @target_table
+            GROUP BY 1, 2
+            ORDER BY 1 ASC
         """
         
         job_config = bigquery.QueryJobConfig(
@@ -330,7 +326,8 @@ class TestHistoryService:
         """
         try:
             # Use TRUNCATE TABLE as requested
-            query = f"TRUNCATE TABLE `{get_history_table_fqn()}`"
+            table_fqn = get_history_table_fqn(project_id)
+            query = f"TRUNCATE TABLE `{table_fqn}`"
             job_config = bigquery.QueryJobConfig() # No params needed
             query_job = self.client.query(query, job_config=job_config)
             query_job.result()  # Wait for completion

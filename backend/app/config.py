@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     debug: bool = False
     
     # Google Cloud
-    google_cloud_project: str = Field("your-project-id", env="GOOGLE_CLOUD_PROJECT")
+    google_cloud_project: Optional[str] = Field(None, env="GOOGLE_CLOUD_PROJECT")
     google_cloud_region: str = Field("us-central1", env="GOOGLE_CLOUD_REGION")
     cloud_run_url: Optional[str] = None
     vertex_ai_location: str = Field("us-central1", env="GOOGLE_CLOUD_REGION")
