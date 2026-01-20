@@ -333,7 +333,7 @@ class BigQueryService:
             return True
             
         except Exception as e:
-            print(f"Error inserting SCD config: {str(e)}")
+            logger.error(f"Error inserting SCD config: {str(e)}", exc_info=True)
             return False
 
 

@@ -454,9 +454,10 @@ async def add_scd_config(request: AddSCDConfigRequest):
         )
         
         if not success:
+            logger.error(f"BigQuery insert_scd_config returned False for config_id: {request.config_id}")
             raise HTTPException(
                 status_code=500,
-                detail="Failed to insert SCD configuration into config table"
+                detail="Failed to insert SCD configuration. Check backend logs for details."
             )
         
 
