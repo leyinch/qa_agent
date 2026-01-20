@@ -119,7 +119,6 @@ CREATE TABLE IF NOT EXISTS `{{PROJECT_ID}}.config.scd_validation_config` (
   active_flag_column STRING,        -- Current row flag (SCD2)
   description STRING,               -- Friendly description
   custom_tests JSON,                -- Array of custom business rules
-  cron_schedule STRING,             -- Cron schedule for the tests
   
   -- Metadata
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP(),

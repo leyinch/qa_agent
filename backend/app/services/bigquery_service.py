@@ -198,7 +198,6 @@ class BigQueryService:
                     bigquery.SchemaField("active_flag_column", "STRING", mode="NULLABLE"),
                     bigquery.SchemaField("description", "STRING", mode="NULLABLE"),
                     bigquery.SchemaField("custom_tests", "JSON", mode="NULLABLE"),
-                    bigquery.SchemaField("cron_schedule", "STRING", mode="NULLABLE"),
                     bigquery.SchemaField("created_at", "TIMESTAMP", mode="NULLABLE"),
                     bigquery.SchemaField("updated_at", "TIMESTAMP", mode="NULLABLE"),
                 ]
@@ -282,8 +281,7 @@ class BigQueryService:
                         @end_date_column as end_date_column,
                         @active_flag_column as active_flag_column,
                         @description as description,
-                        SAFE.PARSE_JSON(@custom_tests) as custom_tests,
-                        @cron_schedule as cron_schedule
+                        SAFE.PARSE_JSON(@custom_tests) as custom_tests
                 ) S
                 ON T.target_dataset = S.target_dataset AND T.target_table = S.target_table
                 WHEN MATCHED THEN
@@ -297,20 +295,19 @@ class BigQueryService:
                         active_flag_column = S.active_flag_column,
                         description = S.description,
                         custom_tests = S.custom_tests,
-                        cron_schedule = S.cron_schedule,
                         updated_at = CURRENT_TIMESTAMP()
                 WHEN NOT MATCHED THEN
                     INSERT (
                         config_id, target_dataset, target_table, scd_type, 
                         primary_keys, surrogate_key, begin_date_column, 
                         end_date_column, active_flag_column, description, 
-                        custom_tests, cron_schedule, created_at, updated_at
+                        custom_tests, created_at, updated_at
                     )
                     VALUES (
                         S.config_id, S.target_dataset, S.target_table, S.scd_type,
                         S.primary_keys, S.surrogate_key, S.begin_date_column,
                         S.end_date_column, S.active_flag_column, S.description,
-                        S.custom_tests, S.cron_schedule, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()
+                        S.custom_tests, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()
                     )
             """
             
@@ -327,7 +324,6 @@ class BigQueryService:
                     bigquery.ScalarQueryParameter("active_flag_column", "STRING", config_data.get("active_flag_column")),
                     bigquery.ScalarQueryParameter("description", "STRING", config_data.get("description", "")),
                     bigquery.ScalarQueryParameter("custom_tests", "STRING", json.dumps(config_data.get("custom_tests")) if config_data.get("custom_tests") else None),
-                    bigquery.ScalarQueryParameter("cron_schedule", "STRING", config_data.get("cron_schedule")),
                 ]
             )
             

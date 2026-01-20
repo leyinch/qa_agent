@@ -442,8 +442,7 @@ async def add_scd_config(request: AddSCDConfigRequest):
             "end_date_column": request.end_date_column,
             "active_flag_column": request.active_flag_column,
             "description": request.description,
-            "custom_tests": request.custom_tests,
-            "cron_schedule": request.cron_schedule
+            "custom_tests": request.custom_tests
         }
         
         # Insert into config table
