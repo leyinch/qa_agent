@@ -1,7 +1,10 @@
-"""BigQuery service for database operations."""
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import json
+import logging
 from google.cloud import bigquery
+
+# Configure logger
+logger = logging.getLogger(__name__)
 
 
 class BigQueryService:
@@ -61,24 +64,26 @@ class BigQueryService:
                 f"Failed to get metadata for {project_id}.{dataset_id}.{table_id}: {str(e)}"
             )
     
-    async def execute_query(self, query: str) -> List[Dict[str, Any]]:
+    async def execute_query(self, query: str, job_config: Optional[bigquery.QueryJobConfig] = None) -> List[Dict[str, Any]]:
         """
         Execute a BigQuery SQL query.
         
         Args:
             query: SQL query string
+            job_config: Optional QueryJobConfig
             
         Returns:
             List of dictionaries representing rows
         """
         try:
-            query_job = self.client.query(query)
+            query_job = self.client.query(query, job_config=job_config)
             results = query_job.result()
             
             # Convert to list of dicts
             return [dict(row) for row in results]
             
         except Exception as e:
+            logger.error(f"Query execution failed: {str(e)}")
             raise ValueError(f"Query execution failed: {str(e)}")
     
     async def get_row_count(self, full_table_name: str) -> int:
