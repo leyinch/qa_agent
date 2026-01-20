@@ -425,6 +425,38 @@ async def get_table_history(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/scd-config/{project_id}/{config_dataset}/{config_table}/{target_dataset}/{target_table}")
+async def get_scd_config_by_table(
+    project_id: str,
+    config_dataset: str,
+    config_table: str,
+    target_dataset: str,
+    target_table: str
+):
+    """Fetch an existing SCD config by target dataset and table for auto-fill."""
+    try:
+        from app.services.bigquery_service import bigquery_service
+        
+        config = await bigquery_service.get_scd_config_by_table(
+            project_id=project_id,
+            config_dataset=config_dataset,
+            config_table=config_table,
+            target_dataset=target_dataset,
+            target_table=target_table
+        )
+        
+        if not config:
+            raise HTTPException(status_code=404, detail="Configuration not found")
+        
+        return config
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching SCD config: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/api/scd-config")
 async def add_scd_config(request: AddSCDConfigRequest):
     """Add a new SCD validation configuration to the config table."""

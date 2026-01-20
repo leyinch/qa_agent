@@ -243,6 +243,46 @@ class BigQueryService:
         """
         return await self.execute_query(query)
 
+    async def get_scd_config_by_table(
+        self,
+        project_id: str,
+        config_dataset: str,
+        config_table: str,
+        target_dataset: str,
+        target_table: str
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Fetch a single SCD config by target dataset and table.
+        
+        Args:
+            project_id: Google Cloud project ID
+            config_dataset: Config table dataset
+            config_table: Config table name
+            target_dataset: Target dataset to search for
+            target_table: Target table to search for
+            
+        Returns:
+            Config dict if found, None otherwise
+        """
+        await self.ensure_config_tables(project_id, config_dataset)
+        query = f"""
+            SELECT *
+            FROM `{project_id}.{config_dataset}.{config_table}`
+            WHERE target_dataset = @target_dataset
+              AND target_table = @target_table
+            LIMIT 1
+        """
+        
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("target_dataset", "STRING", target_dataset),
+                bigquery.ScalarQueryParameter("target_table", "STRING", target_table),
+            ]
+        )
+        
+        results = await self.execute_query(query, job_config)
+        return results[0] if results else None
+
     async def insert_scd_config(
         self,
         project_id: str,

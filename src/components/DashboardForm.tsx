@@ -126,6 +126,39 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
     const [newActiveFlagColumn, setNewActiveFlagColumn] = useState("DWCurrentRowFlag");
     const [newDescription, setNewDescription] = useState("");
     const [newCustomTests, setNewCustomTests] = useState<CustomTest[]>([]);
+    const [isEditingExisting, setIsEditingExisting] = useState(false);
+
+    // Auto-fill existing config when dataset and table are entered
+    const fetchExistingConfig = async (dataset: string, table: string) => {
+        if (!dataset || !table || !projectId) return;
+
+        try {
+            const response = await fetch(
+                `/api/python/scd-config/${projectId}/config/scd_validation_config/${dataset}/${table}`
+            );
+
+            if (response.ok) {
+                const config = await response.json();
+                // Auto-populate all fields
+                setNewConfigId(config.config_id || '');
+                setNewScdType(config.scd_type || 'scd2');
+                setNewPrimaryKeys(Array.isArray(config.primary_keys) ? config.primary_keys.join(',') : '');
+                setNewSurrogateKey(config.surrogate_key || '');
+                setNewBeginDateColumn(config.begin_date_column || 'DWBeginEffDateTime');
+                setNewEndDateColumn(config.end_date_column || 'DWEndEffDateTime');
+                setNewActiveFlagColumn(config.active_flag_column || 'DWCurrentRowFlag');
+                setNewDescription(config.description || '');
+                setNewCustomTests(config.custom_tests || []);
+                setIsEditingExisting(true);
+            } else {
+                // Config doesn't exist, reset edit mode
+                setIsEditingExisting(false);
+            }
+        } catch (error) {
+            console.log('No existing config found or error fetching:', error);
+            setIsEditingExisting(false);
+        }
+    };
 
 
 
@@ -873,7 +906,9 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
                                             border: '2px solid var(--primary)',
                                             marginBottom: '1.75rem'
                                         }}>
-                                            <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '1rem' }}>📝 New Table Configuration</h3>
+                                            <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                {isEditingExisting ? '✏️ Editing Configuration' : '📝 New Table Configuration'}
+                                            </h3>
 
                                             {/* Config ID */}
                                             <div style={{ marginBottom: '1rem' }}>
@@ -901,7 +936,9 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
                                                             setNewTargetDataset(e.target.value);
                                                         }}
                                                         onBlur={() => {
-                                                            setScdTargetDataset(newTargetDataset); // Reuse fetching logic
+                                                            if (newTargetDataset && newTargetTable) {
+                                                                fetchExistingConfig(newTargetDataset, newTargetTable);
+                                                            }
                                                         }}
                                                         placeholder="e.g., DW_Dimensions"
                                                     />
@@ -918,7 +955,9 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
                                                             setScdTargetTable(e.target.value);
                                                         }}
                                                         onBlur={() => {
-                                                            setScdTargetTable(newTargetTable); // Trigger fetch
+                                                            if (newTargetDataset && newTargetTable) {
+                                                                fetchExistingConfig(newTargetDataset, newTargetTable);
+                                                            }
                                                         }}
                                                         placeholder="e.g., D_MyTable_WD"
                                                     />
