@@ -7,6 +7,9 @@ import vertexai
 
 from app.config import settings
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class VertexAIService:
     """Service for Vertex AI operations."""
@@ -147,7 +150,7 @@ Return ONLY a JSON array of findings. No markdown.
             text = text.replace('```json\\n', '').replace('```\\n', '').replace('```', '').strip()
             return json.loads(text)
         except Exception as e:
-            print(f"Failed to validate schema: {str(e)}")
+            logger.error(f"Failed to validate schema: {str(e)}")
             return []
 
 

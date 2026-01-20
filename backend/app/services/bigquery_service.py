@@ -1,9 +1,10 @@
 """BigQuery service for database operations."""
 from typing import List, Dict, Any
 import json
+import logging
 from google.cloud import bigquery
 
-
+logger = logging.getLogger(__name__)
 class BigQueryService:
     """Service for BigQuery operations."""
     
@@ -144,7 +145,8 @@ class BigQueryService:
         self, 
         project_id: str, 
         config_dataset: str, 
-        config_table: str
+        config_table: str,
+        filters: Dict[str, Any] = None
     ) -> List[Dict[str, Any]]:
         """
         Read mappings from config table.
@@ -153,112 +155,49 @@ class BigQueryService:
             project_id: Google Cloud project ID
             config_dataset: Config table dataset
             config_table: Config table name
+            filters: Optional dictionary of filters
             
         Returns:
             List of mapping configurations
         """
+        # Ensure dataset and table exist
+        try:
+            self.client.get_table(f"{project_id}.{config_dataset}.{config_table}")
+        except Exception as e:
+            error_msg = f"Config table '{config_dataset}.{config_table}' not found or inaccessible in project '{project_id}'. Details: {str(e)}"
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+
+        # Build query
         query = f"""
             SELECT *
             FROM `{project_id}.{config_dataset}.{config_table}`
             WHERE is_active = true
         """
+        
+        # Add dynamic filters
+        if filters:
+            for key, value in filters.items():
+                if isinstance(value, str):
+                    query += f" AND {key} = '{value}'"
+                elif isinstance(value, (int, float, bool)):
+                     query += f" AND {key} = {value}"
+                else:
+                    # Fallback for complex types, maybe cast to string
+                    query += f" AND {key} = '{str(value)}'"
+
         return await self.execute_query(query)
 
-    async def read_scd_config_table(
-        self, 
-        project_id: str, 
-        config_dataset: str, 
-        config_table: str
-    ) -> List[Dict[str, Any]]:
-        """
-        Read SCD validation configurations from config table.
-        
-        Args:
-            project_id: Google Cloud project ID
-            config_dataset: Config table dataset
-            config_table: Config table name
-            
-        Returns:
-            List of SCD validation configurations
-        """
-        query = f"""
-            SELECT 
-                config_id,
-                target_dataset,
-                target_table,
-                scd_type,
-                primary_keys,
-                surrogate_key,
-                begin_date_column,
-                end_date_column,
-                active_flag_column,
-                description,
-                custom_tests
-            FROM `{project_id}.{config_dataset}.{config_table}`
-        """
-        return await self.execute_query(query)
-
-    async def insert_scd_config(
-        self,
-        project_id: str,
-        config_dataset: str,
-        config_table: str,
-        config_data: Dict[str, Any]
-    ) -> bool:
-        """
-        Insert a new SCD validation configuration into the config table.
-        
-        Args:
-            project_id: Google Cloud project ID
-            config_dataset: Config table dataset
-            config_table: Config table name
-            config_data: Configuration data to insert
-            
-        Returns:
-            True if successful, False otherwise
-        """
-        try:
-            import datetime
-            
-            full_table_name = f"{project_id}.{config_dataset}.{config_table}"
-            
-            # Prepare row for insertion
-            row = {
-                "config_id": config_data.get("config_id"),
-                "target_dataset": config_data.get("target_dataset"),
-                "target_table": config_data.get("target_table"),
-                "scd_type": config_data.get("scd_type"),
-                "primary_keys": config_data.get("primary_keys", []),
-                "surrogate_key": config_data.get("surrogate_key"),
-                "begin_date_column": config_data.get("begin_date_column"),
-                "end_date_column": config_data.get("end_date_column"),
-                "active_flag_column": config_data.get("active_flag_column"),
-                "description": config_data.get("description", ""),
-                "custom_tests": config_data.get("custom_tests")
-            }
-            
-            # Insert into BigQuery
-            errors = self.client.insert_rows_json(full_table_name, [row])
-            
-            if errors:
-                print(f"Failed to insert SCD config: {errors}")
-                return False
-            
-            return True
-            
-        except Exception as e:
-            print(f"Error inserting SCD config: {str(e)}")
-            return False
 
 
-    async def ensure_history_table(
+    async def ensure_test_history_table(
         self,
         project_id: str,
         dataset_id: str = "config",
-        table_id: str = "execution_history"
+        table_id: str = "test_execution_history"
     ) -> str:
         """
-        Ensure execution history table exists.
+        Ensure test execution history table exists.
         
         Returns:
             Full table name
@@ -270,88 +209,77 @@ class BigQueryService:
             try:
                 self.client.get_dataset(f"{project_id}.{dataset_id}")
             except Exception: # NotFound
-                print(f"Dataset {dataset_id} not found, creating...")
                 try:
                     dataset = bigquery.Dataset(f"{project_id}.{dataset_id}")
-                    dataset.location = "US" # Default to US or make configurable
+                    dataset.location = "US"
                     self.client.create_dataset(dataset)
-                    print(f"Created dataset: {dataset_id}")
                 except Exception as e:
                     print(f"Failed to create dataset {dataset_id}: {e}")
-                    # Allow to proceed, maybe it exists but permission issue
 
             # 2. Check if table exists
             try:
                 self.client.get_table(full_table_name)
                 return full_table_name
             except Exception:
-                # Table doesn't exist, create it
                 pass
             
             schema = [
                 bigquery.SchemaField("execution_id", "STRING", mode="REQUIRED"),
+                bigquery.SchemaField("test_id", "STRING", mode="NULLABLE"),
                 bigquery.SchemaField("timestamp", "TIMESTAMP", mode="REQUIRED"),
                 bigquery.SchemaField("project_id", "STRING", mode="REQUIRED"),
                 bigquery.SchemaField("comparison_mode", "STRING", mode="REQUIRED"),
+                bigquery.SchemaField("mapping_id", "STRING", mode="NULLABLE"),
+                bigquery.SchemaField("test_name", "STRING", mode="NULLABLE"),
+                bigquery.SchemaField("category", "STRING", mode="NULLABLE"),
+                bigquery.SchemaField("status", "STRING", mode="REQUIRED"),
+                bigquery.SchemaField("severity", "STRING", mode="NULLABLE"),
+                bigquery.SchemaField("description", "STRING", mode="NULLABLE"),
+                bigquery.SchemaField("error_message", "STRING", mode="NULLABLE"),
                 bigquery.SchemaField("source", "STRING", mode="NULLABLE"),
                 bigquery.SchemaField("target", "STRING", mode="NULLABLE"),
-                bigquery.SchemaField("status", "STRING", mode="REQUIRED"),
-                bigquery.SchemaField("total_tests", "INTEGER", mode="REQUIRED"),
-                bigquery.SchemaField("passed_tests", "INTEGER", mode="REQUIRED"),
-                bigquery.SchemaField("failed_tests", "INTEGER", mode="REQUIRED"),
-                bigquery.SchemaField("details", "JSON", mode="NULLABLE"),
+                bigquery.SchemaField("rows_affected", "INTEGER", mode="NULLABLE"),
+                bigquery.SchemaField("sql_query", "STRING", mode="NULLABLE"),
             ]
             
             table = bigquery.Table(full_table_name, schema=schema)
             self.client.create_table(table)
-            print(f"Created history table: {full_table_name}")
+            print(f"Created test history table: {full_table_name}")
             return full_table_name
             
         except Exception as e:
-            print(f"Warning: Failed to ensure history table: {str(e)}")
+            print(f"Warning: Failed to ensure test history table: {str(e)}")
             return f"{project_id}.{dataset_id}.{table_id}"
 
     async def log_execution(
         self,
         project_id: str,
-        execution_data: Dict[str, Any],
+        execution_data: List[Dict[str, Any]],
         dataset_id: str = "config",
-        table_id: str = "execution_history"
+        table_id: str = "test_execution_history"
     ) -> None:
         """
-        Log execution result to history table.
+        Log test results to history table.
+        Args:
+            execution_data: List of test result dictionaries
         """
         try:
-            full_table_name = await self.ensure_history_table(project_id, dataset_id, table_id)
-            
-            # Prepare row
-            row = {
-                "execution_id": execution_data.get("execution_id"),
-                "timestamp": "Generic::current_timestamp", # BQ handles this if we use SQL, but for insert_rows we need value. 
-                # Better to use INSERT statement or current_timestamp() in SQL
-            }
-            # Actually, let's use insert_rows_json
+            full_table_name = await self.ensure_test_history_table(project_id, dataset_id, table_id)
             
             import datetime
-            import uuid
+            current_time = datetime.datetime.now().isoformat()
             
-            row = {
-                "execution_id": execution_data.get("execution_id") or str(uuid.uuid4()),
-                "timestamp": datetime.datetime.now().isoformat(),
-                "project_id": project_id,
-                "comparison_mode": execution_data.get("comparison_mode", "unknown"),
-                "source": execution_data.get("source", ""),
-                "target": execution_data.get("target", ""),
-                "status": execution_data.get("status", "UNKNOWN"),
-                "total_tests": execution_data.get("total_tests", 0),
-                "passed_tests": execution_data.get("passed_tests", 0),
-                "failed_tests": execution_data.get("failed_tests", 0),
-                "details": json.dumps(execution_data.get("details", {}), default=str)
-            }
+            rows_to_insert = []
+            for item in execution_data:
+                item['timestamp'] = current_time
+                rows_to_insert.append(item)
             
-            errors = self.client.insert_rows_json(full_table_name, [row])
+            if not rows_to_insert:
+                return
+
+            errors = self.client.insert_rows_json(full_table_name, rows_to_insert)
             if errors:
-                print(f"Failed to insert history row: {errors}")
+                print(f"Failed to insert history rows: {errors}")
                 
         except Exception as e:
             print(f"Failed to log execution: {str(e)}")
@@ -360,23 +288,20 @@ class BigQueryService:
         self,
         project_id: str,
         dataset_id: str = "config",
-        table_id: str = "execution_history",
-        limit: int = 50
+        table_id: str = "test_execution_history",
+        limit: int = 100
     ) -> List[Dict[str, Any]]:
-        """Get recent execution history."""
-        try:
-            # Ensure table exists before querying to avoid NotFound errors
-            await self.ensure_history_table(project_id, dataset_id, table_id)
-            
-            query = f"""
-                SELECT *
-                FROM `{project_id}.{dataset_id}.{table_id}`
-                ORDER BY timestamp DESC
-                LIMIT {limit}
-            """
-        except Exception as e:
-            print(f"Failed to fetch history: {str(e)}")
-            return []
+        """Get recent test execution history."""
+        # Ensure table exists before querying
+        await self.ensure_test_history_table(project_id, dataset_id, table_id)
+        
+        query = f"""
+            SELECT *
+            FROM `{project_id}.{dataset_id}.{table_id}`
+            ORDER BY timestamp DESC
+            LIMIT {limit}
+        """
+        return await self.execute_query(query)
 
     async def ensure_custom_tests_table(
         self,
@@ -470,6 +395,134 @@ class BigQueryService:
         except Exception as e:
             print(f"Failed to save custom test: {str(e)}")
             return False
+
+
+    async def ensure_settings_table(
+        self,
+        project_id: str,
+        dataset_id: str = "config",
+        table_id: str = "project_settings"
+    ) -> str:
+        """Ensure settings table exists."""
+        try:
+            full_table_name = f"{project_id}.{dataset_id}.{table_id}"
+            
+            # Helper to ensure dataset exists
+            try:
+                self.client.get_dataset(f"{project_id}.{dataset_id}")
+            except Exception:
+                pass 
+
+            try:
+                table = self.client.get_table(full_table_name)
+                # Check for missing columns and patch schema if needed
+                existing_fields = {f.name for f in table.schema}
+                new_schema = list(table.schema)
+                schema_changed = False
+
+                if "teams_webhook_url" not in existing_fields:
+                    new_schema.append(bigquery.SchemaField("teams_webhook_url", "STRING", mode="NULLABLE"))
+                    schema_changed = True
+                
+                if schema_changed:
+                    table.schema = new_schema
+                    self.client.update_table(table, ["schema"])
+                    print(f"Updated settings table schema: {full_table_name}")
+                
+                return full_table_name
+            except Exception:
+                pass
+                
+            schema = [
+                bigquery.SchemaField("project_id", "STRING", mode="REQUIRED"),
+                bigquery.SchemaField("alert_emails", "STRING", mode="REPEATED"),
+                bigquery.SchemaField("teams_webhook_url", "STRING", mode="NULLABLE"),
+                bigquery.SchemaField("alert_on_failure", "BOOLEAN", mode="NULLABLE"),
+                bigquery.SchemaField("updated_at", "TIMESTAMP", mode="NULLABLE")
+            ]
+            
+            table = bigquery.Table(full_table_name, schema=schema)
+            self.client.create_table(table)
+            print(f"Created settings table: {full_table_name}")
+            return full_table_name
+        except Exception as e:
+            print(f"Warning: Failed to ensure settings table: {e}")
+            return f"{project_id}.{dataset_id}.{table_id}"
+
+    async def get_project_settings(
+        self,
+        project_id: str,
+        dataset_id: str = "config",
+        table_id: str = "project_settings"
+    ) -> Dict[str, Any]:
+        """Get latest project settings."""
+        try:
+            full_table_name = f"{project_id}.{dataset_id}.{table_id}"
+            # Ensure table exists
+            await self.ensure_settings_table(project_id, dataset_id, table_id)
+            
+            query = f"""
+                SELECT *
+                FROM `{full_table_name}`
+                WHERE project_id = '{project_id}'
+                ORDER BY updated_at DESC
+                LIMIT 1
+            """
+            rows = await self.execute_query(query)
+            if rows:
+                return rows[0]
+            return None
+        except Exception as e:
+            # Table might not exist yet
+            return None
+
+    async def save_project_settings(
+        self,
+        settings: Dict[str, Any],
+        dataset_id: str = "config",
+        table_id: str = "project_settings"
+    ) -> bool:
+        """Save project settings (appends new version)."""
+        try:
+            project_id = settings.get('project_id')
+            full_table_name = await self.ensure_settings_table(project_id, dataset_id, table_id)
+            
+            import datetime
+            row = settings.copy()
+            row['updated_at'] = datetime.datetime.now().isoformat()
+            
+            errors = self.client.insert_rows_json(full_table_name, [row])
+            if errors:
+                print(f"Failed to save settings: {errors}")
+                return False
+            return True
+        except Exception as e:
+            print(f"Failed to save project settings: {str(e)}")
+            return False
+
+
+    async def get_active_custom_tests(
+        self,
+        project_id: str,
+        target_dataset: str,
+        target_table: str,
+        dataset_id: str = "config"
+    ) -> List[Dict[str, Any]]:
+        """Get active custom tests for a target table."""
+        try:
+            full_table_name = await self.ensure_custom_tests_table(project_id, dataset_id)
+            
+            query = f"""
+                SELECT *
+                FROM `{full_table_name}`
+                WHERE is_active = true
+                AND target_dataset = '{target_dataset}'
+                AND target_table = '{target_table}'
+            """
+            return await self.execute_query(query)
+        except Exception as e:
+            print(f"Failed to get custom tests: {str(e)}")
+            return []
 
 
 # Singleton instance

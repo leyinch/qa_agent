@@ -28,16 +28,58 @@ export default function HistoryList({ projectId, onViewResult }: HistoryListProp
     const [error, setError] = useState("");
 
     const fetchHistory = async () => {
-        if (!projectId) return;
         setLoading(true);
         setError("");
         try {
-            const res = await fetch(`/api/history?project_id=${projectId}&limit=50`);
+            const res = await fetch(`/api/history?project_id=${projectId}&limit=500`); // Fetch more rows since they are granular
             if (!res.ok) {
                 throw new Error("Failed to fetch history");
             }
-            const data = await res.json();
-            setHistory(data);
+            const rawData = await res.json();
+
+            // Group by execution_id
+            const grouped: Record<string, HistoryItem> = {};
+
+            rawData.forEach((row: any) => {
+                const execId = row.execution_id || 'unknown';
+
+                if (!grouped[execId]) {
+                    grouped[execId] = {
+                        execution_id: execId,
+                        timestamp: row.timestamp,
+                        project_id: row.project_id,
+                        comparison_mode: row.comparison_mode,
+                        source: row.source,
+                        target: row.target,
+                        status: 'PASS', // Default, will downgrade if any fail
+                        total_tests: 0,
+                        passed_tests: 0,
+                        failed_tests: 0,
+                        details: []
+                    };
+                }
+
+                const group = grouped[execId];
+                group.total_tests++;
+                group.details.push(row);
+
+                if (row.status === 'PASS') {
+                    group.passed_tests++;
+                } else if (row.status === 'FAIL') {
+                    group.failed_tests++;
+                    group.status = 'FAIL';
+                } else {
+                    // ERROR or other
+                    group.status = 'FAIL'; // Treat error as fail for high-level status
+                }
+            });
+
+            // Convert to array and sort descending by timestamp
+            const aggregatedHistory = Object.values(grouped).sort((a, b) =>
+                new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+            );
+
+            setHistory(aggregatedHistory);
         } catch (err: any) {
             setError(err.message || "An error occurred");
         } finally {
@@ -50,17 +92,8 @@ export default function HistoryList({ projectId, onViewResult }: HistoryListProp
     }, []);
 
     const handleViewClick = (run: HistoryItem) => {
-        let details = run.details;
-        if (typeof details === 'string') {
-            try {
-                details = JSON.parse(details);
-            } catch (e) {
-                console.error("Failed to parse details JSON", e);
-                alert("Error parsing result details.");
-                return;
-            }
-        }
-        onViewResult(details);
+        // run.details is already the list of test objects
+        onViewResult(run.details);
     };
 
     const getStatusColor = (status: string) => {
@@ -97,18 +130,6 @@ export default function HistoryList({ projectId, onViewResult }: HistoryListProp
             </span>
         );
     };
-
-    if (!projectId) {
-        return (
-            <div style={{ textAlign: 'center', padding: '3rem', background: 'var(--secondary)', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
-                <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>🆔</div>
-                <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem' }}>Project ID Required</h3>
-                <p style={{ color: 'var(--secondary-foreground)', fontSize: '0.875rem' }}>
-                    Please enter a Google Cloud Project ID above to see execution history.
-                </p>
-            </div>
-        );
-    }
 
     if (loading && history.length === 0) {
         return <div style={{ textAlign: 'center', padding: '2rem' }}>Loading history...</div>;

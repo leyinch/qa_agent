@@ -1,0 +1,38 @@
+steps:
+  # 1. Build the container image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', '$LOCATION-docker.pkg.dev/$PROJECT_ID/agent-repo/$_SERVICE_NAME:latest', '.']
+    dir: 'backend'
+  
+  # 2. Push the container image to Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', '$LOCATION-docker.pkg.dev/$PROJECT_ID/agent-repo/$_SERVICE_NAME:latest']
+  
+  # 3. Deploy to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - '$_SERVICE_NAME'
+      - '--image'
+      - '$LOCATION-docker.pkg.dev/$PROJECT_ID/agent-repo/$_SERVICE_NAME:latest'
+      - '--region'
+      - '$LOCATION'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--set-env-vars'
+      - 'GOOGLE_CLOUD_PROJECT=$PROJECT_ID'
+      # - '--service-account'
+      # - 'sa-qa-backend@$PROJECT_ID.iam.gserviceaccount.com'
+
+# Substitutions allow you to pass variables at build time
+substitutions:
+    _SERVICE_NAME: qa-agent-backend
+
+images:
+  - '$LOCATION-docker.pkg.dev/$PROJECT_ID/agent-repo/$_SERVICE_NAME:latest'
+
+options:
+  logging: CLOUD_LOGGING_ONLY

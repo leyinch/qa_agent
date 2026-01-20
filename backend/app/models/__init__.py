@@ -6,7 +6,7 @@ from .requests import (
     AISuggestion,
     MappingResult,
     CustomTestRequest,
-    AddSCDConfigRequest
+    ProjectSettings
 )
 from .responses import (
     TestSummary,
@@ -23,10 +23,10 @@ __all__ = [
     "AISuggestion",
     "MappingResult",
     "CustomTestRequest",
-    "AddSCDConfigRequest",
     "TestSummary",
     "ConfigTableSummary",
     "GenerateTestsResponse",
     "ConfigTableResponse",
-    "HealthResponse"
+    "HealthResponse",
+    "ProjectSettings"
 ]

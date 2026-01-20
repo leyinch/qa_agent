@@ -10,13 +10,14 @@ This guide explains how to set up the configuration tables for the Data QA Agent
    ```bash
    # Open BigQuery Console
    # Copy and paste the contents of config_tables_setup.sql
+   # Update the project ID in the script from 'miruna-sandpit' to your project ID
    # Execute the script
    ```
 
 2. **Verify tables were created**:
    ```sql
    SELECT table_name 
-   FROM `miruna-sandpit.config.INFORMATION_SCHEMA.TABLES`;
+   FROM `YOUR_PROJECT_ID.config.INFORMATION_SCHEMA.TABLES`;
    ```
 
 ## Config Tables
@@ -27,14 +28,16 @@ Stores GCS-to-BigQuery mappings and test configurations.
 
 **Key columns:**
 - `mapping_id`: Unique identifier for each data load
-- `source_bucket`, `source_file_path`: GCS source location
+- `source_bucket`, `source_file_path`: GCS source location (if applicable)
+- `source_project`, `source_dataset`, `source_table`: BigQuery source location (if applicable)
 - `target_dataset`, `target_table`: BigQuery destination
 - `enabled_test_ids`: Which predefined tests to run
 - `auto_suggest`: Enable/disable AI test suggestions
+- `outlier_columns`: Columns to check for statistical outliers
 
 **Example:**
 ```sql
-SELECT * FROM `miruna-sandpit.config.data_load_config` 
+SELECT * FROM `YOUR_PROJECT_ID.config.data_load_config` 
 WHERE is_active = true;
 ```
 
@@ -56,11 +59,6 @@ System-wide test definitions (8 standard tests included).
 
 Stores AI-suggested tests pending user approval.
 
-**Workflow:**
-1. AI suggests tests after analyzing data
-2. User reviews in UI
-3. Approved tests can be added to predefined suite
-
 ### 4. `test_execution_history` - Audit Trail
 
 Tracks all test executions for monitoring and debugging.
@@ -68,7 +66,7 @@ Tracks all test executions for monitoring and debugging.
 ## Adding a New Mapping
 
 ```sql
-INSERT INTO `miruna-sandpit.config.data_load_config`
+INSERT INTO `YOUR_PROJECT_ID.config.data_load_config`
 (mapping_id, mapping_name, source_bucket, source_file_path, source_file_format,
  target_dataset, target_table, primary_key_columns, required_columns,
  enabled_test_ids, is_active)
@@ -108,6 +106,13 @@ enabled_test_ids: ['row_count_match', 'referential_integrity']
 foreign_key_checks: JSON '{"customer_id": {"table": "analytics.customers", "column": "id"}}'
 ```
 
+### With Outlier Detection
+```sql
+-- Check for statistical outliers (2 standard deviations)
+enabled_test_ids: ['row_count_match', 'outlier_detection']
+outlier_columns: ['transaction_amount', 'processing_time_ms']
+```
+
 ## Using in the App
 
 1. **Select "GCS File Comparison" mode**
@@ -115,64 +120,18 @@ foreign_key_checks: JSON '{"customer_id": {"table": "analytics.customers", "colu
 3. **Enter**: `config` (dataset) and `data_load_config` (table)
 4. **Click "Run Tests"**
 
-The app will:
-- Read all active mappings from the config table
-- Run predefined tests on each mapping
-- Generate AI suggestions for additional tests
-- Display results grouped by mapping
-
 ## Maintenance
 
 ### View Active Mappings
 ```sql
 SELECT mapping_id, mapping_name, target_table, is_active
-FROM `miruna-sandpit.config.data_load_config`
+FROM `YOUR_PROJECT_ID.config.data_load_config`
 WHERE is_active = true;
 ```
 
 ### Disable a Mapping
 ```sql
-UPDATE `miruna-sandpit.config.data_load_config`
+UPDATE `YOUR_PROJECT_ID.config.data_load_config`
 SET is_active = false, updated_at = CURRENT_TIMESTAMP()
 WHERE mapping_id = 'my_data_load';
 ```
-
-### View Test History
-```sql
-SELECT 
-  mapping_id,
-  test_name,
-  status,
-  rows_affected,
-  executed_at
-FROM `miruna-sandpit.config.test_execution_history`
-WHERE mapping_id = 'my_data_load'
-ORDER BY executed_at DESC
-LIMIT 100;
-```
-
-## Best Practices
-
-1. **Start Simple**: Begin with global tests only
-2. **Add Gradually**: Add specific tests as you understand your data
-3. **Use Descriptive IDs**: Make mapping_id clear and meaningful
-4. **Enable Auto-Suggest**: Let AI help discover edge cases
-5. **Review History**: Monitor test results over time
-6. **Keep Active**: Set `is_active = false` instead of deleting
-
-## Troubleshooting
-
-**No tables found:**
-- Check dataset name is `config`
-- Verify you have permissions
-- Run the setup script again
-
-**Tests not running:**
-- Check `is_active = true`
-- Verify `enabled_test_ids` is not empty
-- Check table names are correct
-
-**AI suggestions not appearing:**
-- Ensure `auto_suggest = true`
-- Check you have Vertex AI API enabled
-- Verify project permissions
