@@ -199,6 +199,8 @@ class BigQueryService:
                     bigquery.SchemaField("description", "STRING", mode="NULLABLE"),
                     bigquery.SchemaField("custom_tests", "JSON", mode="NULLABLE"),
                     bigquery.SchemaField("cron_schedule", "STRING", mode="NULLABLE"),
+                    bigquery.SchemaField("created_at", "TIMESTAMP", mode="NULLABLE"),
+                    bigquery.SchemaField("updated_at", "TIMESTAMP", mode="NULLABLE"),
                 ]
                 table = bigquery.Table(scd_table, schema=schema)
                 self.client.create_table(table)
@@ -262,32 +264,75 @@ class BigQueryService:
             True if successful, False otherwise
         """
         try:
-            import datetime
-            
             full_table_name = f"{project_id}.{config_dataset}.{config_table}"
             
-            # Prepare row for insertion
-            row = {
-                "config_id": config_data.get("config_id"),
-                "target_dataset": config_data.get("target_dataset"),
-                "target_table": config_data.get("target_table"),
-                "scd_type": config_data.get("scd_type"),
-                "primary_keys": config_data.get("primary_keys", []),
-                "surrogate_key": config_data.get("surrogate_key"),
-                "begin_date_column": config_data.get("begin_date_column"),
-                "end_date_column": config_data.get("end_date_column"),
-                "active_flag_column": config_data.get("active_flag_column"),
-                "description": config_data.get("description", ""),
-                "custom_tests": config_data.get("custom_tests"),
-                "cron_schedule": config_data.get("cron_schedule")
-            }
+            # Use MERGE to update if table exists, insert if not
+            # Join key is (target_dataset, target_table) as requested
+            query = f"""
+                MERGE `{full_table_name}` T
+                USING (
+                    SELECT 
+                        @config_id as config_id, 
+                        @target_dataset as target_dataset, 
+                        @target_table as target_table,
+                        @scd_type as scd_type,
+                        @primary_keys as primary_keys,
+                        @surrogate_key as surrogate_key,
+                        @begin_date_column as begin_date_column,
+                        @end_date_column as end_date_column,
+                        @active_flag_column as active_flag_column,
+                        @description as description,
+                        SAFE.PARSE_JSON(@custom_tests) as custom_tests,
+                        @cron_schedule as cron_schedule
+                ) S
+                ON T.target_dataset = S.target_dataset AND T.target_table = S.target_table
+                WHEN MATCHED THEN
+                    UPDATE SET 
+                        config_id = S.config_id,
+                        scd_type = S.scd_type,
+                        primary_keys = S.primary_keys,
+                        surrogate_key = S.surrogate_key,
+                        begin_date_column = S.begin_date_column,
+                        end_date_column = S.end_date_column,
+                        active_flag_column = S.active_flag_column,
+                        description = S.description,
+                        custom_tests = S.custom_tests,
+                        cron_schedule = S.cron_schedule,
+                        updated_at = CURRENT_TIMESTAMP()
+                WHEN NOT MATCHED THEN
+                    INSERT (
+                        config_id, target_dataset, target_table, scd_type, 
+                        primary_keys, surrogate_key, begin_date_column, 
+                        end_date_column, active_flag_column, description, 
+                        custom_tests, cron_schedule, created_at, updated_at
+                    )
+                    VALUES (
+                        S.config_id, S.target_dataset, S.target_table, S.scd_type,
+                        S.primary_keys, S.surrogate_key, S.begin_date_column,
+                        S.end_date_column, S.active_flag_column, S.description,
+                        S.custom_tests, S.cron_schedule, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()
+                    )
+            """
             
-            # Insert into BigQuery
-            errors = self.client.insert_rows_json(full_table_name, [row])
+            job_config = bigquery.QueryJobConfig(
+                query_parameters=[
+                    bigquery.ScalarQueryParameter("config_id", "STRING", config_data.get("config_id")),
+                    bigquery.ScalarQueryParameter("target_dataset", "STRING", config_data.get("target_dataset")),
+                    bigquery.ScalarQueryParameter("target_table", "STRING", config_data.get("target_table")),
+                    bigquery.ScalarQueryParameter("scd_type", "STRING", config_data.get("scd_type")),
+                    bigquery.ArrayQueryParameter("primary_keys", "STRING", config_data.get("primary_keys", [])),
+                    bigquery.ScalarQueryParameter("surrogate_key", "STRING", config_data.get("surrogate_key")),
+                    bigquery.ScalarQueryParameter("begin_date_column", "STRING", config_data.get("begin_date_column")),
+                    bigquery.ScalarQueryParameter("end_date_column", "STRING", config_data.get("end_date_column")),
+                    bigquery.ScalarQueryParameter("active_flag_column", "STRING", config_data.get("active_flag_column")),
+                    bigquery.ScalarQueryParameter("description", "STRING", config_data.get("description", "")),
+                    bigquery.ScalarQueryParameter("custom_tests", "STRING", json.dumps(config_data.get("custom_tests")) if config_data.get("custom_tests") else None),
+                    bigquery.ScalarQueryParameter("cron_schedule", "STRING", config_data.get("cron_schedule")),
+                ]
+            )
             
-            if errors:
-                print(f"Failed to insert SCD config: {errors}")
-                return False
+            query_job = self.client.query(query, job_config=job_config)
+            query_job.result()
             
             return True
             

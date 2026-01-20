@@ -106,6 +106,7 @@ class AddSCDConfigRequest(BaseModel):
     active_flag_column: Optional[str] = Field(None, description="Active flag column (SCD2)")
     description: Optional[str] = Field("", description="Configuration description")
     custom_tests: Optional[List[Dict[str, str]]] = Field(None, description="List of custom business rules (name/sql)")
+    cron_schedule: Optional[str] = Field(None, description="Cron schedule for the tests")
 
 
 class SaveHistoryRequest(BaseModel):
