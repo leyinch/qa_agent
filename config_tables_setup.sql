@@ -18,13 +18,18 @@ CREATE TABLE IF NOT EXISTS `miruna-sandpit.config.data_load_config` (
   description STRING,
   
   -- Source (GCS)
-  source_bucket STRING NOT NULL,
-  source_file_path STRING NOT NULL,
-  source_file_format STRING NOT NULL,  -- 'csv', 'json', 'parquet', 'avro'
-  
+  source_bucket STRING,
+  source_file_path STRING,
+  source_file_format STRING,  -- 'csv', 'json', 'parquet', 'avro'
+
   -- Target (BigQuery)
   target_dataset STRING NOT NULL,
   target_table STRING NOT NULL,
+
+  -- Source (BigQuery)
+  source_project STRING,
+  source_dataset STRING,
+  source_table STRING,
   
   -- Test configuration
   primary_key_columns ARRAY<STRING>,

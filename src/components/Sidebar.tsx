@@ -2,7 +2,7 @@
 
 import React from 'react';
 
-type ComparisonMode = 'schema' | 'gcs' | 'history' | 'scd';
+type ComparisonMode = 'schema' | 'gcs' | 'history' | 'settings';
 
 interface SidebarProps {
     currentMode: ComparisonMode;
@@ -12,9 +12,9 @@ interface SidebarProps {
 export default function Sidebar({ currentMode, onModeChange }: SidebarProps) {
     const menuItems = [
         { id: 'schema', label: 'Schema Validation', icon: '📊' },
-        { id: 'scd', label: 'SCD Validation', icon: '🔄' },
         { id: 'gcs', label: 'GCS Comparison', icon: '📁' },
         { id: 'history', label: 'History', icon: '📜' },
+        { id: 'settings', label: 'Settings', icon: '⚙️' },
     ];
 
     return (

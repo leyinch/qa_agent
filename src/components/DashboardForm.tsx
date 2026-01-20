@@ -1,20 +1,13 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import HistoryList from "./HistoryList";
 
-type ComparisonMode = 'schema' | 'gcs' | 'history' | 'scd';
+type ComparisonMode = 'schema' | 'gcs' | 'history' | 'settings';
 type FileFormat = 'csv' | 'json' | 'parquet' | 'avro';
-type GCSMode = 'single' | 'config';
-type SCDMode = 'direct' | 'config';
 
-interface CustomTest {
-    name: string;
-    sql: string;
-    description: string;
-    severity: string;
-}
+// ... types remain ...
 
 interface DashboardFormProps {
     comparisonMode: ComparisonMode;
@@ -27,51 +20,16 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
     const [projectId, setProjectId] = useState("");
     const [loading, setLoading] = useState(false);
 
-    // Persistence: load from localStorage on mount
-    useEffect(() => {
-        const savedProjectId = localStorage.getItem("projectId");
-        if (savedProjectId) {
-            setProjectId(savedProjectId);
-        }
-    }, []);
-
     // Schema mode state
     const [datasets, setDatasets] = useState<string[]>(['']);
     const [erdDescription, setErdDescription] = useState("");
 
     // GCS mode state
-    const [gcsMode, setGcsMode] = useState<GCSMode>('single');
+    // GCS mode state (Config Table only)
     const [configDataset, setConfigDataset] = useState("");
     const [configTable, setConfigTable] = useState("");
-    const [gcsBucket, setGcsBucket] = useState("");
-    const [gcsFilePath, setGcsFilePath] = useState("");
-    const [fileFormat, setFileFormat] = useState<FileFormat>('csv');
-    const [targetDataset, setTargetDataset] = useState("");
-    const [targetTable, setTargetTable] = useState("");
 
-    // SCD mode state
-    const [scdMode, setScdMode] = useState<SCDMode>('direct');
-    const [scdType, setScdType] = useState<'scd1' | 'scd2'>('scd2');
-    const [primaryKeys, setPrimaryKeys] = useState("");
-    const [surrogateKey, setSurrogateKey] = useState("");
-    const [beginDateColumn, setBeginDateColumn] = useState("DWBeginEffDateTime");
-    const [endDateColumn, setEndDateColumn] = useState("DWEndEffDateTime");
-    const [activeFlagColumn, setActiveFlagColumn] = useState("DWCurrentRowFlag");
-    const [customTests, setCustomTests] = useState<CustomTest[]>([]);
 
-    // New config form state
-    const [showAddConfig, setShowAddConfig] = useState(false);
-    const [newConfigId, setNewConfigId] = useState("");
-    const [newTargetDataset, setNewTargetDataset] = useState("");
-    const [newTargetTable, setNewTargetTable] = useState("");
-    const [newScdType, setNewScdType] = useState<'scd1' | 'scd2'>('scd2');
-    const [newPrimaryKeys, setNewPrimaryKeys] = useState("");
-    const [newSurrogateKey, setNewSurrogateKey] = useState("");
-    const [newBeginDateColumn, setNewBeginDateColumn] = useState("DWBeginEffDateTime");
-    const [newEndDateColumn, setNewEndDateColumn] = useState("DWEndEffDateTime");
-    const [newActiveFlagColumn, setNewActiveFlagColumn] = useState("DWCurrentRowFlag");
-    const [newDescription, setNewDescription] = useState("");
-    const [newCustomTests, setNewCustomTests] = useState<CustomTest[]>([]);
 
     const addDataset = () => setDatasets([...datasets, '']);
 
@@ -84,35 +42,6 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
         const newDatasets = [...datasets];
         newDatasets[index] = value;
         setDatasets(newDatasets);
-    };
-
-    const addCustomTest = (isNewConfig: boolean) => {
-        const emptyTest: CustomTest = { name: "", sql: "", description: "", severity: "HIGH" };
-        if (isNewConfig) {
-            setNewCustomTests([...newCustomTests, emptyTest]);
-        } else {
-            setCustomTests([...customTests, emptyTest]);
-        }
-    };
-
-    const removeCustomTest = (index: number, isNewConfig: boolean) => {
-        if (isNewConfig) {
-            setNewCustomTests(newCustomTests.filter((_, i) => i !== index));
-        } else {
-            setCustomTests(customTests.filter((_, i) => i !== index));
-        }
-    };
-
-    const handleCustomTestChange = (index: number, field: keyof CustomTest, value: string, isNewConfig: boolean) => {
-        if (isNewConfig) {
-            const updated = [...newCustomTests];
-            updated[index] = { ...updated[index], [field]: value };
-            setNewCustomTests(updated);
-        } else {
-            const updated = [...customTests];
-            updated[index] = { ...updated[index], [field]: value };
-            setCustomTests(updated);
-        }
     };
 
     const handleViewResult = (details: any) => {
@@ -142,7 +71,7 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
         setLoading(true);
 
         try {
-            const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://data-qa-agent-backend-1037417342779.us-central1.run.app';
+            const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
             const endpoint = `${backendUrl}/api/generate-tests`;
 
             let payload: any = {
@@ -161,49 +90,13 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
                     erd_description: erdDescription
                 };
             } else if (comparisonMode === 'gcs') {
-                if (gcsMode === 'single') {
-                    payload = {
-                        ...payload,
-                        gcs_bucket: gcsBucket,
-                        gcs_file_path: gcsFilePath,
-                        file_format: fileFormat,
-                        target_dataset: targetDataset,
-                        target_table: targetTable,
-                        erd_description: erdDescription // Optional
-                    };
-                } else if (gcsMode === 'config') {
-                    payload = {
-                        ...payload,
-                        comparison_mode: 'gcs-config',
-                        config_dataset: configDataset,
-                        config_table: configTable
-                    };
-                }
-            } else if (comparisonMode === 'scd') {
-                if (scdMode === 'direct') {
-                    if (!targetDataset || !targetTable || !primaryKeys) {
-                        throw new Error("Target dataset, table, and primary keys are required for SCD validation.");
-                    }
-                    payload = {
-                        ...payload,
-                        target_dataset: targetDataset,
-                        target_table: targetTable,
-                        scd_type: scdType,
-                        primary_keys: primaryKeys.split(',').map(k => k.trim()),
-                        surrogate_key: surrogateKey || undefined,
-                        begin_date_column: scdType === 'scd2' ? beginDateColumn : undefined,
-                        end_date_column: scdType === 'scd2' ? endDateColumn : undefined,
-                        active_flag_column: scdType === 'scd2' ? activeFlagColumn : undefined,
-                        custom_tests: customTests.length > 0 ? customTests : undefined
-                    };
-                } else if (scdMode === 'config') {
-                    payload = {
-                        ...payload,
-                        comparison_mode: 'scd-config',
-                        config_dataset: configDataset,
-                        config_table: configTable
-                    };
-                }
+                // Use GCS Config Table mode exclusively
+                payload = {
+                    ...payload,
+                    comparison_mode: 'gcs-config',
+                    config_dataset: configDataset,
+                    config_table: configTable
+                };
             }
 
             const response = await fetch(endpoint, {
@@ -223,6 +116,37 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
             localStorage.setItem("projectId", projectId);
             handleViewResult(data);
 
+            // Trigger notification if execution_id is present
+            if (data.execution_id) {
+                // Ensure we have a summary structure even if backend returns different formats
+                let summary = data.summary;
+                if (!summary && data.results) {
+                    // Calculate summary client-side if missing (fallback)
+                    const total = data.results.length;
+                    const passed = data.results.filter((r: any) => r.status === 'PASS').length;
+                    const failed = data.results.filter((r: any) => r.status === 'FAIL').length;
+                    const errors = data.results.filter((r: any) => r.status === 'ERROR').length;
+                    summary = { total_tests: total, passed, failed, errors };
+                }
+
+                if (summary) {
+                    try {
+                        const notifyRes = await fetch(`${backendUrl}/api/notify`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                project_id: projectId,
+                                execution_id: data.execution_id,
+                                summary: summary
+                            })
+                        });
+                        console.log("Notification trigger response:", notifyRes.status);
+                    } catch (notifyErr) {
+                        console.error("Failed to trigger notification:", notifyErr);
+                    }
+                }
+            }
+
         } catch (error: any) {
             console.error("Error generating tests:", error);
             alert(error.message || "An error occurred while generating tests.");
@@ -231,84 +155,94 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
         }
     };
 
-    const handleAddConfig = async () => {
+    // Settings state
+    const [alertEmails, setAlertEmails] = useState("");
+    const [teamsWebhook, setTeamsWebhook] = useState("");
+    const [alertOnFailure, setAlertOnFailure] = useState(true);
+
+    const fetchSettings = async () => {
+        if (!projectId) return;
         try {
-            if (!newConfigId || !newTargetDataset || !newTargetTable || !newPrimaryKeys) {
-                alert("Please fill in all required fields (Config ID, Dataset, Table, Primary Keys)");
-                return;
+            const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
+            const res = await fetch(`${backendUrl}/api/settings?project_id=${projectId}`);
+            if (res.ok) {
+                const data = await res.json();
+                setAlertEmails((data.alert_emails || []).join(', '));
+                setTeamsWebhook(data.teams_webhook_url || '');
+                setAlertOnFailure(data.alert_on_failure !== undefined ? data.alert_on_failure : true);
             }
+        } catch (e) {
+            console.error("Failed to fetch settings", e);
+        }
+    };
 
-            const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://data-qa-agent-backend-1037417342779.us-central1.run.app';
-            const endpoint = `${backendUrl}/api/scd-config`;
-
+    const handleSaveSettings = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!projectId) {
+            alert("Project ID is required");
+            return;
+        }
+        setLoading(true);
+        try {
+            const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
             const payload = {
                 project_id: projectId,
-                config_dataset: configDataset,
-                config_table: configTable,
-                config_id: newConfigId,
-                target_dataset: newTargetDataset,
-                target_table: newTargetTable,
-                scd_type: newScdType,
-                primary_keys: newPrimaryKeys.split(',').map(k => k.trim()),
-                surrogate_key: newSurrogateKey || null,
-                begin_date_column: newScdType === 'scd2' ? newBeginDateColumn : null,
-                end_date_column: newScdType === 'scd2' ? newEndDateColumn : null,
-                active_flag_column: newScdType === 'scd2' ? newActiveFlagColumn : null,
-                description: newDescription,
-                custom_tests: newCustomTests.length > 0 ? newCustomTests : null
+                alert_emails: alertEmails.split(',').map(s => s.trim()).filter(Boolean),
+                teams_webhook_url: teamsWebhook,
+                alert_on_failure: alertOnFailure
             };
 
-            const response = await fetch(endpoint, {
+            const res = await fetch(`${backendUrl}/api/settings`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(payload),
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
             });
 
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.detail || 'Failed to add configuration');
-            }
-
-            alert(`Configuration "${newConfigId}" added successfully!`);
-
-            // Reset form
-            setShowAddConfig(false);
-            setNewConfigId("");
-            setNewTargetDataset("");
-            setNewTargetTable("");
-            setNewPrimaryKeys("");
-            setNewSurrogateKey("");
-            setNewDescription("");
-
+            if (!res.ok) throw new Error("Failed to save settings");
+            alert("Settings saved successfully!");
+            // No need to close settings, user can navigate away using sidebar
         } catch (error: any) {
-            console.error("Error adding config:", error);
-            alert(error.message || "An error occurred while adding the configuration.");
+            alert(error.message);
+        } finally {
+            setLoading(false);
         }
     };
 
     return (
-        <form onSubmit={handleSubmit} className="card fade-in" style={{ width: '100%', maxWidth: '800px' }}>
-            {/* Header Removed */}
+        <form onSubmit={comparisonMode === 'settings' ? handleSaveSettings : handleSubmit} className="card fade-in" style={{ width: '100%', maxWidth: '800px' }}>
 
-            {/* Comparison Mode Toggle Removed */}
-
-            <h2 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '1.5rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem' }}>
-                {comparisonMode === 'schema' && 'Schema Validation Setup'}
-                {comparisonMode === 'gcs' && 'GCS Comparison Setup'}
-                {comparisonMode === 'scd' && 'SCD Validation Setup'}
-                {comparisonMode === 'history' && 'Execution History'}
-            </h2>
-
-            {/* Project ID (common field) */}
-            {/* ... */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem' }}>
+                <h2 style={{ fontSize: '1.5rem', fontWeight: '700', margin: 0 }}>
+                    {comparisonMode === 'settings' ? 'Alert Settings' :
+                        comparisonMode === 'schema' ? 'Schema Validation Setup' :
+                            comparisonMode === 'gcs' ? 'GCS Comparison Setup' :
+                                'Execution History'
+                    }
+                </h2>
+                {/* Settings button removed, use Sidebar */}
+                {comparisonMode === 'settings' && (
+                    <button
+                        type="button"
+                        onClick={fetchSettings} // Allow manually refreshing settings
+                        style={{
+                            padding: '0.5rem 1rem',
+                            background: 'var(--secondary)',
+                            border: '1px solid var(--border)',
+                            borderRadius: 'var(--radius)',
+                            cursor: 'pointer',
+                            fontSize: '0.875rem'
+                        }}
+                    >
+                        🔄 Refresh
+                    </button>
+                )}
+            </div>
 
             {/* Project ID (common field) */}
             <div style={{ marginBottom: '1.75rem' }}>
                 <label className="label" htmlFor="projectId">
                     <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        🔑 Google Cloud Project ID<span className="required">*</span>
+                        🔑 Google Cloud Project ID
                     </span>
                 </label>
                 <input
@@ -316,14 +250,66 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
                     type="text"
                     className="input"
                     value={projectId}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setProjectId(e.target.value)}
+                    onChange={(e) => setProjectId(e.target.value)}
                     required
-                    placeholder="Project with BigQuery data (e.g., miruna-sandpit)"
+                    placeholder="e.g., miruna-sandpit"
+                    disabled={comparisonMode === 'settings'}
                 />
             </div>
 
-            {/* History Mode */}
-            {comparisonMode === 'history' ? (
+            {comparisonMode === 'settings' ? (
+                <div className="fade-in">
+                    <div style={{ marginBottom: '1.75rem' }}>
+                        <label className="label" htmlFor="alertEmails">
+                            📧 Alert Emails (Comma separated)
+                        </label>
+                        <input
+                            id="alertEmails"
+                            type="text"
+                            className="input"
+                            value={alertEmails}
+                            onChange={(e) => setAlertEmails(e.target.value)}
+                            placeholder="user@example.com, input@test.com"
+                        />
+                    </div>
+
+                    <div style={{ marginBottom: '1.75rem' }}>
+                        <label className="label" htmlFor="teamsWebhook">
+                            💬 Teams Webhook URL
+                        </label>
+                        <input
+                            id="teamsWebhook"
+                            type="text"
+                            className="input"
+                            value={teamsWebhook}
+                            onChange={(e) => setTeamsWebhook(e.target.value)}
+                            placeholder="https://miruna.webhook.office.com/webhookb2/..."
+                        />
+                    </div>
+
+                    <div style={{ marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <input
+                            id="alertOnFailure"
+                            type="checkbox"
+                            checked={alertOnFailure}
+                            onChange={(e) => setAlertOnFailure(e.target.checked)}
+                            style={{ width: '1.25rem', height: '1.25rem' }}
+                        />
+                        <label htmlFor="alertOnFailure" style={{ fontSize: '1rem', cursor: 'pointer' }}>
+                            Enable Alerts on Test Failure
+                        </label>
+                    </div>
+
+                    <button
+                        type="submit"
+                        className="btn btn-primary"
+                        style={{ width: '100%', fontSize: '1rem', padding: '1rem' }}
+                        disabled={loading}
+                    >
+                        {loading ? 'Saving...' : '💾 Save Settings'}
+                    </button>
+                </div>
+            ) : comparisonMode === 'history' ? (
                 <HistoryList projectId={projectId} onViewResult={handleViewResult} />
             ) : (
                 <>
@@ -369,7 +355,7 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
                                                 type="text"
                                                 className="input"
                                                 value={dataset}
-                                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleDatasetChange(index, e.target.value)}
+                                                onChange={(e) => handleDatasetChange(index, e.target.value)}
                                                 placeholder={`Dataset ${index + 1} (e.g., ecommerce_data)`}
                                                 style={{ flex: 1, marginBottom: 0 }}
                                             />
@@ -389,8 +375,8 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
                                                         transition: 'all 0.2s ease',
                                                         minWidth: '80px'
                                                     }}
-                                                    onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => (e.currentTarget.style.transform = 'scale(1.05)')}
-                                                    onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => (e.currentTarget.style.transform = 'scale(1)')}
+                                                    onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
+                                                    onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
                                                 >
                                                     Remove
                                                 </button>
@@ -415,11 +401,11 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
                                         width: '100%',
                                         transition: 'all 0.2s ease'
                                     }}
-                                    onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
+                                    onMouseEnter={(e) => {
                                         e.currentTarget.style.background = 'var(--primary)';
                                         e.currentTarget.style.color = 'white';
                                     }}
-                                    onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
+                                    onMouseLeave={(e) => {
                                         e.currentTarget.style.background = 'var(--secondary)';
                                         e.currentTarget.style.color = 'var(--primary)';
                                     }}
@@ -439,7 +425,7 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
                                     id="erdDescription"
                                     className="input"
                                     value={erdDescription}
-                                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setErdDescription(e.target.value)}
+                                    onChange={(e) => setErdDescription(e.target.value)}
                                     required
                                     placeholder="Describe your table relationships, primary keys, foreign keys, and expected data constraints..."
                                     rows={8}
@@ -457,890 +443,45 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
                         </>
                     )}
 
-                    {/* GCS Comparison Mode Fields */}
+                    {/* GCS Comparison Mode Fields - Config Table ONLY */}
                     {comparisonMode === 'gcs' && (
                         <>
-                            {/* GCS Mode Toggle */}
-                            <div style={{ marginBottom: '2rem' }}>
-                                <label className="label">Data Source</label>
-                                <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
-                                    <button
-                                        type="button"
-                                        onClick={() => setGcsMode('single')}
-                                        style={{
-                                            flex: 1,
-                                            padding: '0.75rem',
-                                            background: gcsMode === 'single' ? 'var(--gradient-primary)' : 'var(--secondary)',
-                                            color: gcsMode === 'single' ? 'white' : 'var(--foreground)',
-                                            border: gcsMode === 'single' ? 'none' : '2px solid var(--border)',
-                                            borderRadius: 'var(--radius)',
-                                            cursor: 'pointer',
-                                            fontWeight: '600',
-                                            transition: 'all 0.2s ease'
-                                        }}
-                                    >
-                                        📄 Single File
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setGcsMode('config')}
-                                        style={{
-                                            flex: 1,
-                                            padding: '0.75rem',
-                                            background: gcsMode === 'config' ? 'var(--gradient-primary)' : 'var(--secondary)',
-                                            color: gcsMode === 'config' ? 'white' : 'var(--foreground)',
-                                            border: gcsMode === 'config' ? 'none' : '2px solid var(--border)',
-                                            borderRadius: 'var(--radius)',
-                                            cursor: 'pointer',
-                                            fontWeight: '600',
-                                            transition: 'all 0.2s ease'
-                                        }}
-                                    >
-                                        📋 Config Table
-                                    </button>
-                                </div>
+                            <div style={{ marginBottom: '1.75rem' }}>
+                                <label className="label" htmlFor="configDataset">
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        📁 Config Dataset
+                                    </span>
+                                </label>
+                                <input
+                                    id="configDataset"
+                                    type="text"
+                                    className="input"
+                                    value={configDataset}
+                                    onChange={(e) => setConfigDataset(e.target.value)}
+                                    required
+                                    placeholder="e.g., config"
+                                />
                             </div>
 
-                            {/* Config Table Mode */}
-                            {gcsMode === 'config' && (
-                                <>
-                                    <div style={{ marginBottom: '1.75rem' }}>
-                                        <label className="label" htmlFor="configDataset">
-                                            <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                📁 Config Dataset
-                                            </span>
-                                        </label>
-                                        <input
-                                            id="configDataset"
-                                            type="text"
-                                            className="input"
-                                            value={configDataset}
-                                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfigDataset(e.target.value)}
-                                            required
-                                            placeholder="e.g., config"
-                                        />
-                                    </div>
-
-                                    <div style={{ marginBottom: '1.75rem' }}>
-                                        <label className="label" htmlFor="configTable">
-                                            <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                📊 Config Table Name
-                                            </span>
-                                        </label>
-                                        <input
-                                            id="configTable"
-                                            type="text"
-                                            className="input"
-                                            value={configTable}
-                                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfigTable(e.target.value)}
-                                            required
-                                            placeholder="e.g., data_load_config"
-                                        />
-                                        <p style={{ fontSize: '0.8125rem', color: 'var(--secondary-foreground)', marginTop: '0.75rem', fontStyle: 'italic' }}>
-                                            💡 The config table contains all GCS-to-BigQuery mappings and test configurations
-                                        </p>
-                                    </div>
-                                </>
-                            )}
-
-                            {/* Single File Mode */}
-                            {gcsMode === 'single' && (
-                                <>
-                                    {/* GCS Bucket */}
-                                    <div style={{ marginBottom: '1.75rem' }}>
-                                        <label className="label" htmlFor="gcsBucket">
-                                            <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                🪣 GCS Bucket Name
-                                            </span>
-                                        </label>
-                                        <input
-                                            id="gcsBucket"
-                                            type="text"
-                                            className="input"
-                                            value={gcsBucket}
-                                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setGcsBucket(e.target.value)}
-                                            required
-                                            placeholder="e.g., my-data-bucket"
-                                        />
-                                    </div>
-
-                                    {/* GCS File Path */}
-                                    <div style={{ marginBottom: '1.75rem' }}>
-                                        <label className="label" htmlFor="gcsFilePath">
-                                            <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                📄 File Path in Bucket
-                                            </span>
-                                        </label>
-                                        <input
-                                            id="gcsFilePath"
-                                            type="text"
-                                            className="input"
-                                            value={gcsFilePath}
-                                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setGcsFilePath(e.target.value)}
-                                            required
-                                            placeholder="e.g., raw/customers_2024.csv or data/*.csv"
-                                        />
-                                        <p style={{ fontSize: '0.8125rem', color: 'var(--secondary-foreground)', marginTop: '0.5rem', fontStyle: 'italic' }}>
-                                            💡 Supports wildcards for multiple files
-                                        </p>
-                                    </div>
-
-                                    {/* File Format */}
-                                    <div style={{ marginBottom: '1.75rem' }}>
-                                        <label className="label" htmlFor="fileFormat">
-                                            <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                📋 File Format
-                                            </span>
-                                        </label>
-                                        <select
-                                            id="fileFormat"
-                                            className="input"
-                                            value={fileFormat}
-                                            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFileFormat(e.target.value as FileFormat)}
-                                            required
-                                            style={{ cursor: 'pointer' }}
-                                        >
-                                            <option value="csv">CSV</option>
-                                            <option value="json">JSON</option>
-                                            <option value="parquet">Parquet</option>
-                                            <option value="avro">Avro</option>
-                                        </select>
-                                    </div>
-
-                                    {/* Target Dataset */}
-                                    <div style={{ marginBottom: '1.75rem' }}>
-                                        <label className="label" htmlFor="targetDataset">
-                                            <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                🎯 Target BigQuery Dataset
-                                            </span>
-                                        </label>
-                                        <input
-                                            id="targetDataset"
-                                            type="text"
-                                            className="input"
-                                            value={targetDataset}
-                                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTargetDataset(e.target.value)}
-                                            required
-                                            placeholder="e.g., analytics"
-                                        />
-                                    </div>
-
-                                    {/* Target Table */}
-                                    <div style={{ marginBottom: '1.75rem' }}>
-                                        <label className="label" htmlFor="targetTable">
-                                            <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                📊 Target BigQuery Table
-                                            </span>
-                                        </label>
-                                        <input
-                                            id="targetTable"
-                                            type="text"
-                                            className="input"
-                                            value={targetTable}
-                                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTargetTable(e.target.value)}
-                                            required
-                                            placeholder="e.g., customers"
-                                        />
-                                    </div>
-
-                                    {/* Optional ERD Description for GCS mode */}
-                                    <div style={{ marginBottom: '2rem' }}>
-                                        <label className="label" htmlFor="erdDescriptionGcs">
-                                            <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                📝 Expected Schema (Optional)
-                                            </span>
-                                        </label>
-                                        <textarea
-                                            id="erdDescriptionGcs"
-                                            className="input"
-                                            value={erdDescription}
-                                            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setErdDescription(e.target.value)}
-                                            placeholder="Describe expected schema, data types, and constraints..."
-                                            rows={6}
-                                            style={{
-                                                resize: 'vertical',
-                                                fontFamily: 'JetBrains Mono, monospace',
-                                                fontSize: '0.875rem',
-                                                lineHeight: '1.6'
-                                            }}
-                                        />
-                                        <p style={{ fontSize: '0.8125rem', color: 'var(--secondary-foreground)', marginTop: '0.75rem', fontStyle: 'italic' }}>
-                                            💡 Optional: Helps AI generate better validation tests
-                                        </p>
-                                    </div>
-                                </>
-                            )}
-                        </>
-                    )}
-
-                    {/* SCD Validation Mode Fields */}
-                    {comparisonMode === 'scd' && (
-                        <>
-                            {/* SCD Mode Toggle */}
-                            <div style={{ marginBottom: '2rem' }}>
-                                <label className="label">Validation Source</label>
-                                <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
-                                    <button
-                                        type="button"
-                                        onClick={() => setScdMode('direct')}
-                                        style={{
-                                            flex: 1,
-                                            padding: '0.75rem',
-                                            background: scdMode === 'direct' ? 'var(--gradient-primary)' : 'var(--secondary)',
-                                            color: scdMode === 'direct' ? 'white' : 'var(--foreground)',
-                                            border: scdMode === 'direct' ? 'none' : '2px solid var(--border)',
-                                            borderRadius: 'var(--radius)',
-                                            cursor: 'pointer',
-                                            fontWeight: '600',
-                                            transition: 'all 0.2s ease'
-                                        }}
-                                    >
-                                        ✏️ Direct Input
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setScdMode('config')}
-                                        style={{
-                                            flex: 1,
-                                            padding: '0.75rem',
-                                            background: scdMode === 'config' ? 'var(--gradient-primary)' : 'var(--secondary)',
-                                            color: scdMode === 'config' ? 'white' : 'var(--foreground)',
-                                            border: scdMode === 'config' ? 'none' : '2px solid var(--border)',
-                                            borderRadius: 'var(--radius)',
-                                            cursor: 'pointer',
-                                            fontWeight: '600',
-                                            transition: 'all 0.2s ease'
-                                        }}
-                                    >
-                                        📋 Config Table
-                                    </button>
-                                </div>
+                            <div style={{ marginBottom: '1.75rem' }}>
+                                <label className="label" htmlFor="configTable">
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        📊 Config Table Name
+                                    </span>
+                                </label>
+                                <input
+                                    id="configTable"
+                                    type="text"
+                                    className="input"
+                                    value={configTable}
+                                    onChange={(e) => setConfigTable(e.target.value)}
+                                    required
+                                    placeholder="e.g., data_load_config"
+                                />
+                                <p style={{ fontSize: '0.8125rem', color: 'var(--secondary-foreground)', marginTop: '0.75rem', fontStyle: 'italic' }}>
+                                    💡 The config table contains all GCS-to-BigQuery mappings and test configurations
+                                </p>
                             </div>
-
-                            {/* Config Table Mode */}
-                            {scdMode === 'config' && (
-                                <>
-                                    <div style={{ marginBottom: '1.75rem' }}>
-                                        <label className="label" htmlFor="scdConfigDataset">
-                                            <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                📁 Config Dataset
-                                            </span>
-                                        </label>
-                                        <input
-                                            id="scdConfigDataset"
-                                            type="text"
-                                            className="input"
-                                            value={configDataset}
-                                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfigDataset(e.target.value)}
-                                            required
-                                            placeholder="e.g., transform_config"
-                                        />
-                                    </div>
-
-                                    <div style={{ marginBottom: '1.75rem' }}>
-                                        <label className="label" htmlFor="scdConfigTable">
-                                            <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                📊 Config Table Name
-                                            </span>
-                                        </label>
-                                        <input
-                                            id="scdConfigTable"
-                                            type="text"
-                                            className="input"
-                                            value={configTable}
-                                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfigTable(e.target.value)}
-                                            required
-                                            placeholder="e.g., scd_validation_config"
-                                        />
-                                        <p style={{ fontSize: '0.8125rem', color: 'var(--secondary-foreground)', marginTop: '0.75rem', fontStyle: 'italic' }}>
-                                            💡 The config table contains all SCD dimension table configurations
-                                        </p>
-                                    </div>
-
-                                    {/* Add New Table Button */}
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowAddConfig(!showAddConfig)}
-                                        style={{
-                                            marginBottom: '1.5rem',
-                                            padding: '0.75rem 1.25rem',
-                                            backgroundColor: showAddConfig ? 'var(--secondary)' : 'var(--primary)',
-                                            color: showAddConfig ? 'var(--primary)' : 'white',
-                                            border: showAddConfig ? '2px solid var(--primary)' : 'none',
-                                            borderRadius: 'var(--radius)',
-                                            cursor: 'pointer',
-                                            fontWeight: '600',
-                                            fontSize: '0.875rem',
-                                            width: '100%',
-                                            transition: 'all 0.2s ease'
-                                        }}
-                                    >
-                                        {showAddConfig ? '✖️ Cancel' : '➕ Add New Table Configuration'}
-                                    </button>
-
-                                    {/* Add New Config Form */}
-                                    {showAddConfig && (
-                                        <div style={{
-                                            padding: '1.5rem',
-                                            background: 'var(--secondary)',
-                                            borderRadius: 'var(--radius)',
-                                            border: '2px solid var(--primary)',
-                                            marginBottom: '1.75rem'
-                                        }}>
-                                            <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '1rem' }}>📝 New Table Configuration</h3>
-
-                                            {/* Config ID */}
-                                            <div style={{ marginBottom: '1rem' }}>
-                                                <label className="label" htmlFor="newConfigId">Config ID *</label>
-                                                <input
-                                                    id="newConfigId"
-                                                    type="text"
-                                                    className="input"
-                                                    value={newConfigId}
-                                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewConfigId(e.target.value)}
-                                                    placeholder="e.g., my_table_scd2"
-                                                />
-                                            </div>
-
-                                            {/* Target Dataset & Table */}
-                                            <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
-                                                <div style={{ flex: 1 }}>
-                                                    <label className="label" htmlFor="newTargetDataset">Target Dataset *</label>
-                                                    <input
-                                                        id="newTargetDataset"
-                                                        type="text"
-                                                        className="input"
-                                                        value={newTargetDataset}
-                                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewTargetDataset(e.target.value)}
-                                                        placeholder="e.g., DW_Dimensions"
-                                                    />
-                                                </div>
-                                                <div style={{ flex: 1 }}>
-                                                    <label className="label" htmlFor="newTargetTable">Target Table *</label>
-                                                    <input
-                                                        id="newTargetTable"
-                                                        type="text"
-                                                        className="input"
-                                                        value={newTargetTable}
-                                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewTargetTable(e.target.value)}
-                                                        placeholder="e.g., D_MyTable_WD"
-                                                    />
-                                                </div>
-                                            </div>
-
-                                            {/* SCD Type Toggle */}
-                                            <div style={{ marginBottom: '1rem' }}>
-                                                <label className="label">SCD Type *</label>
-                                                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setNewScdType('scd1')}
-                                                        style={{
-                                                            flex: 1,
-                                                            padding: '0.5rem',
-                                                            background: newScdType === 'scd1' ? 'var(--primary)' : 'var(--background)',
-                                                            color: newScdType === 'scd1' ? 'white' : 'var(--foreground)',
-                                                            border: '1px solid var(--border)',
-                                                            borderRadius: 'var(--radius)',
-                                                            cursor: 'pointer',
-                                                            fontSize: '0.875rem'
-                                                        }}
-                                                    >
-                                                        Type 1
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setNewScdType('scd2')}
-                                                        style={{
-                                                            flex: 1,
-                                                            padding: '0.5rem',
-                                                            background: newScdType === 'scd2' ? 'var(--primary)' : 'var(--background)',
-                                                            color: newScdType === 'scd2' ? 'white' : 'var(--foreground)',
-                                                            border: '1px solid var(--border)',
-                                                            borderRadius: 'var(--radius)',
-                                                            cursor: 'pointer',
-                                                            fontSize: '0.875rem'
-                                                        }}
-                                                    >
-                                                        Type 2
-                                                    </button>
-                                                </div>
-                                            </div>
-
-                                            {/* Primary Keys */}
-                                            <div style={{ marginBottom: '1rem' }}>
-                                                <label className="label" htmlFor="newPrimaryKeys">Primary Keys *</label>
-                                                <input
-                                                    id="newPrimaryKeys"
-                                                    type="text"
-                                                    className="input"
-                                                    value={newPrimaryKeys}
-                                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewPrimaryKeys(e.target.value)}
-                                                    placeholder="e.g., UserId (comma-separated for composite)"
-                                                />
-                                            </div>
-
-                                            {/* Surrogate Key */}
-                                            <div style={{ marginBottom: '1rem' }}>
-                                                <label className="label" htmlFor="newSurrogateKey">Surrogate Key (Optional)</label>
-                                                <input
-                                                    id="newSurrogateKey"
-                                                    type="text"
-                                                    className="input"
-                                                    value={newSurrogateKey}
-                                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewSurrogateKey(e.target.value)}
-                                                    placeholder="e.g., DWMyTableID"
-                                                />
-                                            </div>
-
-                                            {/* SCD2 Fields */}
-                                            {newScdType === 'scd2' && (
-                                                <div style={{ marginBottom: '1rem', padding: '1rem', background: 'var(--background)', borderRadius: 'var(--radius)' }}>
-                                                    <h4 style={{ fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.75rem' }}>SCD Type 2 Columns</h4>
-                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                                                        <div>
-                                                            <label className="label" htmlFor="newBeginDate">Begin Date Column</label>
-                                                            <input
-                                                                id="newBeginDate"
-                                                                type="text"
-                                                                className="input"
-                                                                value={newBeginDateColumn}
-                                                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewBeginDateColumn(e.target.value)}
-                                                                placeholder="DWBeginEffDateTime"
-                                                            />
-                                                        </div>
-                                                        <div>
-                                                            <label className="label" htmlFor="newEndDate">End Date Column</label>
-                                                            <input
-                                                                id="newEndDate"
-                                                                type="text"
-                                                                className="input"
-                                                                value={newEndDateColumn}
-                                                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewEndDateColumn(e.target.value)}
-                                                                placeholder="DWEndEffDateTime"
-                                                            />
-                                                        </div>
-                                                        <div>
-                                                            <label className="label" htmlFor="newActiveFlag">Active Flag Column</label>
-                                                            <input
-                                                                id="newActiveFlag"
-                                                                type="text"
-                                                                className="input"
-                                                                value={newActiveFlagColumn}
-                                                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewActiveFlagColumn(e.target.value)}
-                                                                placeholder="DWCurrentRowFlag"
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {/* Description */}
-                                            <div style={{ marginBottom: '1rem' }}>
-                                                <label className="label" htmlFor="newDescription">Description (Optional)</label>
-                                                <input
-                                                    id="newDescription"
-                                                    type="text"
-                                                    className="input"
-                                                    value={newDescription}
-                                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewDescription(e.target.value)}
-                                                    placeholder="e.g., Customer dimension table"
-                                                />
-                                            </div>
-
-                                            {/* Custom Business Rules */}
-                                            <div style={{ marginBottom: '1.5rem' }}>
-                                                <label className="label">
-                                                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                        🛠️ Custom Business Rules
-                                                    </span>
-                                                </label>
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                                                    {newCustomTests.map((test, index) => (
-                                                        <div key={index} style={{
-                                                            padding: '1rem',
-                                                            background: 'var(--background)',
-                                                            borderRadius: 'var(--radius)',
-                                                            border: '1px solid var(--border)',
-                                                            position: 'relative'
-                                                        }}>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => removeCustomTest(index, true)}
-                                                                style={{
-                                                                    position: 'absolute',
-                                                                    top: '0.5rem',
-                                                                    right: '0.5rem',
-                                                                    background: 'none',
-                                                                    border: 'none',
-                                                                    color: 'var(--error)',
-                                                                    cursor: 'pointer',
-                                                                    fontSize: '1.25rem'
-                                                                }}
-                                                            >
-                                                                ×
-                                                            </button>
-                                                            <div style={{ display: 'flex', gap: '1rem', marginBottom: '0.75rem' }}>
-                                                                <div style={{ flex: 1 }}>
-                                                                    <label className="label" style={{ fontSize: '0.75rem' }}>Rule Name</label>
-                                                                    <input
-                                                                        type="text"
-                                                                        className="input"
-                                                                        value={test.name}
-                                                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleCustomTestChange(index, 'name', e.target.value, true)}
-                                                                        placeholder="e.g., CreatedDtm NOT NULL"
-                                                                        style={{ marginBottom: 0 }}
-                                                                    />
-                                                                </div>
-                                                                <div style={{ width: '120px' }}>
-                                                                    <label className="label" style={{ fontSize: '0.75rem' }}>Severity</label>
-                                                                    <select
-                                                                        className="input"
-                                                                        value={test.severity}
-                                                                        onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleCustomTestChange(index, 'severity', e.target.value, true)}
-                                                                        style={{ marginBottom: 0, padding: '0.55rem' }}
-                                                                    >
-                                                                        <option value="HIGH">HIGH</option>
-                                                                        <option value="MEDIUM">MEDIUM</option>
-                                                                        <option value="LOW">LOW</option>
-                                                                    </select>
-                                                                </div>
-                                                            </div>
-                                                            <div style={{ marginBottom: '0.75rem' }}>
-                                                                <label className="label" style={{ fontSize: '0.75rem' }}>Description</label>
-                                                                <input
-                                                                    type="text"
-                                                                    className="input"
-                                                                    value={test.description}
-                                                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleCustomTestChange(index, 'description', e.target.value, true)}
-                                                                    placeholder="Describe the purpose of this rule..."
-                                                                    style={{ marginBottom: 0 }}
-                                                                />
-                                                            </div>
-                                                            <div>
-                                                                <label className="label" style={{ fontSize: '0.75rem' }}>SQL Query (Use {'{{target}}'} for table name)</label>
-                                                                <textarea
-                                                                    className="input"
-                                                                    value={test.sql}
-                                                                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => handleCustomTestChange(index, 'sql', e.target.value, true)}
-                                                                    placeholder="SELECT COUNT(0) = 0 FROM {{target}} WHERE CreatedDtm IS NULL"
-                                                                    rows={3}
-                                                                    style={{ marginBottom: 0, resize: 'vertical', fontFamily: 'monospace' }}
-                                                                />
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => addCustomTest(true)}
-                                                        style={{
-                                                            padding: '0.5rem',
-                                                            background: 'none',
-                                                            border: '2px dashed var(--primary)',
-                                                            color: 'var(--primary)',
-                                                            borderRadius: 'var(--radius)',
-                                                            cursor: 'pointer',
-                                                            fontWeight: '600',
-                                                            fontSize: '0.875rem'
-                                                        }}
-                                                    >
-                                                        + Add Business Rule
-                                                    </button>
-                                                </div>
-                                            </div>
-
-                                            {/* Save Button */}
-                                            <button
-                                                type="button"
-                                                onClick={handleAddConfig}
-                                                style={{
-                                                    width: '100%',
-                                                    padding: '0.75rem',
-                                                    background: 'var(--gradient-primary)',
-                                                    color: 'white',
-                                                    border: 'none',
-                                                    borderRadius: 'var(--radius)',
-                                                    cursor: 'pointer',
-                                                    fontWeight: '600',
-                                                    fontSize: '0.875rem'
-                                                }}
-                                            >
-                                                💾 Save Configuration
-                                            </button>
-                                        </div>
-                                    )}
-                                </>
-                            )}
-
-                            {/* Direct Input Mode */}
-                            {scdMode === 'direct' && (
-                                <>
-                                    {/* Target Dataset & Table */}
-                                    <div style={{ display: 'flex', gap: '1.75rem' }}>
-                                        <div style={{ flex: 1, marginBottom: '1.75rem' }}>
-                                            <label className="label" htmlFor="targetDatasetScd">
-                                                <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                    🎯 Target Dataset
-                                                </span>
-                                            </label>
-                                            <input
-                                                id="targetDatasetScd"
-                                                type="text"
-                                                className="input"
-                                                value={targetDataset}
-                                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTargetDataset(e.target.value)}
-                                                required
-                                                placeholder="e.g., DW_Dimensions"
-                                            />
-                                        </div>
-                                        <div style={{ flex: 1, marginBottom: '1.75rem' }}>
-                                            <label className="label" htmlFor="targetTableScd">
-                                                <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                    📊 Target Table
-                                                </span>
-                                            </label>
-                                            <input
-                                                id="targetTableScd"
-                                                type="text"
-                                                className="input"
-                                                value={targetTable}
-                                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTargetTable(e.target.value)}
-                                                required
-                                                placeholder="e.g., D_Employee_WD"
-                                            />
-                                        </div>
-                                    </div>
-
-                                    {/* SCD Type Toggle */}
-                                    <div style={{ marginBottom: '1.75rem' }}>
-                                        <label className="label">SCD Type</label>
-                                        <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
-                                            <button
-                                                type="button"
-                                                onClick={() => setScdType('scd1')}
-                                                style={{
-                                                    flex: 1,
-                                                    padding: '0.75rem',
-                                                    background: scdType === 'scd1' ? 'var(--gradient-primary)' : 'var(--secondary)',
-                                                    color: scdType === 'scd1' ? 'white' : 'var(--foreground)',
-                                                    border: scdType === 'scd1' ? 'none' : '2px solid var(--border)',
-                                                    borderRadius: 'var(--radius)',
-                                                    cursor: 'pointer',
-                                                    fontWeight: '600',
-                                                    transition: 'all 0.2s ease'
-                                                }}
-                                            >
-                                                🔢 SCD Type 1
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => setScdType('scd2')}
-                                                style={{
-                                                    flex: 1,
-                                                    padding: '0.75rem',
-                                                    background: scdType === 'scd2' ? 'var(--gradient-primary)' : 'var(--secondary)',
-                                                    color: scdType === 'scd2' ? 'white' : 'var(--foreground)',
-                                                    border: scdType === 'scd2' ? 'none' : '2px solid var(--border)',
-                                                    borderRadius: 'var(--radius)',
-                                                    cursor: 'pointer',
-                                                    fontWeight: '600',
-                                                    transition: 'all 0.2s ease'
-                                                }}
-                                            >
-                                                🕒 SCD Type 2
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    {/* Primary Keys */}
-                                    <div style={{ marginBottom: '1.75rem' }}>
-                                        <label className="label" htmlFor="primaryKeys">
-                                            <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                🔑 Primary Keys
-                                            </span>
-                                        </label>
-                                        <input
-                                            id="primaryKeys"
-                                            type="text"
-                                            className="input"
-                                            value={primaryKeys}
-                                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPrimaryKeys(e.target.value)}
-                                            required
-                                            placeholder="e.g., UserId (comma separate for composite)"
-                                        />
-                                        <p style={{ fontSize: '0.8125rem', color: 'var(--secondary-foreground)', marginTop: '0.5rem', fontStyle: 'italic' }}>
-                                            💡 Primary business identifier(s) used for comparison
-                                        </p>
-                                    </div>
-
-                                    {/* Surrogate Key */}
-                                    <div style={{ marginBottom: '1.75rem' }}>
-                                        <label className="label" htmlFor="surrogateKey">
-                                            <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                🆔 Surrogate Key (Optional)
-                                            </span>
-                                        </label>
-                                        <input
-                                            id="surrogateKey"
-                                            type="text"
-                                            className="input"
-                                            value={surrogateKey}
-                                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSurrogateKey(e.target.value)}
-                                            placeholder="e.g., DWEmployeeID"
-                                        />
-                                    </div>
-
-                                    {/* SCD2 Specific Fields */}
-                                    {scdType === 'scd2' && (
-                                        <div style={{
-                                            padding: '1.25rem',
-                                            background: 'var(--secondary)',
-                                            borderRadius: 'var(--radius)',
-                                            border: '1px solid var(--border)',
-                                            marginBottom: '1.75rem'
-                                        }}>
-                                            <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '1rem' }}>📜 History Tracking Columns</h3>
-
-                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
-                                                <div style={{ flex: '1 1 200px' }}>
-                                                    <label className="label" htmlFor="beginDate">Begin Date</label>
-                                                    <input
-                                                        id="beginDate"
-                                                        type="text"
-                                                        className="input"
-                                                        value={beginDateColumn}
-                                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setBeginDateColumn(e.target.value)}
-                                                        placeholder="DWBeginEffDateTime"
-                                                    />
-                                                </div>
-                                                <div style={{ flex: '1 1 200px' }}>
-                                                    <label className="label" htmlFor="endDate">End Date</label>
-                                                    <input
-                                                        id="endDate"
-                                                        type="text"
-                                                        className="input"
-                                                        value={endDateColumn}
-                                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEndDateColumn(e.target.value)}
-                                                        placeholder="DWEndEffDateTime"
-                                                    />
-                                                </div>
-                                                <div style={{ flex: '1 1 100%' }}>
-                                                    <label className="label" htmlFor="activeFlag">Active Row Flag</label>
-                                                    <input
-                                                        id="activeFlag"
-                                                        type="text"
-                                                        className="input"
-                                                        value={activeFlagColumn}
-                                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setActiveFlagColumn(e.target.value)}
-                                                        placeholder="DWCurrentRowFlag"
-                                                    />
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Custom Business Rules (Direct Mode) */}
-                                    <div style={{ marginBottom: '1.75rem' }}>
-                                        <label className="label">
-                                            <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                🛠️ Custom Business Rules
-                                            </span>
-                                        </label>
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                                            {customTests.map((test, index) => (
-                                                <div key={index} style={{
-                                                    padding: '1rem',
-                                                    background: 'var(--secondary)',
-                                                    borderRadius: 'var(--radius)',
-                                                    border: '1px solid var(--border)',
-                                                    position: 'relative'
-                                                }}>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => removeCustomTest(index, false)}
-                                                        style={{
-                                                            position: 'absolute',
-                                                            top: '0.5rem',
-                                                            right: '0.5rem',
-                                                            background: 'none',
-                                                            border: 'none',
-                                                            color: 'var(--error)',
-                                                            cursor: 'pointer',
-                                                            fontSize: '1.25rem'
-                                                        }}
-                                                    >
-                                                        ×
-                                                    </button>
-                                                    <div style={{ display: 'flex', gap: '1rem', marginBottom: '0.75rem' }}>
-                                                        <div style={{ flex: 1 }}>
-                                                            <label className="label" style={{ fontSize: '0.75rem' }}>Rule Name</label>
-                                                            <input
-                                                                type="text"
-                                                                className="input"
-                                                                value={test.name}
-                                                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleCustomTestChange(index, 'name', e.target.value, false)}
-                                                                placeholder="e.g., CreatedDtm NOT NULL"
-                                                                style={{ marginBottom: 0 }}
-                                                            />
-                                                        </div>
-                                                        <div style={{ width: '120px' }}>
-                                                            <label className="label" style={{ fontSize: '0.75rem' }}>Severity</label>
-                                                            <select
-                                                                className="input"
-                                                                value={test.severity}
-                                                                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleCustomTestChange(index, 'severity', e.target.value, false)}
-                                                                style={{ marginBottom: 0, padding: '0.55rem' }}
-                                                            >
-                                                                <option value="HIGH">HIGH</option>
-                                                                <option value="MEDIUM">MEDIUM</option>
-                                                                <option value="LOW">LOW</option>
-                                                            </select>
-                                                        </div>
-                                                    </div>
-                                                    <div style={{ marginBottom: '0.75rem' }}>
-                                                        <label className="label" style={{ fontSize: '0.75rem' }}>Description</label>
-                                                        <input
-                                                            type="text"
-                                                            className="input"
-                                                            value={test.description}
-                                                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleCustomTestChange(index, 'description', e.target.value, false)}
-                                                            placeholder="Describe the purpose of this rule..."
-                                                            style={{ marginBottom: 0 }}
-                                                        />
-                                                    </div>
-                                                    <div>
-                                                        <label className="label" style={{ fontSize: '0.75rem' }}>SQL Query (Use {'{{target}}'} for table name)</label>
-                                                        <textarea
-                                                            className="input"
-                                                            value={test.sql}
-                                                            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => handleCustomTestChange(index, 'sql', e.target.value, false)}
-                                                            placeholder="SELECT COUNT(0) = 0 FROM {{target}} WHERE CreatedDtm IS NULL"
-                                                            rows={3}
-                                                            style={{ marginBottom: 0, resize: 'vertical', fontFamily: 'monospace' }}
-                                                        />
-                                                    </div>
-                                                </div>
-                                            ))}
-                                            <button
-                                                type="button"
-                                                onClick={() => addCustomTest(false)}
-                                                style={{
-                                                    padding: '0.5rem',
-                                                    background: 'none',
-                                                    border: '2px dashed var(--primary)',
-                                                    color: 'var(--primary)',
-                                                    borderRadius: 'var(--radius)',
-                                                    cursor: 'pointer',
-                                                    fontWeight: '600',
-                                                    fontSize: '0.875rem'
-                                                }}
-                                            >
-                                                + Add Business Rule
-                                            </button>
-                                        </div>
-                                    </div>
-                                </>
-                            )}
                         </>
                     )}
 

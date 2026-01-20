@@ -1,27 +1,17 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from "recharts";
 
 interface TestResult {
     test_id?: string;
     test_name: string;
-    category?: string;
     description: string;
     sql_query: string;
     severity: string;
     status: "PASS" | "FAIL" | "ERROR";
     rows_affected?: number;
-    sample_data?: any[];
     error_message?: string;
-}
-
-interface AISuggestion {
-    test_name: string;
-    test_category: string;
-    severity: string;
-    sql_query: string;
-    reasoning: string;
 }
 
 interface MappingResult {
@@ -33,18 +23,8 @@ interface MappingResult {
         table_row_count: number;
     };
     predefined_results: TestResult[];
-    ai_suggestions?: AISuggestion[];
+    ai_suggestions?: any[];
     error?: string;
-}
-
-interface SummaryStats {
-    total_mappings: number;
-    passed: number;
-    failed: number;
-    errors: number;
-    total_suggestions: number;
-    total_tests?: number;
-    ai_suggestions?: AISuggestion[];
 }
 
 const COLORS = {
@@ -56,16 +36,11 @@ const COLORS = {
 export default function ResultsView() {
     const [results, setResults] = useState<TestResult[]>([]);
     const [mappingResults, setMappingResults] = useState<MappingResult[]>([]);
-    const [summary, setSummary] = useState<SummaryStats | null>(null);
+    const [summary, setSummary] = useState<any>(null);
     const [isConfigMode, setIsConfigMode] = useState(false);
     const [loading, setLoading] = useState(true);
     const [savedTests, setSavedTests] = useState<Set<string>>(new Set());
     const [projectId, setProjectId] = useState<string>("");
-    const [expandedSql, setExpandedSql] = useState<{ mappingIdx: number, testIdx: number } | null>(null);
-    const [expandedData, setExpandedData] = useState<{ mappingIdx: number, testIdx: number } | null>(null);
-    const [expandedSingleSql, setExpandedSingleSql] = useState<number | null>(null);
-    const [expandedSingleData, setExpandedSingleData] = useState<number | null>(null);
-    const [activeTab, setActiveTab] = useState<number>(0);
 
     useEffect(() => {
         const data = localStorage.getItem("testResults");
@@ -76,12 +51,6 @@ export default function ResultsView() {
                 // Try to extract project_id from mapping info or summary if available
                 if (parsed.project_id) {
                     setProjectId(parsed.project_id);
-                } else if (parsed.results_by_mapping && parsed.results_by_mapping.length > 0) {
-                    // Check if we can infer project_id from context, otherwise we might need it passed
-                    // For now, let's assume it's in the local storage or context
-                    // If not, we might fail to save. 
-                    // Let's check where projectId comes from. It was in DashboardForm.
-                    // We should modify DashboardForm to save projectId in local storage too or pass it.
                 }
 
                 // Check if it's config table mode (has results_by_mapping)
@@ -89,6 +58,64 @@ export default function ResultsView() {
                     setIsConfigMode(true);
                     setMappingResults(parsed.results_by_mapping);
                     setSummary(parsed.summary);
+                } else if (Array.isArray(parsed)) {
+                    // Handle raw array from history (granular logs)
+                    // Check if we can group them by mapping_id
+                    const hasMappingInfo = parsed.some(r => r.mapping_id);
+
+                    if (hasMappingInfo) {
+                        // Group by mapping_id
+                        const grouped: Record<string, MappingResult> = {};
+
+                        parsed.forEach((row: any) => {
+                            const mId = row.mapping_id || 'unknown';
+                            if (!grouped[mId]) {
+                                grouped[mId] = {
+                                    mapping_id: mId,
+                                    mapping_info: {
+                                        source: row.source_file || row.source || 'unknown',
+                                        target: row.target_table || row.target || 'unknown',
+                                        file_row_count: 0, // Info might be lost in flattening
+                                        table_row_count: 0
+                                    },
+                                    predefined_results: [],
+                                    ai_suggestions: []
+                                };
+                            }
+
+                            // transform flat row back to TestResult
+                            grouped[mId].predefined_results.push({
+                                test_id: row.test_id,
+                                test_name: row.test_name,
+                                description: row.description,
+                                sql_query: row.sql_query,
+                                severity: row.severity,
+                                status: row.status,
+                                rows_affected: row.rows_affected,
+                                error_message: row.error_message
+                            });
+                        });
+
+                        setMappingResults(Object.values(grouped));
+                        setIsConfigMode(true);
+                        // Recalculate summary if missing
+                        const totalTests = parsed.length;
+                        const passed = parsed.filter((r: any) => r.status === 'PASS').length;
+                        const failed = parsed.filter((r: any) => r.status === 'FAIL').length;
+                        const errors = parsed.filter((r: any) => r.status === 'ERROR').length;
+
+                        setSummary({
+                            total_mappings: Object.keys(grouped).length,
+                            total_tests: totalTests,
+                            passed,
+                            failed,
+                            errors,
+                            total_suggestions: 0
+                        });
+
+                    } else {
+                        setResults(parsed);
+                    }
                 } else if (parsed.results) {
                     // Single file or schema mode
                     setResults(parsed.results);
@@ -111,16 +138,14 @@ export default function ResultsView() {
         setLoading(false);
     }, []);
 
-    const handleSaveCustomTest = async (suggestion: AISuggestion, mappingId: string, targetDataset: string | null = null, targetTable: string | null = null) => {
+    const handleSaveCustomTest = async (suggestion: any, mappingId: string, targetDataset: string | null = null, targetTable: string | null = null) => {
         if (!projectId) {
             alert("Project ID not found. Cannot save custom test.");
             return;
         }
 
         try {
-            const globalObj = (typeof window !== 'undefined' ? window : globalThis) as any;
-            const env = globalObj.process?.env || {};
-            const backendUrl = env.NEXT_PUBLIC_BACKEND_URL || 'https://data-qa-agent-backend-1037417342779.us-central1.run.app';
+            const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://data-qa-agent-backend-750147355601.us-central1.run.app';
             const payload = {
                 project_id: projectId,
                 test_name: suggestion.test_name,
@@ -146,7 +171,7 @@ export default function ResultsView() {
 
             // Mark as saved
             const key = `${mappingId}-${suggestion.test_name}`;
-            setSavedTests((prev: Set<string>) => new Set(prev).add(key));
+            setSavedTests(prev => new Set(prev).add(key));
             alert("Test case saved to Custom Tests successfully!");
 
         } catch (error) {
@@ -216,276 +241,191 @@ export default function ResultsView() {
                     </div>
                 )}
 
-                {/* Tab Headers */}
-                <div style={{
-                    display: 'flex',
-                    gap: '0.5rem',
-                    marginBottom: '1rem',
-                    overflowX: 'auto',
-                    paddingBottom: '0.5rem',
-                    borderBottom: '1px solid var(--border)'
-                }}>
-                    {mappingResults.map((mapping: MappingResult, idx: number) => {
-                        const mappingStats = {
-                            FAIL: mapping.predefined_results.filter((r: TestResult) => r.status === 'FAIL').length,
-                        };
-                        return (
-                            <button
-                                key={idx}
-                                onClick={() => setActiveTab(idx)}
-                                style={{
-                                    padding: '0.75rem 1.25rem',
-                                    background: activeTab === idx ? 'var(--primary)' : 'var(--secondary)',
-                                    color: activeTab === idx ? 'white' : 'var(--secondary-foreground)',
-                                    border: 'none',
-                                    borderRadius: 'var(--radius)',
-                                    cursor: 'pointer',
-                                    fontWeight: '600',
-                                    whiteSpace: 'nowrap',
-                                    transition: 'all 0.2s',
-                                    boxShadow: activeTab === idx ? '0 2px 4px rgba(0,0,0,0.1)' : 'none'
-                                }}
-                            >
-                                {mapping.mapping_id}
-                                {mappingStats.FAIL > 0 && (
-                                    <span style={{
-                                        marginLeft: '0.5rem',
-                                        background: activeTab === idx ? 'rgba(255,255,255,0.2)' : '#fee2e2',
-                                        color: activeTab === idx ? 'white' : '#991b1b',
-                                        padding: '0.125rem 0.375rem',
-                                        borderRadius: '9999px',
-                                        fontSize: '0.75rem'
-                                    }}>
-                                        {mappingStats.FAIL}
-                                    </span>
-                                )}
-                            </button>
-                        );
-                    })}
-                </div>
+                {/* Results by Mapping */}
+                {mappingResults.map((mapping, idx) => {
+                    const mappingStats = {
+                        PASS: mapping.predefined_results.filter(r => r.status === 'PASS').length,
+                        FAIL: mapping.predefined_results.filter(r => r.status === 'FAIL').length,
+                        ERROR: mapping.predefined_results.filter(r => r.status === 'ERROR').length,
+                    };
 
-                {/* Active Tab Content */}
-                {mappingResults[activeTab] && (
-                    <div className="card" style={{ padding: '1.5rem' }}>
-                        <div style={{ marginBottom: '1.5rem', borderBottom: '1px solid var(--border)', paddingBottom: '1rem' }}>
-                            <h3 style={{ fontSize: '1.25rem', fontWeight: '700', color: 'var(--primary)' }}>
-                                Mapping: {mappingResults[activeTab].mapping_id}
-                            </h3>
-                            {mappingResults[activeTab].mapping_info && (
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '0.5rem', fontSize: '0.875rem' }}>
-                                    <div><strong>Source:</strong> {mappingResults[activeTab].mapping_info.source}</div>
-                                    <div><strong>Target:</strong> {mappingResults[activeTab].mapping_info.target}</div>
+                    return (
+                        <div key={idx} className="card" style={{ marginBottom: '2rem' }}>
+                            <div style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                borderBottom: '1px solid var(--border)',
+                                paddingBottom: '0.75rem',
+                                marginBottom: '1rem'
+                            }}>
+                                <h3 style={{ fontSize: '1.25rem', fontWeight: '600', margin: 0 }}>
+                                    Mapping ID: <span style={{ color: 'var(--primary)', fontFamily: 'monospace' }}>{mapping.mapping_id}</span>
+                                </h3>
+                                <span style={{ fontSize: '0.875rem', color: 'var(--secondary-foreground)' }}>
+                                    Target: {mapping.mapping_info?.target || 'Unknown'}
+                                </span>
+                            </div>
+
+                            {mapping.mapping_info && (
+                                <div style={{
+                                    padding: '1rem',
+                                    background: 'var(--secondary)',
+                                    borderRadius: 'var(--radius)',
+                                    marginBottom: '1rem',
+                                    fontSize: '0.875rem',
+                                    display: 'grid',
+                                    gridTemplateColumns: '1fr 1fr',
+                                    gap: '0.5rem'
+                                }}>
+                                    <div><strong>Source:</strong> <code style={{ wordBreak: 'break-all' }}>{mapping.mapping_info.source}</code></div>
+                                    <div><strong>Target Table:</strong> <code>{mapping.mapping_info.target}</code></div>
+                                    <div><strong>GCS Rows:</strong> {mapping.mapping_info.file_row_count}</div>
+                                    <div><strong>BigQuery Rows:</strong> {mapping.mapping_info.table_row_count}</div>
+                                </div>
+                            )}
+
+                            {mapping.error && (
+                                <div style={{ padding: '1rem', background: '#fef2f2', color: '#991b1b', borderRadius: 'var(--radius)', marginBottom: '1rem' }}>
+                                    <strong>Error:</strong> {mapping.error}
+                                </div>
+                            )}
+
+                            {/* Mapping Stats */}
+                            <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
+                                <div style={{ padding: '0.5rem 1rem', background: '#d1fae5', color: '#065f46', borderRadius: 'var(--radius)', fontWeight: '600' }}>
+                                    ✓ {mappingStats.PASS} Passed
+                                </div>
+                                <div style={{ padding: '0.5rem 1rem', background: '#fee2e2', color: '#991b1b', borderRadius: 'var(--radius)', fontWeight: '600' }}>
+                                    ✗ {mappingStats.FAIL} Failed
+                                </div>
+                                {mappingStats.ERROR > 0 && (
+                                    <div style={{ padding: '0.5rem 1rem', background: '#fef3c7', color: '#92400e', borderRadius: 'var(--radius)', fontWeight: '600' }}>
+                                        ⚠ {mappingStats.ERROR} Errors
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Test Results Table */}
+                            <div style={{ overflowX: 'auto' }}>
+                                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                    <thead>
+                                        <tr style={{ borderBottom: '2px solid var(--border)' }}>
+                                            <th style={{ padding: '0.75rem', textAlign: 'left' }}>Test Name</th>
+                                            <th style={{ padding: '0.75rem', textAlign: 'left' }}>Status</th>
+                                            <th style={{ padding: '0.75rem', textAlign: 'left' }}>Severity</th>
+                                            <th style={{ padding: '0.75rem', textAlign: 'left' }}>Rows Affected</th>
+                                            <th style={{ padding: '0.75rem', textAlign: 'left' }}>Details</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {mapping.predefined_results.map((test, testIdx) => (
+                                            <tr key={testIdx} style={{ borderBottom: '1px solid var(--border)' }}>
+                                                <td style={{ padding: '0.75rem' }}>{test.test_name}</td>
+                                                <td style={{ padding: '0.75rem' }}>
+                                                    <span style={{
+                                                        padding: '0.25rem 0.75rem',
+                                                        borderRadius: '9999px',
+                                                        fontSize: '0.875rem',
+                                                        fontWeight: '600',
+                                                        background: test.status === 'PASS' ? '#d1fae5' : test.status === 'FAIL' ? '#fee2e2' : '#fef3c7',
+                                                        color: test.status === 'PASS' ? '#065f46' : test.status === 'FAIL' ? '#991b1b' : '#92400e'
+                                                    }}>
+                                                        {test.status}
+                                                    </span>
+                                                </td>
+                                                <td style={{ padding: '0.75rem' }}>{test.severity}</td>
+                                                <td style={{ padding: '0.75rem' }}>{test.rows_affected || 0}</td>
+                                                <td style={{ padding: '0.75rem', fontSize: '0.875rem' }}>
+                                                    {test.error_message || test.description}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            {/* AI Suggestions */}
+                            {mapping.ai_suggestions && mapping.ai_suggestions.length > 0 && (
+                                <div style={{ marginTop: '1.5rem' }}>
+                                    <h4 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>
+                                        🤖 AI Suggested Tests ({mapping.ai_suggestions.length})
+                                    </h4>
+                                    {mapping.ai_suggestions.map((suggestion, sugIdx) => {
+                                        const isSaved = savedTests.has(`${mapping.mapping_id}-${suggestion.test_name}`);
+                                        return (
+                                            <div key={sugIdx} style={{
+                                                padding: '1rem',
+                                                background: 'var(--secondary)',
+                                                borderRadius: 'var(--radius)',
+                                                marginBottom: '0.75rem',
+                                                border: '2px dashed var(--primary)',
+                                                display: 'flex',
+                                                justifyContent: 'space-between',
+                                                alignItems: 'flex-start'
+                                            }}>
+                                                <div>
+                                                    <div style={{ fontWeight: '600', marginBottom: '0.5rem' }}>{suggestion.test_name}</div>
+                                                    <div style={{ fontSize: '0.875rem', color: 'var(--secondary-foreground)', marginBottom: '0.5rem' }}>
+                                                        {suggestion.reasoning}
+                                                    </div>
+                                                    <div style={{ fontSize: '0.75rem', color: 'var(--secondary-foreground)' }}>
+                                                        Severity: {suggestion.severity}
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    onClick={() => {
+                                                        // Extract target dataset/table from mapping info if possible
+                                                        // mapping.mapping_info.target usually has "dataset.table" WITHOUT project or "project.dataset.table"
+                                                        let targetDataset = null;
+                                                        let targetTable = null;
+                                                        if (mapping.mapping_info && mapping.mapping_info.target) {
+                                                            const parts = mapping.mapping_info.target.split('.');
+                                                            if (parts.length === 2) {
+                                                                targetDataset = parts[0];
+                                                                targetTable = parts[1];
+                                                            } else if (parts.length === 3) {
+                                                                // project.dataset.table
+                                                                targetDataset = parts[1];
+                                                                targetTable = parts[2];
+                                                            }
+                                                        }
+                                                        handleSaveCustomTest(suggestion, mapping.mapping_id, targetDataset, targetTable);
+                                                    }}
+                                                    disabled={isSaved}
+                                                    style={{
+                                                        padding: '0.5rem 1rem',
+                                                        backgroundColor: isSaved ? '#10b981' : 'var(--primary)',
+                                                        color: 'white',
+                                                        border: 'none',
+                                                        borderRadius: 'var(--radius)',
+                                                        cursor: isSaved ? 'default' : 'pointer',
+                                                        fontSize: '0.875rem',
+                                                        fontWeight: '600',
+                                                        whiteSpace: 'nowrap',
+                                                        marginLeft: '1rem',
+                                                        opacity: isSaved ? 0.7 : 1
+                                                    }}
+                                                >
+                                                    {isSaved ? '✓ Added' : '+ Add to Custom'}
+                                                </button>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             )}
                         </div>
-
-                        {/* Test Results Table */}
-                        <div style={{ overflowX: 'auto' }}>
-                            <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
-                                <thead>
-                                    <tr style={{ borderBottom: '2px solid var(--border)' }}>
-                                        <th style={{ padding: '0.75rem', textAlign: 'left', width: '15%' }}>Test Name</th>
-                                        <th style={{ padding: '0.75rem', textAlign: 'left', width: '10%' }}>Status</th>
-                                        <th style={{ padding: '0.75rem', textAlign: 'left', width: '10%' }}>Severity</th>
-                                        <th style={{ padding: '0.75rem', textAlign: 'left', width: '8%' }}>Affected</th>
-                                        <th style={{ padding: '0.75rem', textAlign: 'left', width: '57%' }}>Details</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {mappingResults[activeTab].predefined_results.map((test: TestResult, testIdx: number) => (
-                                        <tr key={testIdx} style={{ borderBottom: '1px solid var(--border)' }}>
-                                            <td style={{ padding: '0.75rem' }}>{test.test_name}</td>
-                                            <td style={{ padding: '0.75rem' }}>
-                                                <span style={{
-                                                    padding: '0.25rem 0.75rem',
-                                                    borderRadius: '9999px',
-                                                    fontSize: '0.875rem',
-                                                    fontWeight: '600',
-                                                    background: test.status === 'PASS' ? '#d1fae5' : test.status === 'FAIL' ? '#fee2e2' : '#fef3c7',
-                                                    color: test.status === 'PASS' ? '#065f46' : test.status === 'FAIL' ? '#991b1b' : '#92400e'
-                                                }}>
-                                                    {test.status}
-                                                </span>
-                                            </td>
-                                            <td style={{ padding: '0.75rem' }}>{test.severity}</td>
-                                            <td style={{ padding: '0.75rem' }}>{test.rows_affected || 0}</td>
-                                            <td style={{ padding: '0.75rem', fontSize: '0.875rem' }}>
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                                        <span>{test.error_message || test.description}</span>
-                                                        <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                                            {test.status === 'FAIL' && test.sample_data && test.category !== 'smoke' && (
-                                                                <button
-                                                                    onClick={() => {
-                                                                        if (expandedData?.mappingIdx === activeTab && expandedData?.testIdx === testIdx) {
-                                                                            setExpandedData(null);
-                                                                        } else {
-                                                                            setExpandedData({ mappingIdx: activeTab, testIdx: testIdx });
-                                                                        }
-                                                                    }}
-                                                                    style={{
-                                                                        fontSize: '0.75rem',
-                                                                        background: '#3b82f6',
-                                                                        color: 'white',
-                                                                        border: 'none',
-                                                                        borderRadius: '4px',
-                                                                        padding: '2px 8px',
-                                                                        cursor: 'pointer',
-                                                                        whiteSpace: 'nowrap'
-                                                                    }}
-                                                                >
-                                                                    {expandedData?.mappingIdx === activeTab && expandedData?.testIdx === testIdx ? 'Hide Data' : 'View Bad Data'}
-                                                                </button>
-                                                            )}
-                                                            <button
-                                                                onClick={() => {
-                                                                    if (expandedSql?.mappingIdx === activeTab && expandedSql?.testIdx === testIdx) {
-                                                                        setExpandedSql(null);
-                                                                    } else {
-                                                                        setExpandedSql({ mappingIdx: activeTab, testIdx: testIdx });
-                                                                    }
-                                                                }}
-                                                                style={{
-                                                                    fontSize: '0.75rem',
-                                                                    background: 'var(--secondary)',
-                                                                    color: 'var(--secondary-foreground)',
-                                                                    border: '1px solid var(--border)',
-                                                                    borderRadius: '4px',
-                                                                    padding: '2px 8px',
-                                                                    cursor: 'pointer',
-                                                                    whiteSpace: 'nowrap'
-                                                                }}
-                                                            >
-                                                                {expandedSql?.mappingIdx === activeTab && expandedSql?.testIdx === testIdx ? 'Hide SQL' : 'Show SQL'}
-                                                            </button>
-                                                        </div>
-                                                    </div>
-
-                                                    {test.status === 'FAIL' && test.sample_data && test.sample_data.length > 0 && (
-                                                        <>
-                                                            <div style={{ fontWeight: '700', color: '#1d4ed8', marginBottom: '0.5rem', fontSize: '0.75rem' }}>
-                                                                Sample problematic rows (max 10):
-                                                            </div>
-                                                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
-                                                                <thead>
-                                                                    <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                                                                        {Object.keys(test.sample_data[0]).map((key: string) => (
-                                                                            <th key={key} style={{ padding: '0.25rem 0.5rem', textAlign: 'left' }}>{key}</th>
-                                                                        ))}
-                                                                    </tr>
-                                                                </thead>
-                                                                <tbody>
-                                                                    {test.sample_data.map((row: Record<string, any>, rIdx: number) => (
-                                                                        <tr key={rIdx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                                                                            {Object.values(row).map((val: any, vIdx: number) => (
-                                                                                <td key={vIdx} style={{ padding: '0.25rem 0.5rem' }}>{val?.toString() || 'NULL'}</td>
-                                                                            ))}
-                                                                        </tr>
-                                                                    ))}
-                                                                </tbody>
-                                                            </table>
-                                                        </>
-                                                    )}
-
-                                                    {expandedSql?.mappingIdx === activeTab && expandedSql?.testIdx === testIdx && (
-                                                        <pre style={{
-                                                            marginTop: '0.5rem',
-                                                            padding: '0.75rem',
-                                                            background: '#1e293b',
-                                                            borderRadius: '4px',
-                                                            overflowX: 'auto',
-                                                            fontSize: '0.75rem',
-                                                            color: '#f8fafc',
-                                                            borderLeft: '4px solid #3b82f6',
-                                                            fontFamily: 'monospace',
-                                                            whiteSpace: 'pre-wrap'
-                                                        }}>
-                                                            {test.sql_query}
-                                                        </pre>
-                                                    )}
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        {/* AI Suggestions */}
-                        {mappingResults[activeTab].ai_suggestions && mappingResults[activeTab].ai_suggestions.length > 0 && (
-                            <div style={{ marginTop: '1.5rem' }}>
-                                <h4 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>
-                                    🤖 AI Suggested Tests ({mappingResults[activeTab].ai_suggestions.length})
-                                </h4>
-                                {mappingResults[activeTab].ai_suggestions?.map((suggestion: AISuggestion, sugIdx: number) => {
-                                    const isSaved = savedTests.has(`${mappingResults[activeTab].mapping_id}-${suggestion.test_name}`);
-                                    return (
-                                        <div key={sugIdx} style={{
-                                            padding: '1rem',
-                                            background: 'var(--secondary)',
-                                            borderRadius: 'var(--radius)',
-                                            marginBottom: '0.75rem',
-                                            border: '2px dashed var(--primary)',
-                                            display: 'flex',
-                                            justifyContent: 'space-between',
-                                            alignItems: 'flex-start'
-                                        }}>
-                                            <div>
-                                                <div style={{ fontWeight: '600', marginBottom: '0.5rem' }}>{suggestion.test_name}</div>
-                                                <div style={{ fontSize: '0.875rem', color: 'var(--secondary-foreground)', marginBottom: '0.5rem' }}>
-                                                    {suggestion.reasoning}
-                                                </div>
-                                                <div style={{ fontSize: '0.75rem', color: 'var(--secondary-foreground)' }}>
-                                                    Severity: {suggestion.severity}
-                                                </div>
-                                            </div>
-                                            <button
-                                                onClick={() => {
-                                                    let targetDataset = null;
-                                                    let targetTable = null;
-                                                    const currentMapping = mappingResults[activeTab];
-                                                    if (currentMapping.mapping_info && currentMapping.mapping_info.target) {
-                                                        const parts = currentMapping.mapping_info.target.split('.');
-                                                        if (parts.length === 2) {
-                                                            targetDataset = parts[0];
-                                                            targetTable = parts[1];
-                                                        }
-                                                    }
-                                                    handleSaveCustomTest(suggestion, currentMapping.mapping_id, targetDataset, targetTable);
-                                                }}
-                                                disabled={isSaved}
-                                                style={{
-                                                    padding: '0.5rem 1rem',
-                                                    backgroundColor: isSaved ? '#10b981' : 'var(--primary)',
-                                                    color: 'white',
-                                                    border: 'none',
-                                                    borderRadius: 'var(--radius)',
-                                                    cursor: isSaved ? 'default' : 'pointer',
-                                                    fontSize: '0.875rem',
-                                                    fontWeight: '600',
-                                                    whiteSpace: 'nowrap',
-                                                    marginLeft: '1rem',
-                                                    opacity: isSaved ? 0.7 : 1
-                                                }}
-                                            >
-                                                {isSaved ? '✓ Added' : '+ Add to Custom'}
-                                            </button>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        )}
-                    </div>
-                )}
+                    );
+                })}
             </div>
         );
     }
 
     // Single file/schema mode - original display
     const stats = {
-        PASS: results.filter((r: TestResult) => r.status === "PASS").length,
-        FAIL: results.filter((r: TestResult) => r.status === "FAIL").length,
-        ERROR: results.filter((r: TestResult) => r.status === "ERROR").length,
+        PASS: results.filter((r) => r.status === "PASS").length,
+        FAIL: results.filter((r) => r.status === "FAIL").length,
+        ERROR: results.filter((r) => r.status === "ERROR").length,
     };
 
     const chartData = [
@@ -544,7 +484,7 @@ export default function ResultsView() {
                             </tr>
                         </thead>
                         <tbody>
-                            {results.map((test: TestResult, index: number) => (
+                            {results.map((test, index) => (
                                 <tr key={index} style={{ borderBottom: '1px solid var(--border)' }}>
                                     <td style={{ padding: '0.75rem' }}>{test.test_name}</td>
                                     <td style={{ padding: '0.75rem' }}>
@@ -561,96 +501,7 @@ export default function ResultsView() {
                                     </td>
                                     <td style={{ padding: '0.75rem' }}>{test.severity}</td>
                                     <td style={{ padding: '0.75rem', fontSize: '0.875rem' }}>
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                                <span>{test.error_message || test.description}</span>
-                                                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                                    {test.status === 'FAIL' && (test as any).sample_data && test.category !== 'smoke' && (
-                                                        <button
-                                                            onClick={() => setExpandedSingleData(expandedSingleData === index ? null : index)}
-                                                            style={{
-                                                                fontSize: '0.75rem',
-                                                                background: '#3b82f6',
-                                                                color: 'white',
-                                                                border: 'none',
-                                                                borderRadius: '4px',
-                                                                padding: '2px 8px',
-                                                                cursor: 'pointer',
-                                                                whiteSpace: 'nowrap'
-                                                            }}
-                                                        >
-                                                            {expandedSingleData === index ? 'Hide Data' : 'View Bad Data'}
-                                                        </button>
-                                                    )}
-                                                    <button
-                                                        onClick={() => setExpandedSingleSql(expandedSingleSql === index ? null : index)}
-                                                        style={{
-                                                            fontSize: '0.75rem',
-                                                            background: 'var(--secondary)',
-                                                            color: 'var(--secondary-foreground)',
-                                                            border: '1px solid var(--border)',
-                                                            borderRadius: '4px',
-                                                            padding: '2px 8px',
-                                                            cursor: 'pointer',
-                                                            whiteSpace: 'nowrap'
-                                                        }}
-                                                    >
-                                                        {expandedSingleSql === index ? 'Hide SQL' : 'Show SQL'}
-                                                    </button>
-                                                </div>
-                                            </div>
-
-                                            {expandedSingleData === index && test.sample_data && test.sample_data.length > 0 && (
-                                                <div style={{
-                                                    marginTop: '0.5rem',
-                                                    padding: '0.75rem',
-                                                    background: '#fff',
-                                                    borderRadius: '4px',
-                                                    overflowX: 'auto',
-                                                    border: '1px solid #3b82f6',
-                                                    boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
-                                                }}>
-                                                    <div style={{ fontWeight: '700', color: '#1d4ed8', marginBottom: '0.5rem', fontSize: '0.75rem' }}>
-                                                        Sample problematic rows (max 10):
-                                                    </div>
-                                                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
-                                                        <thead>
-                                                            <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                                                                {Object.keys(test.sample_data[0]).map((key: string) => (
-                                                                    <th key={key} style={{ padding: '0.25rem 0.5rem', textAlign: 'left' }}>{key}</th>
-                                                                ))}
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody>
-                                                            {test.sample_data.map((row: Record<string, any>, rIdx: number) => (
-                                                                <tr key={rIdx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                                                                    {Object.values(row).map((val: any, vIdx: number) => (
-                                                                        <td key={vIdx} style={{ padding: '0.25rem 0.5rem' }}>{val?.toString() || 'NULL'}</td>
-                                                                    ))}
-                                                                </tr>
-                                                            ))}
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-                                            )}
-
-                                            {expandedSingleSql === index && (
-                                                <pre style={{
-                                                    marginTop: '0.5rem',
-                                                    padding: '0.75rem',
-                                                    background: '#1e293b',
-                                                    borderRadius: '4px',
-                                                    overflowX: 'auto',
-                                                    fontSize: '0.75rem',
-                                                    color: '#f8fafc',
-                                                    borderLeft: '4px solid #3b82f6',
-                                                    fontFamily: 'monospace',
-                                                    whiteSpace: 'pre-wrap'
-                                                }}>
-                                                    {test.sql_query}
-                                                </pre>
-                                            )}
-                                        </div>
+                                        {test.error_message || test.description}
                                     </td>
                                 </tr>
                             ))}
@@ -665,7 +516,7 @@ export default function ResultsView() {
                     <h3 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>
                         🤖 AI Suggested Tests ({summary.ai_suggestions.length})
                     </h3>
-                    {summary.ai_suggestions.map((suggestion: AISuggestion, idx: number) => {
+                    {summary.ai_suggestions.map((suggestion: any, idx: number) => {
                         const isSaved = savedTests.has(`single-${suggestion.test_name}`);
                         return (
                             <div key={idx} style={{
