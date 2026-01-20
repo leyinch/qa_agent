@@ -163,10 +163,10 @@ class TestHistoryService:
             "total_tests": total_tests,
             "passed_tests": passed_tests,
             "failed_tests": failed_tests,
-            "error_message": error_message,
-            "test_results": self._prepare_json_for_bq(test_results),
+            "error_message": metadata.get("error_message"),
+            "test_results": json.dumps(self._prepare_json_for_bq(test_results)),
             "executed_by": executed_by or "System",
-            "metadata": self._prepare_json_for_bq(metadata) if metadata else None
+            "metadata": json.dumps(self._prepare_json_for_bq(metadata))
         }
         
         try:
