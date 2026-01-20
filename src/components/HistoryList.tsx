@@ -78,8 +78,26 @@ export default function HistoryList({ projectId, onViewResult }: HistoryListProp
         }
     };
 
-    const handleViewClick = (run: HistoryItem) => {
+    const handleViewClick = async (run: HistoryItem) => {
         let results = run.test_results || run.details;
+
+        // If results missing from list (common for specialized large blobs), fetch detail
+        if (!results && run.execution_id) {
+            setLoading(true);
+            try {
+                const res = await fetch(`/api/python/history?project_id=${projectId}&execution_id=${run.execution_id}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data && data.length > 0) {
+                        results = data[0].test_results || data[0].details;
+                    }
+                }
+            } catch (err) {
+                console.error("Failed to fetch history details", err);
+            } finally {
+                setLoading(false);
+            }
+        }
 
         // Parse if string
         if (typeof results === 'string') {
@@ -90,6 +108,11 @@ export default function HistoryList({ projectId, onViewResult }: HistoryListProp
                 alert("Error parsing result details.");
                 return;
             }
+        }
+
+        if (!results) {
+            alert("No details available for this historical run.");
+            return;
         }
 
         // Normalize for ResultsView

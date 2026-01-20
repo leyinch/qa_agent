@@ -626,38 +626,23 @@ export default function ResultsView() {
             </div>
 
             {/* Summary Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                    <div className="card" style={{ padding: '1.5rem', borderLeft: '4px solid #10b981' }}>
-                        <div style={{ fontSize: '0.875rem', fontWeight: '600', color: '#10b981' }}>Passed</div>
-                        <div style={{ fontSize: '2.5rem', fontWeight: '800', color: '#10b981', marginTop: '0.5rem' }}>{stats.PASS}</div>
-                    </div>
-                    <div className="card" style={{ padding: '1.5rem', borderLeft: '4px solid #ef4444' }}>
-                        <div style={{ fontSize: '0.875rem', fontWeight: '600', color: '#ef4444' }}>Failed</div>
-                        <div style={{ fontSize: '2.5rem', fontWeight: '800', color: '#ef4444', marginTop: '0.5rem' }}>{stats.FAIL}</div>
-                    </div>
-                    <div className="card" style={{ padding: '1.5rem', borderLeft: '4px solid #f59e0b' }}>
-                        <div style={{ fontSize: '0.875rem', fontWeight: '600', color: '#f59e0b' }}>Errors</div>
-                        <div style={{ fontSize: '2.5rem', fontWeight: '800', color: '#f59e0b', marginTop: '0.5rem' }}>{stats.ERROR}</div>
-                    </div>
+            <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+                gap: '1.5rem',
+                marginBottom: '3rem'
+            }}>
+                <div className="card" style={{ padding: '1.5rem', borderLeft: '4px solid #10b981' }}>
+                    <div style={{ fontSize: '0.875rem', fontWeight: '600', color: '#10b981' }}>Passed</div>
+                    <div style={{ fontSize: '2.5rem', fontWeight: '800', color: '#10b981', marginTop: '0.5rem' }}>{stats.PASS}</div>
                 </div>
-
-                {/* Pie Chart Card */}
-                <div className="card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
-                    <h3 style={{ fontSize: '1.125rem', fontWeight: '700', marginBottom: '1.5rem', color: 'var(--card-foreground)' }}>Distribution</h3>
-                    <div style={{ flex: 1, minHeight: '250px' }}>
-                        <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                                <Pie data={chartData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} label>
-                                    {chartData.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={COLORS[entry.name.toUpperCase() as keyof typeof COLORS]} />
-                                    ))}
-                                </Pie>
-                                <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }} />
-                                <Legend verticalAlign="bottom" height={36} />
-                            </PieChart>
-                        </ResponsiveContainer>
-                    </div>
+                <div className="card" style={{ padding: '1.5rem', borderLeft: '4px solid #ef4444' }}>
+                    <div style={{ fontSize: '0.875rem', fontWeight: '600', color: '#ef4444' }}>Failed</div>
+                    <div style={{ fontSize: '2.5rem', fontWeight: '800', color: '#ef4444', marginTop: '0.5rem' }}>{stats.FAIL}</div>
+                </div>
+                <div className="card" style={{ padding: '1.5rem', borderLeft: '4px solid #f59e0b' }}>
+                    <div style={{ fontSize: '0.875rem', fontWeight: '600', color: '#f59e0b' }}>Errors</div>
+                    <div style={{ fontSize: '2.5rem', fontWeight: '800', color: '#f59e0b', marginTop: '0.5rem' }}>{stats.ERROR}</div>
                 </div>
             </div>
 
