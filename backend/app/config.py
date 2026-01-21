@@ -1,31 +1,29 @@
-"""Configuration settings for the Data QA Agent backend."""
-from pydantic import Field
 from pydantic_settings import BaseSettings
 from typing import Optional
 
-
 class Settings(BaseSettings):
-    """Application settings."""
+    # Google Cloud Settings
+    google_cloud_project: str = "your-project-id"
+    google_cloud_region: str = "us-central1"
     
-    # Application
-    app_name: str = "Data QA Agent Backend"
+    # Vertex AI Settings
+    vertex_ai_model: str = "gemini-1.5-pro"
+    
+    # BigQuery Settings
+    bq_dataset: str = "qa_agent"
+    bq_config_table: str = "validation_config"
+    bq_history_table: str = "execution_history"
+    bq_custom_tests_table: str = "custom_tests"
+    bq_settings_table: str = "project_settings"
+    
+    # Application Settings
+    app_name: str = "Data QA Agent API"
     debug: bool = False
     
-    # Google Cloud
-    google_cloud_project: Optional[str] = Field(None, env="GOOGLE_CLOUD_PROJECT")
-    google_cloud_region: str = Field("us-central1", env="GOOGLE_CLOUD_REGION")
+    # Cloud Run / Deployment
     cloud_run_url: Optional[str] = None
-    vertex_ai_location: str = Field("us-central1", env="GOOGLE_CLOUD_REGION")
-    vertex_ai_model: str = Field("gemini-1.5-flash", env="VERTEX_AI_MODEL")
-    scheduler_location: str = Field("us-central1", env="GOOGLE_CLOUD_REGION")
-    scheduler_timezone: str = Field("Australia/Melbourne", env="SCHEDULER_TIMEZONE")
-    
-    # CORS
-    cors_origins: list[str] = ["*"]
     
     class Config:
         env_file = ".env"
-        case_sensitive = False
-
 
 settings = Settings()

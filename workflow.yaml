@@ -1,0 +1,46 @@
+main:
+  params: [input]
+  steps:
+    - init:
+        assign:
+          - project_id: "miruna-sandpit"
+          - backend_url: "https://data-qa-agent-backend-750147355601.us-central1.run.app"
+          - execution_id: ${sys.get_env("GOOGLE_CLOUD_WORKFLOW_EXECUTION_ID")}
+    
+    - run_data_qa_test:
+        call: http.post
+        args:
+          url: ${backend_url + "/api/generate-tests"}
+          auth:
+            type: OIDC
+          body:
+            project_id: ${project_id}
+            execution_id: ${execution_id}
+            comparison_mode: "gcs-config"
+            config_dataset: "config"
+            config_table: "data_load_config"
+            config_filters: ${input}
+        result: test_response
+    
+    - check_status:
+        switch:
+          - condition: ${test_response.body.summary.failed > 0}
+            next: notify_on_failure
+        next: log_success
+
+    - notify_on_failure:
+        call: http.post
+        args:
+          url: ${backend_url + "/api/notify"}
+          auth:
+            type: OIDC
+          body:
+            project_id: ${project_id}
+            execution_id: ${execution_id}
+            summary: ${test_response.body.summary}
+        result: notify_response
+        next: log_failure
+    - log_failure:
+        return: ${"Tests Failed " + string(test_response.body.summary.failed) + " failures found."}
+    - log_success:
+        return: "All tests passed successfully."

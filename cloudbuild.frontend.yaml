@@ -8,8 +8,8 @@ steps:
         if [ ! -f "deploy.config" ]; then echo "Error: deploy.config not found"; exit 1; fi
         source deploy.config
         echo "Building image for project: $$PROJECT_ID, service: $$FRONTEND_SERVICE"
-        docker build -t "$$REGISTRY/$$PROJECT_ID/$$FRONTEND_SERVICE:latest" .
-        docker push "$$REGISTRY/$$PROJECT_ID/$$FRONTEND_SERVICE:latest"
+        docker build -t "$$LOCATION-docker.pkg.dev/$$PROJECT_ID/agent-repo/$$FRONTEND_SERVICE:latest" .
+        docker push "$$LOCATION-docker.pkg.dev/$$PROJECT_ID/agent-repo/$$FRONTEND_SERVICE:latest"
 
   # 2. Deploy to Cloud Run using dynamic URL lookup
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
@@ -30,7 +30,7 @@ steps:
         # Deploy Frontend
         echo "Deploying $$FRONTEND_SERVICE to $$REGION..."
         gcloud run deploy $$FRONTEND_SERVICE \
-          --image "$$REGISTRY/$$PROJECT_ID/$$FRONTEND_SERVICE:latest" \
+          --image "$$LOCATION-docker.pkg.dev/$$PROJECT_ID/agent-repo/$$FRONTEND_SERVICE:latest" \
           --region $$REGION \
           --platform managed \
           --allow-unauthenticated \
@@ -38,4 +38,3 @@ steps:
 
 options:
   logging: CLOUD_LOGGING_ONLY
-

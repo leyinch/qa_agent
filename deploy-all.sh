@@ -41,24 +41,22 @@ fi
 sync_yaml_files() {
     echo -e "${BLUE}Syncing cloudbuild.yaml files with deploy.config...${NC}"
     
-    # Update frontend cloudbuild.yaml
-    if [ -f "${SCRIPT_DIR}/cloudbuild.yaml" ]; then
+    # Update frontend cloudbuild.frontend.yaml
+    if [ -f "${SCRIPT_DIR}/cloudbuild.frontend.yaml" ]; then
         sed -i.bak \
-            -e "s/_SERVICE_NAME:.*/_SERVICE_NAME: $FRONTEND_SERVICE/" \
-            -e "s/_REGION:.*/_REGION: $REGION/" \
-            -e "s/_PROJECT_ID:.*/_PROJECT_ID: $PROJECT_ID/" \
-            "${SCRIPT_DIR}/cloudbuild.yaml"
-        echo -e "${GREEN}✓ Synced cloudbuild.yaml${NC}"
+            -e "s/$$LOCATION/$REGION/g" \
+            -e "s/$$PROJECT_ID/$PROJECT_ID/g" \
+            "${SCRIPT_DIR}/cloudbuild.frontend.yaml"
+        echo -e "${GREEN}✓ Synced cloudbuild.frontend.yaml${NC}"
     fi
     
-    # Update backend cloudbuild.yaml
-    if [ -f "${SCRIPT_DIR}/backend/cloudbuild.yaml" ]; then
+    # Update backend cloudbuild.backend.yaml
+    if [ -f "${SCRIPT_DIR}/cloudbuild.backend.yaml" ]; then
         sed -i.bak \
-            -e "s/_SERVICE_NAME:.*/_SERVICE_NAME: $BACKEND_SERVICE/" \
-            -e "s/_REGION:.*/_REGION: $REGION/" \
-            -e "s/_PROJECT_ID:.*/_PROJECT_ID: $PROJECT_ID/" \
-            "${SCRIPT_DIR}/backend/cloudbuild.yaml"
-        echo -e "${GREEN}✓ Synced backend/cloudbuild.yaml${NC}"
+            -e "s/$$LOCATION/$REGION/g" \
+            -e "s/$$PROJECT_ID/$PROJECT_ID/g" \
+            "${SCRIPT_DIR}/cloudbuild.backend.yaml"
+        echo -e "${GREEN}✓ Synced cloudbuild.backend.yaml${NC}"
     fi
 }
 

@@ -1,11 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import LoginButton from "@/components/LoginButton";
 import DashboardForm from "@/components/DashboardForm";
 import Sidebar from "@/components/Sidebar";
 
-type ComparisonMode = 'schema' | 'gcs' | 'history' | 'scd';
+type ComparisonMode = 'schema' | 'gcs' | 'scd' | 'history' | 'settings';
 
 export default function Home() {
     const [comparisonMode, setComparisonMode] = useState<ComparisonMode>('schema');
@@ -61,26 +60,9 @@ export default function Home() {
                                     AI-powered data quality testing
                                 </p>
                             </div>
-                            <LoginButton />
                         </div>
 
-                        {/* Feature highlights (Mini) */}
-                        <div style={{
-                            display: 'grid',
-                            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                            gap: '1rem',
-                            marginBottom: '2rem'
-                        }}>
-                            <div className="card" style={{ padding: '1rem', textAlign: 'center', background: 'rgba(255,255,255,0.05)' }}>
-                                <span style={{ marginRight: '0.5rem' }}>🤖</span> Gemini AI Analysis
-                            </div>
-                            <div className="card" style={{ padding: '1rem', textAlign: 'center', background: 'rgba(255,255,255,0.05)' }}>
-                                <span style={{ marginRight: '0.5rem' }}>⚡</span> Automated Testing
-                            </div>
-                            <div className="card" style={{ padding: '1rem', textAlign: 'center', background: 'rgba(255,255,255,0.05)' }}>
-                                <span style={{ marginRight: '0.5rem' }}>📊</span> Multi-Dataset
-                            </div>
-                        </div>
+
 
                         {/* Main Form */}
                         <DashboardForm comparisonMode={comparisonMode} />

@@ -8,8 +8,8 @@ steps:
         if [ ! -f "deploy.config" ]; then echo "Error: deploy.config not found"; exit 1; fi
         source deploy.config
         echo "Building image for project: $$PROJECT_ID, service: $$BACKEND_SERVICE"
-        docker build -t "$$REGISTRY/$$PROJECT_ID/$$BACKEND_SERVICE:latest" -f backend/Dockerfile backend/
-        docker push "$$REGISTRY/$$PROJECT_ID/$$BACKEND_SERVICE:latest"
+        docker build -t "$$LOCATION-docker.pkg.dev/$$PROJECT_ID/agent-repo/$$BACKEND_SERVICE:latest" -f backend/Dockerfile backend/
+        docker push "$$LOCATION-docker.pkg.dev/$$PROJECT_ID/agent-repo/$$BACKEND_SERVICE:latest"
 
   # 2. Deploy to Cloud Run using dynamic URL lookup
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
@@ -22,7 +22,7 @@ steps:
         # Deploy initially
         echo "Deploying $$BACKEND_SERVICE to $$REGION..."
         gcloud run deploy $$BACKEND_SERVICE \
-          --image "$$REGISTRY/$$PROJECT_ID/$$BACKEND_SERVICE:latest" \
+          --image "$$LOCATION-docker.pkg.dev/$$PROJECT_ID/agent-repo/$$BACKEND_SERVICE:latest" \
           --region $$REGION \
           --platform managed \
           --allow-unauthenticated \

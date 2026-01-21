@@ -6,6 +6,7 @@ from typing import Optional, List, Dict, Any
 class GenerateTestsRequest(BaseModel):
     """Request model for test generation."""
     project_id: str = Field(..., description="Google Cloud project ID")
+    execution_id: Optional[str] = Field(None, description="Workflow or execution ID")
     comparison_mode: str = Field(..., description="Mode: 'schema', 'gcs', 'gcs-config', 'scd', or 'scd-config'")
     
     # Schema mode fields
@@ -19,18 +20,10 @@ class GenerateTestsRequest(BaseModel):
     target_dataset: Optional[str] = Field(None, description="Target BigQuery dataset")
     target_table: Optional[str] = Field(None, description="Target BigQuery table")
     
-    # GCS config table mode fields
+    # GCS config table mode and SCD config mode fields
     config_dataset: Optional[str] = Field(None, description="Config table dataset")
     config_table: Optional[str] = Field(None, description="Config table name")
-    
-    # SCD validation fields
-    scd_type: Optional[str] = Field(None, description="SCD type: 'scd1' or 'scd2'")
-    primary_keys: Optional[List[str]] = Field(None, description="Primary key columns")
-    surrogate_key: Optional[str] = Field(None, description="Surrogate key column")
-    begin_date_column: Optional[str] = Field(None, description="Effect beginning date column (SCD2)")
-    end_date_column: Optional[str] = Field(None, description="Effect ending date column (SCD2)")
-    active_flag_column: Optional[str] = Field(None, description="Active row flag column (SCD2)")
-    custom_tests: Optional[List[Dict[str, str]]] = Field(None, description="List of custom business rules (name/sql)")
+    config_filters: Optional[Dict[str, Any]] = Field(None, description="Key-value pairs to filter config table records")
     
     # Common optional fields
     enabled_test_ids: Optional[List[str]] = Field(None, description="List of test IDs to enable")
@@ -46,9 +39,9 @@ class TestResult(BaseModel):
     severity: str  # HIGH, MEDIUM, LOW
     sql_query: str
     rows_affected: int = 0
-    sample_data: Optional[List[Dict[str, Any]]] = None
     error_message: Optional[str] = None
     details: Optional[Dict[str, Any]] = None
+    sample_data: Optional[List[Dict[str, Any]]] = None # For SCD samples
 
 
 class MappingInfo(BaseModel):
@@ -80,7 +73,7 @@ class MappingResult(BaseModel):
 class CustomTestRequest(BaseModel):
     """Request model for saving a custom test."""
     project_id: str
-    dataset_id: str = "config"  # Default config dataset
+    dataset_id: str = "config"
     test_name: str
     test_category: str
     severity: str
@@ -90,22 +83,12 @@ class CustomTestRequest(BaseModel):
     target_table: Optional[str] = None
 
 
-class AddSCDConfigRequest(BaseModel):
-    """Request model for adding a new SCD configuration."""
-    project_id: str = Field(..., description="Google Cloud project ID")
-    config_dataset: str = Field(..., description="Config table dataset")
-    config_table: str = Field(..., description="Config table name")
-    config_id: str = Field(..., description="Unique configuration ID")
-    target_dataset: str = Field(..., description="Target dataset containing the SCD table")
-    target_table: str = Field(..., description="Target table name")
-    scd_type: str = Field(..., description="SCD type: 'scd1' or 'scd2'")
-    primary_keys: List[str] = Field(..., description="Primary key columns")
-    surrogate_key: Optional[str] = Field(None, description="Surrogate key column")
-    begin_date_column: Optional[str] = Field(None, description="Begin date column (SCD2)")
-    end_date_column: Optional[str] = Field(None, description="End date column (SCD2)")
-    active_flag_column: Optional[str] = Field(None, description="Active flag column (SCD2)")
-    description: Optional[str] = Field("", description="Configuration description")
-    custom_tests: Optional[List[Dict[str, str]]] = Field(None, description="List of custom business rules (name/sql)")
+class ProjectSettings(BaseModel):
+    """Model for project-wide settings."""
+    project_id: str
+    alert_emails: List[str] = []
+    teams_webhook_url: Optional[str] = None
+    alert_on_failure: bool = True
 
 
 class SaveHistoryRequest(BaseModel):
@@ -116,6 +99,22 @@ class SaveHistoryRequest(BaseModel):
     target_dataset: Optional[str] = None
     target_table: Optional[str] = None
     mapping_id: Optional[str] = None
+    executed_by: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
 
 
+class AddSCDConfigRequest(BaseModel):
+    """Request model for adding/updating SCD configuration."""
+    project_id: str
+    config_dataset: str = "config"
+    config_table: str = "scd_validation_config"
+    target_dataset: str
+    target_table: str
+    scd_type: str = "scd2"
+    primary_keys: List[str]
+    surrogate_key: Optional[str] = None
+    begin_date_column: Optional[str] = None
+    end_date_column: Optional[str] = None
+    active_flag_column: Optional[str] = None
+    description: Optional[str] = None
+    custom_tests: Optional[List[Dict[str, Any]]] = None

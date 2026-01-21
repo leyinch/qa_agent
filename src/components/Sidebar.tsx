@@ -2,7 +2,7 @@
 
 import React from 'react';
 
-type ComparisonMode = 'schema' | 'gcs' | 'history' | 'scd';
+type ComparisonMode = 'schema' | 'gcs' | 'scd' | 'history' | 'settings';
 
 interface SidebarProps {
     currentMode: ComparisonMode;
@@ -12,9 +12,10 @@ interface SidebarProps {
 export default function Sidebar({ currentMode, onModeChange }: SidebarProps) {
     const menuItems = [
         { id: 'schema', label: 'Schema Validation', icon: '📊' },
-        { id: 'scd', label: 'SCD Validation', icon: '🔄' },
         { id: 'gcs', label: 'GCS Comparison', icon: '📁' },
+        { id: 'scd', label: 'SCD Validation', icon: '🛡️' },
         { id: 'history', label: 'History', icon: '📜' },
+        { id: 'settings', label: 'Settings', icon: '⚙️' },
     ];
 
     return (
@@ -51,12 +52,12 @@ export default function Sidebar({ currentMode, onModeChange }: SidebarProps) {
                             transition: 'all 0.2s ease',
                             whiteSpace: 'nowrap'
                         }}
-                        onMouseEnter={(e) => {
+                        onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
                             if (currentMode !== item.id) {
                                 e.currentTarget.style.backgroundColor = 'var(--secondary)';
                             }
                         }}
-                        onMouseLeave={(e) => {
+                        onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
                             if (currentMode !== item.id) {
                                 e.currentTarget.style.backgroundColor = 'transparent';
                             }

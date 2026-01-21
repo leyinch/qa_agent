@@ -69,54 +69,34 @@ PREDEFINED_TESTS = {
         )
     ),
     
-    'table_exists': TestTemplate(
-        test_id='table_exists',
-        name='Table exists (smoke)',
-        category='smoke',
-        severity='HIGH',
-        description='Verify the target table exists and is accessible',
-        is_global=False,
-        generate_sql=lambda config: f"SELECT TRUE FROM `{config['full_table_name']}` LIMIT 1"
-    ),
-
-    # --- SCD1 Tests ---
-    'scd1_primary_key_null': TestTemplate(
-        test_id='scd1_primary_key_null',
-        name='Primary Key NOT NULL',
-        category='completeness',
-        severity='HIGH',
-        description='Check composite primary key for NULL values',
-        is_global=False,
-        generate_sql=lambda config: (
-            f"""
-            SELECT * FROM `{config['full_table_name']}`
-            WHERE ({' || '.join([f"SAFE_CAST({col} AS STRING)" for col in config['primary_keys']])}) IS NULL
-            LIMIT 100
-            """ if config.get('primary_keys') else None
-        )
-    ),
-
-    'scd1_primary_key_unique': TestTemplate(
-        test_id='scd1_primary_key_unique',
-        name='Primary Key uniqueness',
+    'referential_integrity': TestTemplate(
+        test_id='referential_integrity',
+        name='Referential Integrity',
         category='integrity',
         severity='HIGH',
-        description='Ensure composite primary key uniqueness',
+        description='Validate foreign key relationships',
         is_global=False,
         generate_sql=lambda config: (
-            f"""
-            SELECT 
-                ({' || '.join([f"IFNULL(SAFE_CAST({col} AS STRING), '')" for col in config['primary_keys']])}) as primary_key,
-                COUNT(*) as duplicate_count
-            FROM `{config['full_table_name']}`
-            GROUP BY 1
-            HAVING COUNT(*) > 1
-            LIMIT 100
-            """ if config.get('primary_keys') else None
+            ' UNION ALL '.join([
+                f"""
+                SELECT 
+                    '{fk_col}' as fk_column, 
+                    {fk_col} as invalid_value,
+                    COUNT(*) as occurrence_count
+                FROM `{config['full_table_name']}` t
+                WHERE {fk_col} IS NOT NULL
+                AND NOT EXISTS (
+                    SELECT 1 FROM `{ref['table']}` r
+                    WHERE r.{ref['column']} = t.{fk_col}
+                )
+                GROUP BY {fk_col}
+                """
+                for fk_col, ref in config.get('foreign_key_checks', {}).items()
+            ]) if config.get('foreign_key_checks') else None
         )
     ),
 
-    # --- SCD2 Tests (11 + 4 Structural) ---
+    # --- SCD2 Tests ---
     'scd2_primary_key_null': TestTemplate(
         test_id='scd2_primary_key_null',
         name='Primary Key NOT NULL',
@@ -198,23 +178,6 @@ PREDEFINED_TESTS = {
         )
     ),
 
-    'scd2_invalid_flag_combination': TestTemplate(
-        test_id='scd2_invalid_flag_combination',
-        name='No invalid current-row combinations',
-        category='validity',
-        severity='HIGH',
-        description='Ensure active flag is only set for high-watermark end dates',
-        is_global=False,
-        generate_sql=lambda config: (
-            f"""
-            SELECT * FROM `{config['full_table_name']}`
-            WHERE SAFE_CAST({config['active_flag_column']} AS STRING) IN ('true', 'TRUE', 'Y', '1')
-            AND CAST({config['end_date_column']} AS STRING) NOT LIKE '2099-12-31%'
-            LIMIT 100
-            """
-        )
-    ),
-
     'scd2_date_order': TestTemplate(
         test_id='scd2_date_order',
         name='Begin < End datetime',
@@ -272,67 +235,98 @@ PREDEFINED_TESTS = {
             f"""
             WITH ordered_history AS (
                 SELECT 
-                    *,
-                    LEAD({config['begin_date_column']}) OVER (PARTITION BY {' , '.join(config['primary_keys'])} ORDER BY {config['begin_date_column']}) as next_begin
+                    {', '.join(config['primary_keys'])},
+                    {config['begin_date_column']},
+                    {config['end_date_column']},
+                    LEAD({config['begin_date_column']}) OVER (PARTITION BY {', '.join(config['primary_keys'])} ORDER BY {config['begin_date_column']}) as next_begin
                 FROM `{config['full_table_name']}`
             )
             SELECT * FROM ordered_history
             WHERE next_begin IS NOT NULL 
-            AND DATE_ADD({config['end_date_column']}, INTERVAL 1 SECOND) <> next_begin
+            AND {config['end_date_column']} <> next_begin
             LIMIT 100
             """
         )
     ),
-
-    'scd2_no_record_after_current': TestTemplate(
-        test_id='scd2_no_record_after_current',
-        name='No record after current row',
-        category='validity',
-        severity='HIGH',
-        description='Ensure no record exists after the high-watermark current row',
+    
+    'numeric_range': TestTemplate(
+        test_id='numeric_range',
+        name='Numeric Range Validation',
+        category='quality',
+        severity='MEDIUM',
+        description='Check numeric values are within expected ranges',
         is_global=False,
         generate_sql=lambda config: (
             f"""
-            WITH history AS (
+            SELECT * FROM `{config['full_table_name']}`
+            WHERE {' OR '.join(
+                f"({col} < {range_val['min']} OR {col} > {range_val['max']})"
+                for col, range_val in config.get('numeric_range_checks', {}).items()
+            )}
+            LIMIT 100
+            """ if config.get('numeric_range_checks') else None
+        )
+    ),
+    
+    'date_range': TestTemplate(
+        test_id='date_range',
+        name='Date Range Validation',
+        category='quality',
+        severity='MEDIUM',
+        description='Validate dates are within expected range',
+        is_global=False,
+        generate_sql=lambda config: (
+            f"""
+            SELECT * FROM `{config['full_table_name']}`
+            WHERE {' OR '.join(
+                f"({col} < '{range_val['min_date']}' OR {col} > '{range_val['max_date']}')"
+                for col, range_val in config.get('date_range_checks', {}).items()
+            )}
+            LIMIT 100
+            """ if config.get('date_range_checks') else None
+        )
+    ),
+    
+    'pattern_validation': TestTemplate(
+        test_id='pattern_validation',
+        name='Pattern Validation',
+        category='quality',
+        severity='MEDIUM',
+        description='Check string patterns (email, phone, etc.)',
+        is_global=False,
+        generate_sql=lambda config: (
+            f"""
+            SELECT * FROM `{config['full_table_name']}`
+            WHERE {' OR '.join(
+                f"NOT REGEXP_CONTAINS(CAST({col} AS STRING), r'{pattern}')"
+                for col, pattern in config.get('pattern_checks', {}).items()
+            )}
+            LIMIT 100
+            """ if config.get('pattern_checks') else None
+        )
+    ),
+    
+    'outlier_detection': TestTemplate(
+        test_id='outlier_detection',
+        name='Statistical Outlier Detection',
+        category='statistical',
+        severity='LOW',
+        description='Detect statistical outliers using standard deviation',
+        is_global=False,
+        generate_sql=lambda config: (
+            f"""
+            WITH stats AS (
                 SELECT 
-                    *,
-                    LEAD({config['begin_date_column']}) OVER (PARTITION BY {' , '.join(config['primary_keys'])} ORDER BY {config['begin_date_column']}) as next_begin
+                    AVG({config['outlier_columns'][0]}) as mean,
+                    STDDEV({config['outlier_columns'][0]}) as stddev
                 FROM `{config['full_table_name']}`
+                WHERE {config['outlier_columns'][0]} IS NOT NULL
             )
-            SELECT * FROM history
-            WHERE SAFE_CAST({config['active_flag_column']} AS STRING) IN ('true', 'TRUE', 'Y', '1')
-            AND next_begin IS NOT NULL
+            SELECT t.* 
+            FROM `{config['full_table_name']}` t, stats
+            WHERE ABS(t.{config['outlier_columns'][0]} - stats.mean) > 3 * stats.stddev
             LIMIT 100
-            """
-        )
-    ),
-
-    # --- Structural Tests ---
-    'surrogate_key_null': TestTemplate(
-        test_id='surrogate_key_null',
-        name='Surrogate key NOT NULL',
-        category='completeness',
-        severity='HIGH',
-        description='Check surrogate key for NULL values',
-        is_global=False,
-        generate_sql=lambda config: f"SELECT * FROM `{config['full_table_name']}` WHERE {config['surrogate_key']} IS NULL LIMIT 100" if config.get('surrogate_key') else None
-    ),
-
-    'surrogate_key_unique': TestTemplate(
-        test_id='surrogate_key_unique',
-        name='Surrogate key uniqueness',
-        category='integrity',
-        severity='HIGH',
-        description='Ensure surrogate key uniqueness',
-        is_global=False,
-        generate_sql=lambda config: (
-            f"""
-            SELECT {config['surrogate_key']}, COUNT(*) as duplicate_count
-            FROM `{config['full_table_name']}`
-            GROUP BY {config['surrogate_key']}
-            HAVING COUNT(*) > 1
-            LIMIT 100
-            """ if config.get('surrogate_key') else None
+            """ if config.get('outlier_columns') else None
         )
     )
 }
@@ -341,15 +335,8 @@ PREDEFINED_TESTS = {
 def get_enabled_tests(enabled_test_ids: Optional[List[str]] = None) -> List[TestTemplate]:
     """
     Get enabled test templates.
-    
-    Args:
-        enabled_test_ids: List of test IDs to enable. If None, returns all global tests.
-        
-    Returns:
-        List of enabled test templates
     """
     if not enabled_test_ids:
-        # Return all global tests by default
         return [test for test in PREDEFINED_TESTS.values() if test.is_global]
     
     return [
