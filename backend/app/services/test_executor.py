@@ -297,10 +297,13 @@ class TestExecutor:
                 predefined_results=predefined_results, ai_suggestions=[]
             )
         except Exception as e:
-            logger.error(f"Critical error in process_scd for {mapping_id}: {e}", exc_info=True)
+            logger.error(f"Critical error in process_scd for {mapping_id or 'unknown'}: {e}", exc_info=True)
+            # Use local variables if available, otherwise fallback
+            ds = target_dataset or mapping.get('target_dataset', 'unknown_ds')
+            tbl = target_table or mapping.get('target_table', 'unknown_tbl')
             return MappingResult(
-                mapping_id=mapping_id, 
-                mapping_info=MappingInfo(source="SCD Validation", target=f"{mapping.get('target_dataset')}.{mapping.get('target_table')}", file_row_count=0, table_row_count=0),
+                mapping_id=mapping_id or "error", 
+                mapping_info=MappingInfo(source="SCD Validation", target=f"{ds}.{tbl}", file_row_count=0, table_row_count=0),
                 predefined_results=[], 
                 ai_suggestions=[], 
                 error=str(e)
@@ -309,14 +312,31 @@ class TestExecutor:
     async def process_scd_config_table(self, project_id: str, config_dataset: str, config_table: str) -> Dict[str, Any]:
         """Process multiple SCD validations (Our feature)."""
         configs = await bigquery_service.read_scd_config_table(project_id, config_dataset, config_table)
-        tasks = [self.process_scd(project_id, {
-            'mapping_id': c.get('config_id', f"{c['target_table']}_scd"),
-            'target_dataset': c['target_dataset'], 'target_table': c['target_table'],
-            'scd_type': c.get('scd_type', 'scd2'), 'primary_keys': c.get('primary_keys', []),
-            'surrogate_key': c.get('surrogate_key'), 'begin_date_column': c.get('begin_date_column'),
-            'end_date_column': c.get('end_date_column'), 'active_flag_column': c.get('active_flag_column'),
-            'custom_tests': c.get('custom_tests')
-        }) for c in configs]
+        tasks = []
+        for c in configs:
+            target_table = c.get('target_table', 'unknown_table')
+            tasks.append(self.process_scd(project_id, {
+                'mapping_id': c.get('config_id', f"{target_table}_scd"),
+                'target_dataset': c.get('target_dataset'), 
+                'target_table': target_table,
+                'scd_type': c.get('scd_type', 'scd2'), 
+                'primary_keys': c.get('primary_keys', []),
+                'surrogate_key': c.get('surrogate_key'), 
+                'begin_date_column': c.get('begin_date_column'),
+                'end_date_column': c.get('end_date_column'), 
+                'active_flag_column': c.get('active_flag_column'),
+                'custom_tests': c.get('custom_tests')
+            }))
+        
+        if not tasks:
+            return {
+                'summary': {
+                    'total_mappings': 0, 'total_tests': 0, 'passed': 0, 
+                    'failed': 0, 'errors': 0, 'total_suggestions': 0
+                },
+                'results_by_mapping': []
+            }
+
         results = await asyncio.gather(*tasks)
         total_tests = sum(len(r.predefined_results) for r in results)
         passed = sum(len([t for t in r.predefined_results if t.status == 'PASS']) for r in results)
@@ -329,7 +349,8 @@ class TestExecutor:
                 'total_tests': total_tests,
                 'passed': passed,
                 'failed': failed,
-                'errors': errors
+                'errors': errors,
+                'total_suggestions': 0
             },
             'results_by_mapping': results
         }
