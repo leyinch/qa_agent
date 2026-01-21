@@ -312,6 +312,10 @@ class TestHistoryService:
             ORDER BY 1 ASC
         """
         
+        # Calculate start date from days_back
+        tz = pytz.timezone('Australia/Melbourne')
+        start_date = datetime.now(tz).replace(tzinfo=None) - timedelta(days=days_back)
+
         job_config = bigquery.QueryJobConfig(
             query_parameters=[
                 bigquery.ScalarQueryParameter("project_id", "STRING", project_id),

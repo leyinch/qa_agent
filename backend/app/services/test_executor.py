@@ -3,6 +3,8 @@ import logging
 from typing import Dict, List, Any, Optional
 import json
 import asyncio
+import decimal
+from datetime import datetime, date
 
 from app.services.gcs_service import gcs_service
 from app.services.bigquery_service import bigquery_service
@@ -16,6 +18,20 @@ logger = logging.getLogger(__name__)
 class TestExecutor:
     """Service for executing tests on data mappings."""
     
+    def _clean_for_json(self, data: Any) -> Any:
+        """Recursively convert Decimal, Date, etc. for JSON serialization."""
+        if isinstance(data, (datetime, date)):
+            return data.isoformat()
+        elif isinstance(data, decimal.Decimal):
+            return float(data)
+        elif isinstance(data, (bytes, bytearray)):
+            return data.decode('utf-8', errors='replace')
+        elif isinstance(data, dict):
+            return {k: self._clean_for_json(v) for k, v in data.items()}
+        elif isinstance(data, list):
+            return [self._clean_for_json(i) for i in data]
+        return data
+
     async def process_mapping(
         self,
         project_id: str,
@@ -104,7 +120,8 @@ class TestExecutor:
                     predefined_results.append(TestResult(
                         test_id=test.id, test_name=test.name, category=test.category,
                         description=test.description, status='PASS' if row_count == 0 else 'FAIL',
-                        severity=test.severity, sql_query=sql, rows_affected=row_count
+                        severity=test.severity, sql_query=sql, rows_affected=row_count,
+                        sample_data=self._clean_for_json(rows[:10]) if row_count > 0 else None
                     ))
                 except Exception as e:
                     predefined_results.append(TestResult(
@@ -130,7 +147,8 @@ class TestExecutor:
                             description=custom_test.get('description', ''),
                             status='PASS' if row_count == 0 else 'FAIL',
                             severity=custom_test.get('severity', 'HIGH'),
-                            sql_query=sql, rows_affected=row_count
+                            sql_query=sql, rows_affected=row_count,
+                            sample_data=self._clean_for_json(rows[:10]) if row_count > 0 else None
                         ))
                     except Exception as e:
                         predefined_results.append(TestResult(
@@ -235,7 +253,7 @@ class TestExecutor:
                         test_id=test.id, test_name=test.name, category=test.category,
                         description=test.description, status=('PASS' if row_count > 0 else 'FAIL') if test.category == 'smoke' else ('PASS' if row_count == 0 else 'FAIL'),
                         severity=test.severity, sql_query=sql, rows_affected=row_count,
-                        sample_data=rows[:10] if row_count > 0 else None
+                        sample_data=self._clean_for_json(rows[:10]) if row_count > 0 else None
                     ))
                 except Exception as e:
                     predefined_results.append(TestResult(
@@ -275,7 +293,7 @@ class TestExecutor:
                             status='PASS' if row_count == 0 else 'FAIL',
                             severity=custom_test.get('severity', 'HIGH'),
                             sql_query=sql, rows_affected=row_count,
-                            sample_data=rows[:10] if row_count > 0 else None
+                            sample_data=self._clean_for_json(rows[:10]) if row_count > 0 else None
                         ))
                     except Exception as e:
                         predefined_results.append(TestResult(
