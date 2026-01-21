@@ -171,17 +171,36 @@ class TestExecutor:
         try:
             target_dataset = mapping['target_dataset']
             target_table = mapping['target_table']
-            scd_type = mapping.get('scd_type', 'scd2')
             full_table_name = f"{project_id}.{target_dataset}.{target_table}"
             
+            # --- Smart Config Lookup ---
+            # If critical params (PKs) are missing from the request (e.g. from UI), 
+            # try to fetch them from the scd_validation_config table.
+            from_db_config = {}
+            if not mapping.get('primary_keys'):
+                try:
+                    # Default config location
+                    db_config = await bigquery_service.get_scd_config_by_table(
+                        project_id, "config", "scd_validation_config", target_dataset, target_table
+                    )
+                    if db_config:
+                        from_db_config = db_config
+                        logger.info(f"Loaded SCD config from DB for {target_table}: {db_config.get('primary_keys')}")
+                except Exception as e:
+                    logger.warning(f"Could not auto-load config from DB: {e}")
+
+            # Merge configs: Request > DB > Defaults
             test_config = {
                 'full_table_name': full_table_name,
-                'primary_keys': mapping.get('primary_keys', []),
-                'surrogate_key': mapping.get('surrogate_key'),
-                'begin_date_column': mapping.get('begin_date_column', 'DWBeginEffDateTime'),
-                'end_date_column': mapping.get('end_date_column', 'DWEndEffDateTime'),
-                'active_flag_column': mapping.get('active_flag_column', 'DWCurrentRowFlag')
+                'primary_keys': mapping.get('primary_keys') or from_db_config.get('primary_keys', []),
+                'surrogate_key': mapping.get('surrogate_key') or from_db_config.get('surrogate_key'),
+                'begin_date_column': mapping.get('begin_date_column') or from_db_config.get('begin_date_column', 'DWBeginEffDateTime'),
+                'end_date_column': mapping.get('end_date_column') or from_db_config.get('end_date_column', 'DWEndEffDateTime'),
+                'active_flag_column': mapping.get('active_flag_column') or from_db_config.get('active_flag_column', 'DWCurrentRowFlag')
             }
+            
+            # Update SCD type if missing and found in DB
+            scd_type = mapping.get('scd_type') or from_db_config.get('scd_type', 'scd2')
             
             enabled_test_ids = mapping.get('enabled_test_ids', [])
             if not enabled_test_ids:
