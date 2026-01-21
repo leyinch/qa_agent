@@ -143,7 +143,7 @@ PREDEFINED_TESTS = {
         generate_sql=lambda config: (
             f"""
             SELECT * FROM `{config['full_table_name']}`
-            WHERE ({' + '.join([f"IFNULL(SAFE_CAST({col} AS STRING), '')" for col in config['primary_keys']])}) = ''
+            WHERE {' OR '.join([f"{col} IS NULL" for col in config['primary_keys']])}
             LIMIT 100
             """ if config.get('primary_keys') else None
         )
@@ -167,7 +167,39 @@ PREDEFINED_TESTS = {
         )
     ),
 
-    'scd2_primary_key_null': TestTemplate(
+    'scd2_invalid_flag_combination': TestTemplate(
+        test_id='scd2_invalid_flag_combination',
+        name='Invalid active flag/date combination',
+        category='integrity',
+        severity='HIGH',
+        description='Ensure flag matches end date logic',
+        is_global=False,
+        generate_sql=lambda config: (
+            f"""
+            SELECT * FROM `{config['full_table_name']}`
+            WHERE (SAFE_CAST({config['active_flag_column']} AS STRING) IN ('true', 'TRUE', 'Y', '1') AND CAST({config['end_date_column']} AS STRING) NOT LIKE '2099-12-31%')
+            OR (SAFE_CAST({config['active_flag_column']} AS STRING) NOT IN ('true', 'TRUE', 'Y', '1') AND CAST({config['end_date_column']} AS STRING) LIKE '2099-12-31%')
+            LIMIT 100
+            """
+        )
+    ),
+
+    'scd2_no_record_after_current': TestTemplate(
+        test_id='scd2_no_record_after_current',
+        name='No records after current record',
+        category='validity',
+        severity='HIGH',
+        description='Ensure no history exists with begin date after current record end date',
+        is_global=False,
+        generate_sql=lambda config: (
+            f"""
+            SELECT * FROM `{config['full_table_name']}`
+            WHERE {config['begin_date_column']} > (SELECT MAX({config['begin_date_column']}) FROM `{config['full_table_name']}` WHERE SAFE_CAST({config['active_flag_column']} AS STRING) IN ('true', 'TRUE', 'Y', '1'))
+            AND SAFE_CAST({config['active_flag_column']} AS STRING) NOT IN ('true', 'TRUE', 'Y', '1')
+            LIMIT 100
+            """
+        )
+    ),
 
     'scd2_begin_date_null': TestTemplate(
         test_id='scd2_begin_date_null',
