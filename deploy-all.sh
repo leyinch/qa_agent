@@ -108,6 +108,22 @@ check_service_exists() {
     fi
 }
 
+# Function to check if service is healthy (Ready condition)
+check_service_healthy() {
+    local service_name=$1
+    local status=$(gcloud run services describe "$service_name" \
+        --platform managed \
+        --region "$REGION" \
+        --project "$PROJECT_ID" \
+        --format="value(status.conditions.filter(type:Ready).status)" 2>/dev/null || echo "Unknown")
+    
+    if [ "$status" = "True" ]; then
+        return 0  # Service is healthy
+    else
+        return 1  # Service is not healthy or status unknown
+    fi
+}
+
 # Function to check if OAuth is configured
 check_oauth_configured() {
     local service_name=$1
@@ -133,12 +149,18 @@ FIRST_TIME_DEPLOYMENT=false
 if [ "$DEPLOY_BACKEND" = true ]; then
     if check_service_exists "$BACKEND_SERVICE"; then
         BACKEND_EXISTS=true
+        if check_service_healthy "$BACKEND_SERVICE"; then
+            BACKEND_HEALTHY=true
+        fi
     fi
 fi
 
 if [ "$DEPLOY_FRONTEND" = true ]; then
     if check_service_exists "$FRONTEND_SERVICE"; then
         FRONTEND_EXISTS=true
+        if check_service_healthy "$FRONTEND_SERVICE"; then
+            FRONTEND_HEALTHY=true
+        fi
         if check_oauth_configured "$FRONTEND_SERVICE"; then
             OAUTH_CONFIGURED=true
         fi
@@ -158,8 +180,8 @@ echo "Project: $PROJECT_ID"
 echo "Region: $REGION"
 echo ""
 echo -e "${BLUE}Service Status:${NC}"
-echo "Backend:  $([ "$DEPLOY_BACKEND" = true ] && echo "✓ Deploy" || echo "✗ Skip") $([ "$BACKEND_EXISTS" = true ] && echo "(exists)" || echo "(new)")"
-echo "Frontend: $([ "$DEPLOY_FRONTEND" = true ] && echo "✓ Deploy" || echo "✗ Skip") $([ "$FRONTEND_EXISTS" = true ] && echo "(exists)" || echo "(new)")"
+echo "Backend:  $([ "$DEPLOY_BACKEND" = true ] && echo "✓ Deploy" || echo "✗ Skip") $([ "$BACKEND_EXISTS" = true ] && echo "(exists)" || echo "(new)") $([ "$BACKEND_HEALTHY" = true ] && echo -e "${GREEN}[HEALTHY]${NC}")"
+echo "Frontend: $([ "$DEPLOY_FRONTEND" = true ] && echo "✓ Deploy" || echo "✗ Skip") $([ "$FRONTEND_EXISTS" = true ] && echo "(exists)" || echo "(new)") $([ "$FRONTEND_HEALTHY" = true ] && echo -e "${GREEN}[HEALTHY]${NC}")"
 echo ""
 echo -e "${BLUE}Deployment Type:${NC}"
 if [ "$FIRST_TIME_DEPLOYMENT" = true ]; then
@@ -191,6 +213,27 @@ if [ "$FIRST_TIME_DEPLOYMENT" = true ]; then
     echo -e "${GREEN}✓ APIs enabled${NC}"
 
 
+fi
+
+# Smart Check: Ask to skip healthy services
+if [ "$DEPLOY_BACKEND" = true ] && [ "$BACKEND_HEALTHY" = true ]; then
+    echo -e "${BLUE}Backend service is already healthy.${NC}"
+    read -p "Do you want to skip redeploying the backend? (Y/n): " -n 1 -r
+    echo ""
+    if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+        echo -e "${YELLOW}Skipping backend deployment...${NC}"
+        DEPLOY_BACKEND=false
+    fi
+fi
+
+if [ "$DEPLOY_FRONTEND" = true ] && [ "$FRONTEND_HEALTHY" = true ]; then
+    echo -e "${BLUE}Frontend service is already healthy.${NC}"
+    read -p "Do you want to skip redeploying the frontend? (Y/n): " -n 1 -r
+    echo ""
+    if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+        echo -e "${YELLOW}Skipping frontend deployment...${NC}"
+        DEPLOY_FRONTEND=false
+    fi
 fi
 
 # Deploy Backend
