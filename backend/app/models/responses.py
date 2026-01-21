@@ -24,12 +24,14 @@ class ConfigTableSummary(BaseModel):
 
 class GenerateTestsResponse(BaseModel):
     """Response model for test generation."""
+    execution_id: Optional[str] = None
     summary: TestSummary
     results: List[TestResult] = []
 
 
 class ConfigTableResponse(BaseModel):
     """Response model for config table mode."""
+    execution_id: Optional[str] = None
     summary: ConfigTableSummary
     results_by_mapping: List[MappingResult]
 
@@ -45,4 +47,3 @@ class TableMetadataResponse(BaseModel):
     full_table_name: str
     columns: List[str]
     schema_info: Dict[str, Any]
-

@@ -2,59 +2,136 @@
 
 ## Overview
 
-This guide explains how to set up the configuration tables for the Data QA Agent. The setup is now consolidated into two main scripts:
-1.  **`config_tables_setup.sql`**: Creates system datasets, configuration tables, and predefined tests.
-2.  **`setup_scd_resources.sql`**: Creates mock datasets and tables for testing SCD validation.
+This guide explains how to set up the configuration tables for the Data QA Agent's hybrid testing system.
 
 ## Quick Start
 
-1.  **Parameterize your SQL files**:
-    Run this in your terminal or Cloud Shell to ensure your `PROJECT_ID` is correctly set in the scripts:
-    ```bash
-    ./parameterize-sql.sh
-    ```
+1. **Run the setup script** in BigQuery:
+   ```bash
+   # Open BigQuery Console
+   # Copy and paste the contents of config_tables_setup.sql
+   # Update the project ID in the script from 'miruna-sandpit' to your project ID
+   # Execute the script
+   ```
 
-2.  **Run the Setup Scripts**:
-    Run these commands in order (using `bq` CLI or copy-pasting to BigQuery Console):
-    ```bash
-    # 1. Setup System Tables
-    bq query --use_legacy_sql=false --project_id=your-project-id < config_tables_setup.generated.sql
+2. **Verify tables were created**:
+   ```sql
+   SELECT table_name 
+   FROM `YOUR_PROJECT_ID.config.INFORMATION_SCHEMA.TABLES`;
+   ```
 
-    # 2. Setup Mock Resources (Optional for testing)
-    bq query --use_legacy_sql=false --project_id=your-project-id < setup_scd_resources.generated.sql
-    ```
+## Config Tables
 
-## System Tables
+### 1. `data_load_config` - Main Configuration Table
 
-### 1. `config.scd_validation_config`
-Stores settings for SCD Type 1 and Type 2 validation.
+Stores GCS-to-BigQuery mappings and test configurations.
 
-**Columns:**
-- `config_id`: Unique identifier for the configuration
-- `target_dataset`, `target_table`: The BigQuery table to validate
-- `scd_type`: `'scd1'` or `'scd2'`
-- `primary_keys`: Array of columns forming the grain of the table
-- `surrogate_key`: (SCD2) Unique key for the version
-- `begin_date_column`, `end_date_column`: (SCD2) Effective history dates
-- `active_flag_column`: (SCD2) Current version indicator
-- `custom_tests`: JSON array of business logic rules
-- `description`: Human-readable notes
+**Key columns:**
+- `mapping_id`: Unique identifier for each data load
+- `source_bucket`, `source_file_path`: GCS source location (if applicable)
+- `source_project`, `source_dataset`, `source_table`: BigQuery source location (if applicable)
+- `target_dataset`, `target_table`: BigQuery destination
+- `enabled_test_ids`: Which predefined tests to run
+- `auto_suggest`: Enable/disable AI test suggestions
+- `outlier_columns`: Columns to check for statistical outliers
 
-### 2. `qa_results.scd_test_history`
-Centralized log for all test executions. This table is partitioned by day for performance.
+**Example:**
+```sql
+SELECT * FROM `YOUR_PROJECT_ID.config.data_load_config` 
+WHERE is_active = true;
+```
 
-### 3. `config.data_load_config`
-Stores configuration for GCS and Schema validation mappings.
+### 2. `predefined_tests` - Test Definitions
 
-## Views for Reporting
+System-wide test definitions (8 standard tests included).
 
-- `qa_results.latest_scd_results_by_table`: Shows only the most recent run for each table.
-- `qa_results.v_scd_validation_report`: Human-readable detailed report of test failures.
+**Standard tests:**
+- Row Count Match
+- No NULLs in Required Fields
+- No Duplicate Primary Keys
+- Referential Integrity
+- Numeric Range Validation
+- Date Range Validation
+- Pattern Validation
+- Statistical Outlier Detection
+
+### 3. `suggested_tests` - AI Suggestions
+
+Stores AI-suggested tests pending user approval.
+
+### 4. `test_execution_history` - Audit Trail
+
+Tracks all test executions for monitoring and debugging.
+
+## Adding a New Mapping
+
+```sql
+INSERT INTO `YOUR_PROJECT_ID.config.data_load_config`
+(mapping_id, mapping_name, source_bucket, source_file_path, source_file_format,
+ target_dataset, target_table, primary_key_columns, required_columns,
+ enabled_test_ids, is_active)
+VALUES
+('my_data_load', 'My Data Load', 'my-bucket', 'raw/data.csv', 'csv',
+ 'analytics', 'my_table', ['id'], ['id', 'name'],
+ ['row_count_match', 'no_nulls_required', 'no_duplicates_pk'], true);
+```
+
+## Test Configuration Examples
+
+### Basic Configuration
+```sql
+-- Minimal config - only global tests
+enabled_test_ids: ['row_count_match', 'no_nulls_required', 'no_duplicates_pk']
+```
+
+### With Range Checks
+```sql
+-- Add numeric and date validations
+enabled_test_ids: ['row_count_match', 'no_nulls_required', 'numeric_range', 'date_range']
+numeric_range_checks: JSON '{"age": {"min": 0, "max": 120}, "price": {"min": 0, "max": 10000}}'
+date_range_checks: JSON '{"order_date": {"min_date": "2024-01-01", "max_date": "2024-12-31"}}'
+```
+
+### With Pattern Validation
+```sql
+-- Validate email and phone formats
+enabled_test_ids: ['row_count_match', 'pattern_validation']
+pattern_checks: JSON '{"email": "^[^@]+@[^@]+\\\\.[^@]+$", "phone": "^\\\\+?[0-9]{10,15}$"}'
+```
+
+### With Foreign Keys
+```sql
+-- Check referential integrity
+enabled_test_ids: ['row_count_match', 'referential_integrity']
+foreign_key_checks: JSON '{"customer_id": {"table": "analytics.customers", "column": "id"}}'
+```
+
+### With Outlier Detection
+```sql
+-- Check for statistical outliers (2 standard deviations)
+enabled_test_ids: ['row_count_match', 'outlier_detection']
+outlier_columns: ['transaction_amount', 'processing_time_ms']
+```
+
+## Using in the App
+
+1. **Select "GCS File Comparison" mode**
+2. **Choose "Config Table" option**
+3. **Enter**: `config` (dataset) and `data_load_config` (table)
+4. **Click "Run Tests"**
 
 ## Maintenance
 
-### Clearing History
-You can use the **"Clear History"** button in the UI or run:
+### View Active Mappings
 ```sql
-TRUNCATE TABLE `your-project-id.qa_results.scd_test_history`;
+SELECT mapping_id, mapping_name, target_table, is_active
+FROM `YOUR_PROJECT_ID.config.data_load_config`
+WHERE is_active = true;
+```
+
+### Disable a Mapping
+```sql
+UPDATE `YOUR_PROJECT_ID.config.data_load_config`
+SET is_active = false, updated_at = CURRENT_TIMESTAMP()
+WHERE mapping_id = 'my_data_load';
 ```

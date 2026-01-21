@@ -1,4 +1,3 @@
-"""Models package initialization."""
 from .requests import (
     GenerateTestsRequest,
     TestResult,
@@ -6,6 +5,7 @@ from .requests import (
     AISuggestion,
     MappingResult,
     CustomTestRequest,
+    ProjectSettings,
     AddSCDConfigRequest,
     SaveHistoryRequest
 )
@@ -25,6 +25,7 @@ __all__ = [
     "AISuggestion",
     "MappingResult",
     "CustomTestRequest",
+    "ProjectSettings",
     "AddSCDConfigRequest",
     "SaveHistoryRequest",
     "TestSummary",

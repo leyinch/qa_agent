@@ -1,0 +1,164 @@
+{
+    "info": {
+        "_postman_id": "data-qa-agent-backend",
+        "name": "Data QA Agent Backend",
+        "description": "Collection for testing the Data QA Agent Backend API.",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "item": [
+        {
+            "name": "Health Check",
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{baseUrl}}/health",
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "health"
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "Generate Tests (GCS Mode)",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json",
+                        "type": "text"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n  \"project_id\": \"miruna-sandpit\",\n  \"comparison_mode\": \"gcs\",\n  \"gcs_bucket\": \"your-bucket-name\",\n  \"gcs_file_path\": \"path/to/file.csv\",\n  \"target_dataset\": \"your_dataset\",\n  \"target_table\": \"your_table\"\n}"
+                },
+                "url": {
+                    "raw": "{{baseUrl}}/api/generate-tests",
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "api",
+                        "generate-tests"
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "Generate Tests (Config Mode)",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json",
+                        "type": "text"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n  \"project_id\": \"miruna-sandpit\",\n  \"comparison_mode\": \"gcs-config\",\n  \"config_dataset\": \"config\",\n  \"config_table\": \"data_load_config\",\n  \"config_filters\": {\n    \"mapping_id\": \"example_mapping_id\"\n  }\n}"
+                },
+                "url": {
+                    "raw": "{{baseUrl}}/api/generate-tests",
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "api",
+                        "generate-tests"
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "Get History",
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{baseUrl}}/api/history?project_id=miruna-sandpit&limit=10",
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "api",
+                        "history"
+                    ],
+                    "query": [
+                        {
+                            "key": "project_id",
+                            "value": "miruna-sandpit"
+                        },
+                        {
+                            "key": "limit",
+                            "value": "10"
+                        }
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "List Predefined Tests",
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{baseUrl}}/api/predefined-tests",
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "api",
+                        "predefined-tests"
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "Save Custom Test",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json",
+                        "type": "text"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n  \"project_id\": \"miruna-sandpit\",\n  \"dataset_id\": \"config\",\n  \"test_name\": \"Postman Test\",\n  \"test_category\": \"api_test\",\n  \"severity\": \"LOW\",\n  \"sql_query\": \"SELECT 1\",\n  \"description\": \"Test created from Postman\",\n  \"target_dataset\": \"test_ds\",\n  \"target_table\": \"test_table\"\n}"
+                },
+                "url": {
+                    "raw": "{{baseUrl}}/api/custom-tests",
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "api",
+                        "custom-tests"
+                    ]
+                }
+            },
+            "response": []
+        }
+    ],
+    "variable": [
+        {
+            "key": "baseUrl",
+            "value": "https://data-qa-agent-backend-750147355601.us-central1.run.app",
+            "type": "string"
+        }
+    ]
+}

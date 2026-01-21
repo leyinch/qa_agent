@@ -1,0 +1,40 @@
+name: "qa-agent-backend-trigger"
+tags:
+  - "qa-agent"
+  - "gcp-cloud-build-deploy-cloud-run"
+github:
+  owner: "mirunasuresh23"
+  name: "qa_agent"
+  push:
+    branch: "^main$"
+serviceAccount: "projects/crown-cdw-intelia-dev/serviceAccounts/445471616138-compute@developer.gserviceaccount.com"
+substitutions:
+  _SERVICE_NAME: "qa-agent-backend"
+  LOCATION: "australia-southeast2"
+build:
+  steps:
+    - name: 'gcr.io/cloud-builders/docker'
+      args: ['build', '-t', '$LOCATION-docker.pkg.dev/$PROJECT_ID/agent-repo/$_SERVICE_NAME:latest', '.']
+      dir: 'backend'
+    - name: 'gcr.io/cloud-builders/docker'
+      args: ['push', '$LOCATION-docker.pkg.dev/$PROJECT_ID/agent-repo/$_SERVICE_NAME:latest']
+    - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+      entrypoint: gcloud
+      args:
+        - 'run'
+        - 'deploy'
+        - '$_SERVICE_NAME'
+        - '--image'
+        - '$LOCATION-docker.pkg.dev/$PROJECT_ID/agent-repo/$_SERVICE_NAME:latest'
+        - '--region'
+        - '$LOCATION'
+        - '--platform'
+        - 'managed'
+        - '--allow-unauthenticated'
+        - '--service-account=qa-agent-sa@crown-cdw-intelia-dev.iam.gserviceaccount.com'
+        - '--set-env-vars'
+        - 'GOOGLE_CLOUD_PROJECT=$PROJECT_ID'
+  images:
+    - '$LOCATION-docker.pkg.dev/$PROJECT_ID/agent-repo/$_SERVICE_NAME:latest'
+  options:
+    logging: CLOUD_LOGGING_ONLY

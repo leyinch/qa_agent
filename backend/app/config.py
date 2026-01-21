@@ -1,5 +1,4 @@
 """Configuration settings for the Data QA Agent backend."""
-from pydantic import Field
 from pydantic_settings import BaseSettings
 from typing import Optional
 
@@ -12,16 +11,15 @@ class Settings(BaseSettings):
     debug: bool = False
     
     # Google Cloud
-    google_cloud_project: Optional[str] = Field(None, env="GOOGLE_CLOUD_PROJECT")
-    google_cloud_region: str = Field("us-central1", env="GOOGLE_CLOUD_REGION")
-    cloud_run_url: Optional[str] = None
-    vertex_ai_location: str = Field("us-central1", env="GOOGLE_CLOUD_REGION")
-    vertex_ai_model: str = Field("gemini-1.5-flash", env="VERTEX_AI_MODEL")
-    scheduler_location: str = Field("us-central1", env="GOOGLE_CLOUD_REGION")
-    scheduler_timezone: str = Field("Australia/Melbourne", env="SCHEDULER_TIMEZONE")
+    google_cloud_project: str = "default-project"
+    vertex_ai_location: str = "us-central1"
+    vertex_ai_model: str = "gemini-1.5-flash-001"
     
     # CORS
-    cors_origins: list[str] = ["*"]
+    cors_origins: list[str] = [
+        "http://localhost:3000",
+        "https://data-qa-agent-*.run.app"
+    ]
     
     class Config:
         env_file = ".env"

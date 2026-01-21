@@ -13,9 +13,6 @@ The Data QA Agent now uses a hybrid architecture:
 - Google Cloud SDK
 - Docker (optional, for containerized deployment)
 
-### ⚙️ One-Time Project Setup
-Most infrastructure (APIs, Cloud Scheduler location) is automatically handled by the `deploy-all.sh` script during first-time deployment.
-
 ---
 
 ## 🚀 Local Development
@@ -65,7 +62,7 @@ docker-compose up
 
 Create `backend/.env`:
 ```bash
-GOOGLE_CLOUD_PROJECT=[YOUR_PROJECT_ID]
+GOOGLE_CLOUD_PROJECT=miruna-sandpit
 ```
 
 ### Frontend (.env.local)
@@ -91,10 +88,10 @@ cd backend
 gcloud run deploy data-qa-agent-backend \
   --source . \
   --platform managed \
-  --region [YOUR_REGION] \
-  --project [YOUR_PROJECT_ID] \
+  --region us-central1 \
+  --project miruna-sandpit \
   --allow-unauthenticated \
-  --set-env-vars GOOGLE_CLOUD_PROJECT=[YOUR_PROJECT_ID]
+  --set-env-vars GOOGLE_CLOUD_PROJECT=miruna-sandpit
 ```
 
 **Note the backend URL** from the output (e.g., `https://data-qa-agent-backend-xxx.run.app`)
@@ -106,8 +103,8 @@ gcloud run deploy data-qa-agent-backend \
 gcloud run deploy data-qa-agent-frontend \
   --source . \
   --platform managed \
-  --region [YOUR_REGION] \
-  --project [YOUR_PROJECT_ID] \
+  --region us-central1 \
+  --project miruna-sandpit \
   --allow-unauthenticated \
   --set-env-vars NEXT_PUBLIC_BACKEND_URL=https://data-qa-agent-backend-xxx.run.app,GOOGLE_CLIENT_ID=your-id,GOOGLE_CLIENT_SECRET=your-secret,NEXTAUTH_SECRET=your-secret,NEXTAUTH_URL=https://data-qa-agent-frontend-xxx.run.app
 ```
@@ -139,7 +136,7 @@ curl http://localhost:8000/api/predefined-tests
 curl -X POST http://localhost:8000/api/generate-tests \
   -H "Content-Type: application/json" \
   -d '{
-    "project_id": "[YOUR_PROJECT_ID]",
+    "project_id": "miruna-sandpit",
     "comparison_mode": "gcs",
     "gcs_bucket": "your-bucket",
     "gcs_file_path": "path/to/file.csv",
@@ -148,6 +145,18 @@ curl -X POST http://localhost:8000/api/generate-tests \
   }'
 ```
 
+### Generate Tests (Config Table)
+
+```bash
+curl -X POST http://localhost:8000/api/generate-tests \
+  -H "Content-Type: application/json" \
+  -d '{
+    "project_id": "miruna-sandpit",
+    "comparison_mode": "gcs-config",
+    "config_dataset": "config",
+    "config_table": "data_load_config"
+  }'
+```
 
 ---
 

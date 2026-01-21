@@ -6,6 +6,7 @@ from typing import Optional, List, Dict, Any
 class GenerateTestsRequest(BaseModel):
     """Request model for test generation."""
     project_id: str = Field(..., description="Google Cloud project ID")
+    execution_id: Optional[str] = Field(None, description="Workflow or execution ID")
     comparison_mode: str = Field(..., description="Mode: 'schema', 'gcs', 'gcs-config', 'scd', or 'scd-config'")
     
     # Schema mode fields
@@ -22,6 +23,7 @@ class GenerateTestsRequest(BaseModel):
     # GCS config table mode fields
     config_dataset: Optional[str] = Field(None, description="Config table dataset")
     config_table: Optional[str] = Field(None, description="Config table name")
+    config_filters: Optional[Dict[str, Any]] = Field(None, description="Key-value pairs to filter config table records")
     
     # SCD validation fields
     scd_type: Optional[str] = Field(None, description="SCD type: 'scd1' or 'scd2'")
@@ -119,3 +121,9 @@ class SaveHistoryRequest(BaseModel):
     metadata: Optional[Dict[str, Any]] = None
 
 
+class ProjectSettings(BaseModel):
+    """Model for project-wide settings."""
+    project_id: str
+    alert_emails: List[str] = []
+    teams_webhook_url: Optional[str] = None
+    alert_on_failure: bool = True

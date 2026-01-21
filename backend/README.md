@@ -62,17 +62,6 @@ Generate and execute data quality tests.
 - `gcs`: Single file comparison
 - `gcs-config`: Config table batch processing
 - `schema`: Schema validation (coming soon)
-- `scd`: SCD Type 1 & Type 2 validation
-
-### GET /api/history
-Get execution history.
-- `project_id`: (Required) GCP Project ID
-- `limit`: Number of results (default 50)
-
-### DELETE /api/history
-Clear execution history for a project.
-- `project_id`: (Required) GCP Project ID
-*Note: This operation truncates the history table.*
 
 ### GET /health
 Health check endpoint.
@@ -128,6 +117,6 @@ Deploy to Cloud Run:
 gcloud run deploy data-qa-agent-backend \
   --source . \
   --platform managed \
-  --region your-region \
+  --region us-central1 \
   --allow-unauthenticated
 ```
