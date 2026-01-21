@@ -66,15 +66,12 @@ export default function HistoryList({ projectId, onViewResult, showToast }: Hist
                 }
 
                 const group = grouped[execId];
-                group.total_tests++;
+                group.total_tests += row.total_tests || 0;
+                group.passed_tests += row.passed_tests || 0;
+                group.failed_tests += row.failed_tests || 0;
                 group.details?.push(row);
 
-                if (row.status === 'PASS') {
-                    group.passed_tests++;
-                } else if (row.status === 'FAIL') {
-                    group.failed_tests++;
-                    group.status = 'FAIL';
-                } else {
+                if (row.status !== 'PASS') {
                     group.status = 'FAIL';
                 }
             });

@@ -149,10 +149,12 @@ async def generate_tests(request: GenerateTestsRequest):
             try:
                 for mapping_result in result['results_by_mapping']:
                     history_service.save_test_results(
-                        project_id=request.project_id, comparison_mode="scd", test_results=[r.dict() for r in mapping_result.predefined_results],
+                        project_id=request.project_id, comparison_mode="scd-config", 
+                        test_results=[r.dict() for r in mapping_result.predefined_results],
                         target_dataset=mapping_result.mapping_info.target.split('.')[0] if '.' in mapping_result.mapping_info.target else request.config_dataset,
                         target_table=mapping_result.mapping_info.target.split('.')[1] if '.' in mapping_result.mapping_info.target else mapping_result.mapping_id,
-                        mapping_id=mapping_result.mapping_id, executed_by="Batch Run"
+                        mapping_id=mapping_result.mapping_id, executed_by="Batch Run",
+                        execution_id=exec_id
                     )
             except Exception as e:
                 logger.error(f"SCD History logging failed: {e}")
@@ -168,8 +170,10 @@ async def generate_tests(request: GenerateTestsRequest):
             # Our History Logging
             try:
                 history_service.save_test_results(
-                    project_id=request.project_id, comparison_mode="scd", test_results=[r.dict() for r in result.predefined_results],
-                    target_dataset=request.target_dataset, target_table=request.target_table, executed_by="Manual Run"
+                    project_id=request.project_id, comparison_mode="scd", 
+                    test_results=[r.dict() for r in result.predefined_results],
+                    target_dataset=request.target_dataset, target_table=request.target_table, 
+                    executed_by="Manual Run", execution_id=exec_id
                 )
             except Exception as e:
                 logger.error(f"SCD History logging failed: {e}")

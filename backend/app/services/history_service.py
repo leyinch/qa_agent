@@ -124,7 +124,8 @@ class TestHistoryService:
         target_table: Optional[str] = None,
         mapping_id: Optional[str] = None,
         executed_by: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
+        execution_id: Optional[str] = None
     ) -> str:
         """
         Saves test results to BigQuery history.
@@ -134,7 +135,7 @@ class TestHistoryService:
         # Ensure table exists before writing
         self._ensure_table_exists(project_id)
 
-        execution_id = str(uuid.uuid4())
+        save_execution_id = execution_id or str(uuid.uuid4())
         
         # Get execution timestamp in Melbourne time (wall-clock time)
         tz = pytz.timezone('Australia/Melbourne')
@@ -163,7 +164,7 @@ class TestHistoryService:
 
         # Prepare pure JSON-compatible dict
         row = {
-            "execution_id": execution_id,
+            "execution_id": save_execution_id,
             "execution_timestamp": execution_timestamp.isoformat(), # Use string to ensure serialization success
             "project_id": project_id,
             "comparison_mode": comparison_mode,

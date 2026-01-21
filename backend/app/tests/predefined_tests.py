@@ -26,6 +26,42 @@ class TestTemplate:
 
 # Predefined test templates
 PREDEFINED_TESTS = {
+    'table_exists': TestTemplate(
+        test_id='table_exists',
+        name='Table exists (smoke)',
+        category='smoke',
+        severity='HIGH',
+        description='Check if the target table exists and has rows',
+        is_global=True,
+        generate_sql=lambda config: f"SELECT * FROM `{config['full_table_name']}` LIMIT 1"
+    ),
+
+    'surrogate_key_null': TestTemplate(
+        test_id='surrogate_key_null',
+        name='Surrogate key NOT NULL',
+        category='completeness',
+        severity='HIGH',
+        description='Ensure surrogate key column has no NULLs',
+        is_global=False,
+        generate_sql=lambda config: (
+            f"SELECT * FROM `{config['full_table_name']}` WHERE {config['surrogate_key']} IS NULL LIMIT 100"
+            if config.get('surrogate_key') else None
+        )
+    ),
+
+    'surrogate_key_unique': TestTemplate(
+        test_id='surrogate_key_unique',
+        name='Surrogate key uniqueness',
+        category='integrity',
+        severity='HIGH',
+        description='Ensure surrogate key column has no duplicates',
+        is_global=False,
+        generate_sql=lambda config: (
+            f"SELECT {config['surrogate_key']}, COUNT(*) FROM `{config['full_table_name']}` GROUP BY 1 HAVING COUNT(*) > 1 LIMIT 100"
+            if config.get('surrogate_key') else None
+        )
+    ),
+
     'row_count_match': TestTemplate(
         test_id='row_count_match',
         name='Row Count Match',
@@ -96,22 +132,42 @@ PREDEFINED_TESTS = {
         )
     ),
 
-    # --- SCD2 Tests ---
-    'scd2_primary_key_null': TestTemplate(
-        test_id='scd2_primary_key_null',
+    # --- SCD Tests ---
+    'scd_primary_key_null': TestTemplate(
+        test_id='scd_primary_key_null',
         name='Primary Key NOT NULL',
         category='completeness',
         severity='HIGH',
-        description='Check SCD2 primary key for NULL values',
+        description='Check composite primary key for NULL values',
         is_global=False,
         generate_sql=lambda config: (
             f"""
             SELECT * FROM `{config['full_table_name']}`
-            WHERE ({' || '.join([f"SAFE_CAST({col} AS STRING)" for col in config['primary_keys']])}) IS NULL
+            WHERE ({' + '.join([f"IFNULL(SAFE_CAST({col} AS STRING), '')" for col in config['primary_keys']])}) = ''
             LIMIT 100
             """ if config.get('primary_keys') else None
         )
     ),
+
+    'scd_primary_key_unique': TestTemplate(
+        test_id='scd_primary_key_unique',
+        name='Primary Key uniqueness',
+        category='integrity',
+        severity='HIGH',
+        description='Check for duplicate primary keys (for SCD1) or non-unique keys in current state',
+        is_global=False,
+        generate_sql=lambda config: (
+            f"""
+            SELECT {', '.join(config['primary_keys'])}, COUNT(*) as duplicate_count
+            FROM `{config['full_table_name']}`
+            GROUP BY {', '.join(config['primary_keys'])}
+            HAVING COUNT(*) > 1
+            LIMIT 100
+            """ if config.get('primary_keys') else None
+        )
+    ),
+
+    'scd2_primary_key_null': TestTemplate(
 
     'scd2_begin_date_null': TestTemplate(
         test_id='scd2_begin_date_null',
