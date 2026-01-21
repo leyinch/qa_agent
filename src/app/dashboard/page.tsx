@@ -4,9 +4,11 @@ import { useState } from "react";
 import DashboardForm from "@/components/DashboardForm";
 import Sidebar from "@/components/Sidebar";
 
+type ComparisonMode = 'schema' | 'gcs' | 'scd' | 'history' | 'settings';
+
 export default function Dashboard() {
-    // Mode state: 'schema' | 'gcs' | 'history' | 'settings'
-    const [comparisonMode, setComparisonMode] = useState<'schema' | 'gcs' | 'history' | 'settings'>('schema');
+    // Mode state: 'schema' | 'gcs' | 'scd' | 'history' | 'settings'
+    const [comparisonMode, setComparisonMode] = useState<ComparisonMode>('schema');
 
     return (
         <main style={{ minHeight: '100vh', position: 'relative' }}>
