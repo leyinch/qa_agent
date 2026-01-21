@@ -145,7 +145,7 @@ PREDEFINED_TESTS = {
             SELECT * FROM `{config['full_table_name']}`
             WHERE {' OR '.join([f"{col} IS NULL" for col in config['primary_keys']])}
             LIMIT 100
-            """ if config.get('primary_keys') else None
+            """ if config.get('primary_keys') else (_ for _ in ()).throw(ValueError("Primary keys check requires 'primary_keys' in config"))
         )
     ),
 
@@ -163,7 +163,7 @@ PREDEFINED_TESTS = {
             GROUP BY {', '.join(config['primary_keys'])}
             HAVING COUNT(*) > 1
             LIMIT 100
-            """ if config.get('primary_keys') else None
+            """ if config.get('primary_keys') else (_ for _ in ()).throw(ValueError("Primary keys check requires 'primary_keys' in config"))
         )
     ),
 
