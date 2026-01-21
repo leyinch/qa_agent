@@ -232,7 +232,16 @@ class TestExecutor:
                         sample_data=rows[:10] if row_count > 0 else None
                     ))
                 except Exception as e:
-                    predefined_results.append(TestResult(test_id=test.id, status='ERROR', error_message=str(e)))
+                    predefined_results.append(TestResult(
+                        test_id=test.id, 
+                        test_name=test.name,
+                        category=test.category,
+                        description=test.description, 
+                        status='ERROR', 
+                        severity=test.severity,
+                        sql_query=sql,
+                        error_message=str(e)
+                    ))
             
             # --- Custom Tests (Business Rules) ---
             try:
@@ -265,7 +274,13 @@ class TestExecutor:
                     except Exception as e:
                         predefined_results.append(TestResult(
                             test_id=f"custom_err_{custom_test.get('test_name', 'unknown')}",
-                            status='ERROR', error_message=str(e)
+                            test_name=f"[Business Rule] {custom_test.get('test_name', 'Error')}",
+                            category=custom_test.get('test_category', 'business_rule'),
+                            description=custom_test.get('description', 'Error running custom test'),
+                            status='ERROR',
+                            severity='HIGH',
+                            sql_query=custom_test.get('sql_query', ''),
+                            error_message=str(e)
                         ))
             except Exception as e:
                 logger.error(f"Failed to run custom SCD tests: {e}")
