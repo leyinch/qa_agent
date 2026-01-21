@@ -62,6 +62,12 @@ export default function ResultsView() {
                         errors: allTests.filter((t: any) => t.status === 'ERROR').length,
                         total_mappings: currentMappingResults.length
                     };
+                    
+                    // Fallback: If total_tests is 0 but we have passed/failed, recalc
+                    if (currentSummary.total_tests === 0 && (currentSummary.passed > 0 || currentSummary.failed > 0)) {
+                        currentSummary.total_tests = currentSummary.passed + currentSummary.failed + currentSummary.errors;
+                    }
+
                     setIsConfigMode(true);
                     setMappingResults(currentMappingResults);
                 } else {
@@ -231,8 +237,8 @@ export default function ResultsView() {
             {summary && (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem', marginBottom: '3rem' }}>
                     <div className="card" style={{ padding: '1.5rem', background: 'white' }}>
-                        <div style={{ fontSize: '0.875rem', fontWeight: '600', opacity: 0.6, marginBottom: '0.5rem' }}>Total Mappings</div>
-                        <div style={{ fontSize: '2.5rem', fontWeight: '800' }}>{summary.total_mappings || 1}</div>
+                        <div style={{ fontSize: '0.875rem', fontWeight: '600', opacity: 0.6, marginBottom: '0.5rem' }}>Total Tests</div>
+                        <div style={{ fontSize: '2.5rem', fontWeight: '800' }}>{summary.total_tests || (summary.passed + summary.failed)}</div>
                         <div style={{ height: '4px', background: 'var(--border)', marginTop: '1rem', borderRadius: '2px' }} />
                     </div>
                     <div className="card" style={{ padding: '1.5rem', background: 'white', position: 'relative', overflow: 'hidden' }}>
