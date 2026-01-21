@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     
     # Cloud Run / Deployment
     cloud_run_url: Optional[str] = None
+    cors_origins: List[str] = ["*"]
     
     class Config:
         env_file = ".env"
