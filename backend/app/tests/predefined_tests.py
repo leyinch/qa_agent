@@ -176,11 +176,12 @@ PREDEFINED_TESTS = {
         is_global=False,
         generate_sql=lambda config: (
             f"""
+            """
             SELECT * FROM `{config['full_table_name']}`
             WHERE (SAFE_CAST({config['active_flag_column']} AS STRING) IN ('true', 'TRUE', 'Y', '1') AND CAST({config['end_date_column']} AS STRING) NOT LIKE '2099-12-31%')
             OR (SAFE_CAST({config['active_flag_column']} AS STRING) NOT IN ('true', 'TRUE', 'Y', '1') AND CAST({config['end_date_column']} AS STRING) LIKE '2099-12-31%')
             LIMIT 100
-            """
+            """ if config.get('active_flag_column') and config.get('end_date_column') else (_ for _ in ()).throw(ValueError("Test requires 'active_flag_column' and 'end_date_column'"))
         )
     ),
 
@@ -197,7 +198,7 @@ PREDEFINED_TESTS = {
             WHERE {config['begin_date_column']} > (SELECT MAX({config['begin_date_column']}) FROM `{config['full_table_name']}` WHERE SAFE_CAST({config['active_flag_column']} AS STRING) IN ('true', 'TRUE', 'Y', '1'))
             AND SAFE_CAST({config['active_flag_column']} AS STRING) NOT IN ('true', 'TRUE', 'Y', '1')
             LIMIT 100
-            """
+            """ if config.get('begin_date_column') and config.get('active_flag_column') else (_ for _ in ()).throw(ValueError("Test requires 'begin_date_column' and 'active_flag_column'"))
         )
     ),
 
@@ -239,13 +240,13 @@ PREDEFINED_TESTS = {
         description='Ensure exactly one active record per primary key',
         is_global=False,
         generate_sql=lambda config: (
-            f"""
+            """
             SELECT {' , '.join(config['primary_keys'])}, COUNTIF(SAFE_CAST({config['active_flag_column']} AS STRING) IN ('true', 'TRUE', 'Y', '1')) as active_count
             FROM `{config['full_table_name']}`
             GROUP BY {' , '.join(config['primary_keys'])}
             HAVING active_count <> 1
             LIMIT 100
-            """
+            """ if config.get('primary_keys') and config.get('active_flag_column') else (_ for _ in ()).throw(ValueError("Test requires 'primary_keys' and 'active_flag_column'"))
         )
     ),
 
@@ -257,12 +258,12 @@ PREDEFINED_TESTS = {
         description='Ensure active rows have the high-watermark end date',
         is_global=False,
         generate_sql=lambda config: (
-            f"""
+            """
             SELECT * FROM `{config['full_table_name']}`
             WHERE SAFE_CAST({config['active_flag_column']} AS STRING) IN ('true', 'TRUE', 'Y', '1')
             AND CAST({config['end_date_column']} AS STRING) NOT LIKE '2099-12-31%'
             LIMIT 100
-            """
+            """ if config.get('active_flag_column') and config.get('end_date_column') else (_ for _ in ()).throw(ValueError("Test requires 'active_flag_column' and 'end_date_column'"))
         )
     ),
 
@@ -273,7 +274,10 @@ PREDEFINED_TESTS = {
         severity='HIGH',
         description='Ensure BeginEffDateTime < EndEffDateTime',
         is_global=False,
-        generate_sql=lambda config: f"SELECT * FROM `{config['full_table_name']}` WHERE {config['begin_date_column']} >= {config['end_date_column']} LIMIT 100"
+        generate_sql=lambda config: (
+            f"SELECT * FROM `{config['full_table_name']}` WHERE {config['begin_date_column']} >= {config['end_date_column']} LIMIT 100"
+            if config.get('begin_date_column') and config.get('end_date_column') else (_ for _ in ()).throw(ValueError("Test requires 'begin_date_column' and 'end_date_column'"))
+        )
     ),
 
     'scd2_unique_begin_date': TestTemplate(
@@ -284,13 +288,13 @@ PREDEFINED_TESTS = {
         description='Ensure no primary key has multiple records starting at the same time',
         is_global=False,
         generate_sql=lambda config: (
-            f"""
+            """
             SELECT {' , '.join(config['primary_keys'])}, {config['begin_date_column']}, COUNT(*) as duplicate_count
             FROM `{config['full_table_name']}`
             GROUP BY {' , '.join(config['primary_keys'])}, {config['begin_date_column']}
             HAVING COUNT(*) > 1
             LIMIT 100
-            """
+            """ if config.get('primary_keys') and config.get('begin_date_column') else (_ for _ in ()).throw(ValueError("Test requires 'primary_keys' and 'begin_date_column'"))
         )
     ),
 
@@ -302,13 +306,13 @@ PREDEFINED_TESTS = {
         description='Ensure no primary key has multiple records ending at the same time',
         is_global=False,
         generate_sql=lambda config: (
-            f"""
+            """
             SELECT {' , '.join(config['primary_keys'])}, {config['end_date_column']}, COUNT(*) as duplicate_count
             FROM `{config['full_table_name']}`
             GROUP BY {' , '.join(config['primary_keys'])}, {config['end_date_column']}
             HAVING COUNT(*) > 1
             LIMIT 100
-            """
+            """ if config.get('primary_keys') and config.get('end_date_column') else (_ for _ in ()).throw(ValueError("Test requires 'primary_keys' and 'end_date_column'"))
         )
     ),
 
@@ -333,7 +337,7 @@ PREDEFINED_TESTS = {
             WHERE next_begin IS NOT NULL 
             AND {config['end_date_column']} <> next_begin
             LIMIT 100
-            """
+            """ if config.get('primary_keys') and config.get('begin_date_column') and config.get('end_date_column') else (_ for _ in ()).throw(ValueError("Test requires 'primary_keys', 'begin_date_column', and 'end_date_column'"))
         )
     ),
     
