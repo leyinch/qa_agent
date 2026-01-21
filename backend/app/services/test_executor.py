@@ -135,7 +135,13 @@ class TestExecutor:
                     except Exception as e:
                         predefined_results.append(TestResult(
                             test_id=f"custom_err_{custom_test.get('test_name', 'unknown')}",
-                            status='ERROR', error_message=str(e)
+                            test_name=f"[Custom] {custom_test.get('test_name', 'Error')}",
+                            category=custom_test.get('test_category', 'custom'),
+                            description=custom_test.get('description', 'Error running custom test'),
+                            status='ERROR',
+                            severity=custom_test.get('severity', 'HIGH'),
+                            sql_query=custom_test.get('sql_query', ''),
+                            error_message=str(e)
                         ))
             except Exception as e:
                 logger.error(f"Failed to run custom tests: {e}")
@@ -291,7 +297,14 @@ class TestExecutor:
                 predefined_results=predefined_results, ai_suggestions=[]
             )
         except Exception as e:
-            return MappingResult(mapping_id=mapping_id, predefined_results=[], ai_suggestions=[], error=str(e))
+            logger.error(f"Critical error in process_scd for {mapping_id}: {e}", exc_info=True)
+            return MappingResult(
+                mapping_id=mapping_id, 
+                mapping_info=MappingInfo(source="SCD Validation", target=f"{mapping.get('target_dataset')}.{mapping.get('target_table')}", file_row_count=0, table_row_count=0),
+                predefined_results=[], 
+                ai_suggestions=[], 
+                error=str(e)
+            )
 
     async def process_scd_config_table(self, project_id: str, config_dataset: str, config_table: str) -> Dict[str, Any]:
         """Process multiple SCD validations (Our feature)."""

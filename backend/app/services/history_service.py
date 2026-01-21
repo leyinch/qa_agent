@@ -13,6 +13,7 @@ import logging
 from typing import List, Dict, Optional, Any
 from datetime import datetime, timedelta, date
 import pytz
+import decimal
 
 from app.config import settings
 
@@ -106,9 +107,16 @@ class TestHistoryService:
         Recursively convert objects to BigQuery-compatible JSON formats.
         BigQuery JSON columns expect Python dicts/lists, but nested
         datetime/date objects must be converted to strings.
+        Handle Decimal, bytes, and UUID as well.
         """
         if isinstance(data, (datetime, date)):
             return data.isoformat()
+        elif isinstance(data, decimal.Decimal):
+            return float(data)
+        elif isinstance(data, (bytes, bytearray)):
+            return data.decode('utf-8', errors='replace')
+        elif hasattr(data, '__dict__'): # Handle objects
+            return self._prepare_json_for_bq(data.__dict__)
         elif isinstance(data, dict):
             return {k: self._prepare_json_for_bq(v) for k, v in data.items()}
         elif isinstance(data, list):
