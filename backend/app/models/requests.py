@@ -25,6 +25,15 @@ class GenerateTestsRequest(BaseModel):
     config_table: Optional[str] = Field(None, description="Config table name")
     config_filters: Optional[Dict[str, Any]] = Field(None, description="Key-value pairs to filter config table records")
     
+    # SCD mode fields
+    scd_type: Optional[str] = Field("scd2", description="SCD type: scd1, scd2")
+    primary_keys: Optional[List[str]] = Field(None, description="List of primary key columns")
+    surrogate_key: Optional[str] = Field(None, description="Surrogate key column")
+    begin_date_column: Optional[str] = Field(None, description="SCD2 begin date column")
+    end_date_column: Optional[str] = Field(None, description="SCD2 end date column")
+    active_flag_column: Optional[str] = Field(None, description="SCD2 active flag column")
+    custom_tests: Optional[List[Dict[str, Any]]] = Field(None, description="List of custom tests")
+    
     # Common optional fields
     enabled_test_ids: Optional[List[str]] = Field(None, description="List of test IDs to enable")
 

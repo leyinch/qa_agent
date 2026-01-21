@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import HistoryList from "./HistoryList";
 
@@ -112,6 +112,7 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        console.log("Submit clicked. Mode:", comparisonMode, "SCD Mode:", scdMode);
         setLoading(true);
 
         try {
@@ -155,7 +156,9 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
 
             if (!response.ok) {
                 const errData = await response.json();
-                throw new Error(errData.detail || "Failed to generate tests");
+                const errorMessage = errData.detail || errData.error || "Failed to generate tests";
+                console.error("Backend error:", errorMessage);
+                throw new Error(errorMessage);
             }
 
             const data = await response.json();
@@ -180,7 +183,7 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
             {toast && (
                 <div style={{
                     position: 'fixed', top: '2rem', right: '2rem', padding: '1rem 2rem',
-                    background: toast.type === 'error' ? 'var(--error-text)' : 'var(--primary)',
+                    backgroundColor: toast.type === 'error' ? 'var(--error)' : 'var(--primary)',
                     color: 'white', borderRadius: 'var(--radius)', zIndex: 1000,
                     boxShadow: '0 4px 12px rgba(0,0,0,0.1)', animation: 'slideIn 0.3s ease-out'
                 }}>

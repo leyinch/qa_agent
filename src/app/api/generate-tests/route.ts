@@ -21,6 +21,7 @@ export async function POST(req: Request) {
         }
 
         const data = await res.json();
+        console.log("Backend response successful");
         return NextResponse.json(data);
 
     } catch (error: any) {

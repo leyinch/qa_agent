@@ -14,7 +14,9 @@
   --card: #ffffff;
   --card-foreground: #0f172a;
   --success: #10b981;
+  --success-text: #065f46;
   --error: #ef4444;
+  --error-text: #991b1b;
   --warning: #f59e0b;
   --radius: 12px;
 
