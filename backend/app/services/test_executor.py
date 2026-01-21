@@ -234,6 +234,42 @@ class TestExecutor:
                 except Exception as e:
                     predefined_results.append(TestResult(test_id=test.id, status='ERROR', error_message=str(e)))
             
+            # --- Custom Tests (Business Rules) ---
+            try:
+                # 1. Fetch from DB (same as process_mapping)
+                active_custom_tests = await bigquery_service.get_active_custom_tests(
+                    project_id, target_dataset, target_table
+                )
+                
+                # 2. Merge with any passed via mapping (from config table)
+                if mapping.get('custom_tests'):
+                    # precise logic depends on format, but usually config table has them embedded
+                    # unique the list by test_name or use DB ones as source of truth
+                    pass 
+
+                for custom_test in active_custom_tests:
+                    try:
+                        sql = custom_test['sql_query']
+                        rows = await bigquery_service.execute_query(sql)
+                        row_count = len(rows)
+                        predefined_results.append(TestResult(
+                            test_id=f"custom_{custom_test.get('test_name', 'unknown')}",
+                            test_name=f"[Business Rule] {custom_test.get('test_name', 'Custom Test')}",
+                            category=custom_test.get('test_category', 'business_rule'),
+                            description=custom_test.get('description', ''),
+                            status='PASS' if row_count == 0 else 'FAIL',
+                            severity=custom_test.get('severity', 'HIGH'),
+                            sql_query=sql, rows_affected=row_count,
+                            sample_data=rows[:10] if row_count > 0 else None
+                        ))
+                    except Exception as e:
+                        predefined_results.append(TestResult(
+                            test_id=f"custom_err_{custom_test.get('test_name', 'unknown')}",
+                            status='ERROR', error_message=str(e)
+                        ))
+            except Exception as e:
+                logger.error(f"Failed to run custom SCD tests: {e}")
+            
             return MappingResult(
                 mapping_id=mapping_id,
                 mapping_info=MappingInfo(source="SCD Validation", target=f"{target_dataset}.{target_table}", file_row_count=0, table_row_count=0),
