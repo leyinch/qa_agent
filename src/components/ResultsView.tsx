@@ -62,7 +62,7 @@ export default function ResultsView() {
                         errors: allTests.filter((t: any) => t.status === 'ERROR').length,
                         total_mappings: currentMappingResults.length
                     };
-                    
+
                     // Fallback: If total_tests is 0 but we have passed/failed, recalc
                     if (currentSummary.total_tests === 0 && (currentSummary.passed > 0 || currentSummary.failed > 0)) {
                         currentSummary.total_tests = currentSummary.passed + currentSummary.failed + currentSummary.errors;
@@ -219,7 +219,7 @@ export default function ResultsView() {
             <div style={{ marginBottom: '2.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div>
                     <div style={{ fontSize: '0.75rem', fontWeight: '800', color: '#10b981', letterSpacing: '0.1em', marginBottom: '0.5rem' }}>VALIDATION REPORT</div>
-                    <h1 style={{ fontSize: '2.75rem', fontWeight: '800' }} className="gradient-text">Test Results</h1>
+                    <h1 style={{ fontSize: '2.75rem', fontWeight: '800' }} className="gradient-text">Test Results v2</h1>
                 </div>
                 {summary?.executed_by && (
                     <div className="card" style={{ padding: '0.75rem 1.25rem', display: 'flex', alignItems: 'center', gap: '1rem', background: 'white', border: '1px solid var(--border)' }}>
