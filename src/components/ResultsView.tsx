@@ -52,17 +52,43 @@ export default function ResultsView() {
                 const parsed = JSON.parse(data);
                 setProjectId(parsed.project_id || localStorage.getItem("projectId") || "");
 
-                if (parsed.results_by_mapping) {
-                    setIsConfigMode(true);
-                    setMappingResults(parsed.results_by_mapping);
-                    setSummary(parsed.summary);
-                } else if (parsed.predefined_results) {
-                    setResults(parsed.predefined_results);
-                    setSummary(parsed.summary);
-                } else if (parsed.results) {
-                    setResults(parsed.results);
-                    setSummary(parsed.summary);
+                let currentSummary = parsed.summary || {};
+                let currentMappingResults = parsed.results_by_mapping || [];
+                let currentResults = parsed.results || parsed.predefined_results || [];
+
+                // Defensive Aggregation: If summary is missing or empty, calculate it from results
+                if (!currentSummary.total_tests || currentSummary.total_tests === 0) {
+                    if (currentMappingResults.length > 0) {
+                        const allTests = currentMappingResults.flatMap((m: any) => m.predefined_results || []);
+                        currentSummary = {
+                            total_tests: allTests.length,
+                            passed: allTests.filter((t: any) => t.status === 'PASS').length,
+                            failed: allTests.filter((t: any) => t.status === 'FAIL').length,
+                            errors: allTests.filter((t: any) => t.status === 'ERROR').length
+                        };
+                    } else if (currentResults.length > 0) {
+                        currentSummary = {
+                            total_tests: currentResults.length,
+                            passed: currentResults.filter((t: any) => t.status === 'PASS').length,
+                            failed: currentResults.filter((t: any) => t.status === 'FAIL').length,
+                            errors: currentResults.filter((t: any) => t.status === 'ERROR').length
+                        };
+                    }
                 }
+
+                if (currentMappingResults.length > 0) {
+                    setIsConfigMode(true);
+                    setMappingResults(currentMappingResults);
+                } else {
+                    setResults(currentResults);
+                }
+                setSummary(currentSummary);
+
+                // If we have metadata for run type
+                if (parsed.executed_by) {
+                    setSummary((prev: any) => ({ ...prev, executed_by: parsed.executed_by }));
+                }
+
             } catch (e) {
                 console.error("Failed to parse results", e);
             }
@@ -172,9 +198,17 @@ export default function ResultsView() {
 
     return (
         <div style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
-            <div style={{ marginBottom: '2rem' }}>
-                <h1 style={{ fontSize: '2.5rem', fontWeight: '800' }} className="gradient-text">Test Results</h1>
-                {projectId && <div style={{ color: 'var(--secondary-foreground)' }}>Project: {projectId}</div>}
+            <div style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                <div>
+                    <h1 style={{ fontSize: '2.5rem', fontWeight: '800', marginBottom: '0.25rem' }} className="gradient-text">Test Results</h1>
+                    {projectId && <div style={{ color: 'var(--secondary-foreground)', opacity: 0.8 }}>Project: {projectId}</div>}
+                </div>
+                {summary?.executed_by && (
+                    <div style={{ background: 'var(--secondary)', padding: '0.5rem 1rem', borderRadius: '20px', fontSize: '0.875rem', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '0.5rem', border: '1px solid var(--border)' }}>
+                        <span style={{ opacity: 0.6 }}>Triggered By:</span>
+                        <span style={{ color: 'var(--primary)' }}>{summary.executed_by}</span>
+                    </div>
+                )}
             </div>
 
             {summary && (
@@ -202,18 +236,47 @@ export default function ResultsView() {
                                 key={idx}
                                 onClick={() => setActiveTab(idx)}
                                 className={`btn ${activeTab === idx ? 'btn-primary' : 'btn-outline'}`}
-                                style={{ whiteSpace: 'nowrap' }}
+                                style={{ whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '0.75rem' }}
                             >
-                                {m.mapping_id} {m.predefined_results.some(r => r.status === 'FAIL') ? '❌' : '✅'}
+                                <span>{m.mapping_id}</span>
+                                <span style={{
+                                    background: m.predefined_results.some(r => r.status === 'FAIL') ? '#ef4444' : '#10b981',
+                                    color: 'white',
+                                    padding: '2px 8px',
+                                    borderRadius: '10px',
+                                    fontSize: '0.7rem',
+                                    fontWeight: '800'
+                                }}>
+                                    {m.predefined_results.filter(r => r.status === 'FAIL').length || m.predefined_results.length}
+                                </span>
                             </button>
                         ))}
                     </div>
 
                     {mappingResults[activeTab] && (
                         <div>
-                            <div style={{ marginBottom: '1.5rem', padding: '1rem', background: 'var(--secondary)', borderRadius: '12px' }}>
-                                <div style={{ fontWeight: '700' }}>{mappingResults[activeTab].mapping_id}</div>
-                                <div style={{ fontSize: '0.875rem' }}>Target: {mappingResults[activeTab].mapping_info?.target}</div>
+                            <div style={{
+                                marginBottom: '1.5rem',
+                                padding: '1.25rem',
+                                background: 'white',
+                                borderRadius: '12px',
+                                border: '1px solid var(--border)',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center'
+                            }}>
+                                <div>
+                                    <div style={{ fontSize: '0.75rem', fontWeight: '800', color: 'var(--primary)', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>CURRENT MAPPING</div>
+                                    <div style={{ fontSize: '1.5rem', fontWeight: '800' }}>{mappingResults[activeTab].mapping_id}</div>
+                                </div>
+                                <div style={{ textAlign: 'right' }}>
+                                    <div style={{ fontSize: '0.75rem', opacity: 0.6, marginBottom: '0.25rem' }}>Target Dataset/Table</div>
+                                    <div style={{ fontWeight: '700' }}>{mappingResults[activeTab].mapping_info?.target || 'N/A'}</div>
+                                    <div style={{ marginTop: '0.5rem', display: 'flex', gap: '1rem', justifyContent: 'flex-end', fontSize: '0.875rem' }}>
+                                        <span style={{ color: '#10b981' }}>PASSED: <b>{mappingResults[activeTab].predefined_results.filter(r => r.status === 'PASS').length}</b></span>
+                                        <span style={{ color: '#ef4444' }}>FAILED: <b>{mappingResults[activeTab].predefined_results.filter(r => r.status === 'FAIL').length}</b></span>
+                                    </div>
+                                </div>
                             </div>
 
                             {mappingResults[activeTab].predefined_results.map((t, i) => renderTestCard(t, i, mappingResults[activeTab].mapping_id))}

@@ -235,8 +235,19 @@ class TestExecutor:
             'custom_tests': c.get('custom_tests')
         }) for c in configs]
         results = await asyncio.gather(*tasks)
+        total_tests = sum(len(r.predefined_results) for r in results)
+        passed = sum(len([t for t in r.predefined_results if t.status == 'PASS']) for r in results)
+        failed = sum(len([t for t in r.predefined_results if t.status == 'FAIL']) for r in results)
+        errors = sum(len([t for t in r.predefined_results if t.status == 'ERROR']) for r in results)
+        
         return {
-            'summary': {'total_mappings': len(results), 'passed': sum(len([t for t in r.predefined_results if t.status == 'PASS']) for r in results)},
+            'summary': {
+                'total_mappings': len(results),
+                'total_tests': total_tests,
+                'passed': passed,
+                'failed': failed,
+                'errors': errors
+            },
             'results_by_mapping': results
         }
 
