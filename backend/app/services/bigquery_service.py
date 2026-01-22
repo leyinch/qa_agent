@@ -17,7 +17,16 @@ class BigQueryService:
     def client(self):
         """Lazy load BigQuery client."""
         if not self._client:
-            self._client = bigquery.Client()
+            from google.auth.exceptions import DefaultCredentialsError
+            try:
+                self._client = bigquery.Client()
+            except DefaultCredentialsError as e:
+                logger.error("BigQuery Client initialization failed: Credentials not found.")
+                raise ValueError(
+                    "Google Cloud credentials not found. "
+                    "Locally: Run 'gcloud auth application-default login'. "
+                    "Docker: Ensure ${APPDATA}/gcloud is mounted or service-account.json is provided."
+                ) from e
         return self._client
     
     async def get_table_metadata(

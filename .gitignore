@@ -27,3 +27,6 @@ yarn-error.log*
 # OS
 .DS_Store
 Thumbs.db
+backend/service-account.json
+service-account.json
+*.json.local

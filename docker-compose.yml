@@ -8,9 +8,11 @@ services:
     ports:
       - "8000:8080"
     environment:
-      - GOOGLE_CLOUD_PROJECT=miruna-sandpit
+      - GOOGLE_CLOUD_PROJECT=leyin-sandpit
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/service-account.json
     volumes:
-      - ~/.config/gcloud:/root/.config/gcloud:ro
+      - ${APPDATA}/gcloud:/root/.config/gcloud:ro
+      - ./backend/service-account.json:/app/service-account.json:ro
     networks:
       - app-network
 
