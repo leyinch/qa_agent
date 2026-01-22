@@ -464,14 +464,19 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
                     margin: '0 auto'
                 }}
             >
-                <h2 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '1.5rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span>
-                        {comparisonMode === 'settings' ? 'Alert Settings' :
-                            comparisonMode === 'schema' ? 'Schema Validation Setup' :
-                                comparisonMode === 'gcs' ? 'GCS Comparison Setup' :
-                                    comparisonMode === 'scd' ? (showResults ? '🚀 SCD Validation Results' : 'SCD Validation Setup') :
-                                        'Execution History'}
-                    </span>
+                <div style={{ marginBottom: '1.5rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <h2 style={{ fontSize: '1.5rem', fontWeight: '700', margin: 0, padding: 0, border: 'none' }}>
+                            {comparisonMode === 'settings' ? 'Alert Settings' :
+                                comparisonMode === 'schema' ? 'Schema Validation Setup' :
+                                    comparisonMode === 'gcs' ? 'GCS Comparison Setup' :
+                                        comparisonMode === 'scd' ? (showResults ? '🚀 SCD Validation Results' : 'SCD Validation Setup') :
+                                            'Execution History'}
+                        </h2>
+                        <div style={{ fontSize: '0.85rem', fontWeight: '500', color: '#64748b', marginTop: '0.25rem' }}>
+                            Current Project: <span style={{ fontFamily: 'monospace', fontWeight: '700', color: 'var(--primary)' }}>{projectId}</span>
+                        </div>
+                    </div>
                     {showResults && (
                         <button
                             type="button"
@@ -481,47 +486,9 @@ export default function DashboardForm({ comparisonMode }: DashboardFormProps) {
                             ⬅ Back to Setup
                         </button>
                     )}
-                </h2>
+                </div>
 
-                {/* Common Project ID - Input hidden for SCD and History but shown as info */}
-                {!showResults && (comparisonMode !== 'scd' && comparisonMode !== 'history' ? (
-                    <div style={{ marginBottom: '1.75rem', width: '100%' }}>
-                        <label className="label" htmlFor="projectId">
-                            <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                🔑 Google Cloud Project ID<span className="required">*</span>
-                            </span>
-                        </label>
-                        <input
-                            id="projectId"
-                            type="text"
-                            className="input"
-                            style={{ width: '100%' }}
-                            value={projectId}
-                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setProjectId(e.target.value)}
-                            required
-                            placeholder="Project with BigQuery data"
-                            disabled={comparisonMode === 'settings'}
-                        />
-                    </div>
-                ) : (
-                    <div style={{
-                        marginBottom: '1.75rem',
-                        padding: '0.75rem 1rem',
-                        background: 'var(--secondary)',
-                        borderRadius: 'var(--radius)',
-                        border: '1px solid var(--border)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between'
-                    }}>
-                        <span style={{ fontSize: '0.875rem', fontWeight: '600', color: 'var(--secondary-foreground)' }}>
-                            Active Google Cloud Project:
-                        </span>
-                        <code style={{ fontSize: '0.9rem', color: 'var(--primary)', fontWeight: 'bold' }}>
-                            {projectId || 'leyin-sandpit'}
-                        </code>
-                    </div>
-                ))}
+                {/* Project ID input removed here as it is now displayed in the common header */}
 
                 {comparisonMode === 'settings' ? (
                     <div className="fade-in">

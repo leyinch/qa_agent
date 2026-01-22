@@ -1,13 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import DashboardForm from "@/components/DashboardForm";
 import Sidebar from "@/components/Sidebar";
 
 type ComparisonMode = 'schema' | 'gcs' | 'history' | 'settings' | 'scd';
 
-export default function Home() {
+function HomeContent() {
+    const searchParams = useSearchParams();
     const [comparisonMode, setComparisonMode] = useState<ComparisonMode>('schema');
+
+    useEffect(() => {
+        const mode = searchParams.get('mode') as ComparisonMode;
+        if (mode && ['schema', 'gcs', 'history', 'settings', 'scd'].includes(mode)) {
+            setComparisonMode(mode);
+        }
+    }, [searchParams]);
 
     return (
         <main style={{
@@ -81,5 +90,13 @@ export default function Home() {
                 </div>
             </div>
         </main>
+    );
+}
+
+export default function Home() {
+    return (
+        <Suspense fallback={<div>Loading...</div>}>
+            <HomeContent />
+        </Suspense>
     );
 }

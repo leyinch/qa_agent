@@ -45,6 +45,7 @@ export default function ResultsView() {
     const [projectId, setProjectId] = useState<string>("");
     const [mode, setMode] = useState<string>("");
     const [executionTimestamp, setExecutionTimestamp] = useState<string>("");
+    const [executionId, setExecutionId] = useState<string>("");
 
     useEffect(() => {
         const data = localStorage.getItem("testResults");
@@ -62,9 +63,11 @@ export default function ResultsView() {
                     setIsConfigMode(true);
                     setMappingResults(parsed.results_by_mapping);
                     setSummary(parsed.summary);
-                    setMode(parsed.comparison_mode || "");
                     if (parsed.execution_timestamp) {
                         setExecutionTimestamp(parsed.execution_timestamp);
+                    }
+                    if (parsed.execution_id) {
+                        setExecutionId(parsed.execution_id);
                     }
                 } else if (Array.isArray(parsed)) {
                     // Handle raw array from history (granular logs)
@@ -122,8 +125,8 @@ export default function ResultsView() {
                         });
 
 
-                        if (parsed.execution_timestamp) {
-                            setExecutionTimestamp(parsed.execution_timestamp);
+                        if ((parsed as any).execution_timestamp) {
+                            setExecutionTimestamp((parsed as any).execution_timestamp);
                         } else if (parsed.length > 0 && (parsed[0] as any).execution_timestamp) {
                             setExecutionTimestamp((parsed[0] as any).execution_timestamp);
                         }
@@ -131,16 +134,24 @@ export default function ResultsView() {
                     } else {
                         setResults(parsed);
                     }
-                } else if (parsed.results) {
-                    // Single file or schema mode
-                    setResults(parsed.results);
-                    if (parsed.execution_timestamp) {
-                        setExecutionTimestamp(parsed.execution_timestamp);
-                    }
                 } else if (parsed.predefined_results) {
                     // Single GCS file mode
                     setResults(parsed.predefined_results);
                     setSummary(parsed.summary);
+                }
+
+                if (parsed.execution_id) {
+                    setExecutionId(parsed.execution_id);
+                } else if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].execution_id) {
+                    setExecutionId(parsed[0].execution_id);
+                } else if (parsed.results && Array.isArray(parsed.results) && parsed.results.length > 0 && parsed.results[0].execution_id) {
+                    setExecutionId(parsed.results[0].execution_id);
+                }
+
+                if (parsed.comparison_mode) {
+                    setMode(parsed.comparison_mode);
+                } else if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].comparison_mode) {
+                    setMode(parsed[0].comparison_mode);
                 }
             } catch (e) {
                 console.error("Failed to parse results", e);
@@ -212,14 +223,23 @@ export default function ResultsView() {
     if (isConfigMode) {
         return (
             <div style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
-                <h2 style={{ fontSize: '2rem', fontWeight: '700', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-                    <span>Test Results</span>
+                <div style={{ marginBottom: '2rem', borderBottom: '1px solid var(--border)', paddingBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                        <div style={{ fontSize: '0.9rem', color: '#64748b' }}>
+                            Project: <span style={{ fontFamily: 'monospace', fontWeight: '700', color: 'var(--primary)' }}>{projectId}</span>
+                        </div>
+                        {executionId && (
+                            <div style={{ fontSize: '0.9rem', color: '#64748b' }}>
+                                Execution ID: <span style={{ fontFamily: 'monospace', fontWeight: '600' }}>{executionId.substring(0, 8)}</span>
+                            </div>
+                        )}
+                    </div>
                     {executionTimestamp && (
-                        <span style={{ fontSize: '1rem', fontWeight: '500', color: '#64748b' }}>
-                            Prior Execution: {new Date(executionTimestamp).toLocaleString()}
+                        <span style={{ fontSize: '0.9rem', fontWeight: '500', color: '#64748b', textAlign: 'right' }}>
+                            Ran on: {new Date(executionTimestamp).toLocaleString()}
                         </span>
                     )}
-                </h2>
+                </div>
 
                 {/* Overall Summary */}
                 {summary && (
@@ -303,11 +323,11 @@ export default function ResultsView() {
                                     gridTemplateColumns: mode?.toLowerCase().includes('scd') ? '1fr' : '1fr 1fr',
                                     gap: '0.5rem'
                                 }}>
-                                    {!mode?.toLowerCase().includes('scd') && (
+                                    {!mode?.toLowerCase().includes('scd') && mapping.mapping_info.source !== 'SCD Validation' && (
                                         <div><strong>Source:</strong> <code style={{ wordBreak: 'break-all' }}>{mapping.mapping_info.source}</code></div>
                                     )}
                                     <div><strong>Target Table:</strong> <code>{mapping.mapping_info.target}</code></div>
-                                    {!mode?.toLowerCase().includes('scd') && (
+                                    {!mode?.toLowerCase().includes('scd') && mapping.mapping_info.source !== 'SCD Validation' && (
                                         <>
                                             <div><strong>GCS Rows:</strong> {mapping.mapping_info.file_row_count}</div>
                                             <div><strong>BigQuery Rows:</strong> {mapping.mapping_info.table_row_count}</div>
@@ -467,7 +487,23 @@ export default function ResultsView() {
 
     return (
         <div style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
-            <h2 style={{ fontSize: '2rem', fontWeight: '700', marginBottom: '2rem' }}>Test Results</h2>
+            <div style={{ marginBottom: '2rem', borderBottom: '1px solid var(--border)', paddingBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                    <div style={{ fontSize: '0.9rem', color: '#64748b' }}>
+                        Project: <span style={{ fontFamily: 'monospace', fontWeight: '700', color: 'var(--primary)' }}>{projectId}</span>
+                    </div>
+                    {executionId && (
+                        <div style={{ fontSize: '0.9rem', color: '#64748b' }}>
+                            Execution ID: <span style={{ fontFamily: 'monospace', fontWeight: '600' }}>{executionId.substring(0, 8)}</span>
+                        </div>
+                    )}
+                </div>
+                {executionTimestamp && (
+                    <span style={{ fontSize: '0.9rem', fontWeight: '500', color: '#64748b', textAlign: 'right' }}>
+                        Ran on: {new Date(executionTimestamp).toLocaleString()}
+                    </span>
+                )}
+            </div>
 
             {/* Summary Cards */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>

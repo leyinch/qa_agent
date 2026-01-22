@@ -50,22 +50,8 @@ export default function HistoryList({ projectId, onViewResult }: HistoryListProp
     }, []);
 
     const handleViewClick = (run: HistoryItem) => {
-        // Enrich details with timestamp so ResultsView can display it
-        let details = run.details;
-
-        if (Array.isArray(details)) {
-            // If it's a raw array, wrap it
-            details = {
-                results: details,
-                execution_timestamp: run.timestamp,
-                comparison_mode: run.comparison_mode
-            };
-        } else if (details && typeof details === 'object') {
-            // If it's already an object, inject timestamp
-            details = { ...details, execution_timestamp: run.timestamp };
-        }
-
-        onViewResult(details);
+        // run.details is already the list of test objects
+        onViewResult(run.details);
     };
 
     const getStatusColor = (status: string) => {
@@ -132,7 +118,7 @@ export default function HistoryList({ projectId, onViewResult }: HistoryListProp
                         onClick={async () => {
                             if (confirm('Are you sure you want to delete ALL history records? This cannot be undone.')) {
                                 try {
-                                    const res = await fetch(`/api/history?project_id=${projectId}`, { method: 'DELETE' });
+                                    const res = await fetch('/api/history', { method: 'DELETE' });
                                     if (res.ok) {
                                         await fetchHistory();
                                         alert('All history cleared successfully');
@@ -177,12 +163,13 @@ export default function HistoryList({ projectId, onViewResult }: HistoryListProp
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem', tableLayout: 'fixed' }}>
                         <thead>
                             <tr style={{ background: 'var(--secondary)', borderBottom: '1px solid var(--border)', textAlign: 'left' }}>
-                                <th style={{ padding: '0.75rem 1rem', width: '20%' }}>Time</th>
-                                <th style={{ padding: '0.75rem 1rem', width: '10%' }}>Mode</th>
-                                <th style={{ padding: '0.75rem 1rem', width: '35%' }}>Source / Target</th>
-                                <th style={{ padding: '0.75rem 1rem', width: '10%' }}>Status</th>
-                                <th style={{ padding: '0.75rem 1rem', textAlign: 'center', width: '15%' }}>Distribution</th>
-                                <th style={{ padding: '0.75rem 1rem', textAlign: 'center', width: '10%' }}>Action</th>
+                                <th style={{ padding: '0.75rem 1rem', width: '90px' }}>ID</th>
+                                <th style={{ padding: '0.75rem 1rem', width: '180px' }}>Execution Time</th>
+                                <th style={{ padding: '0.75rem 1rem', width: '90px' }}>Mode</th>
+                                <th style={{ padding: '0.75rem 1.5rem 0.75rem 1rem' }}>Source / Target</th>
+                                <th style={{ padding: '0.75rem 1rem', width: '140px' }}>Status</th>
+                                <th style={{ padding: '0.75rem 1rem', textAlign: 'center', width: '120px' }}>Distribution</th>
+                                <th style={{ padding: '0.75rem 1rem', textAlign: 'center', width: '120px' }}>Action</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -198,23 +185,20 @@ export default function HistoryList({ projectId, onViewResult }: HistoryListProp
 
                                 return (
                                     <tr key={run.execution_id} style={{ borderBottom: '1px solid var(--border)' }}>
-                                        <td style={{ padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}>
-                                            <div style={{ fontWeight: '500' }}>{new Date(run.timestamp).toLocaleString()}</div>
-                                            <div style={{ fontSize: '0.65rem', color: '#94a3b8', marginTop: '0.25rem', fontFamily: 'monospace' }}>
-                                                ID: {run.execution_id.substring(0, 8)}...
-                                            </div>
+                                        <td style={{ padding: '0.75rem 1rem', fontFamily: 'monospace', fontSize: '0.7rem' }} title={run.execution_id}>
+                                            {run.execution_id?.substring(0, 8)}
                                         </td>
-                                        <td style={{ padding: '0.75rem 1rem', textTransform: 'capitalize' }}>
+                                        <td style={{ padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}>
+                                            {new Date(run.timestamp).toLocaleString([], { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                        </td>
+                                        <td style={{ padding: '0.75rem 1rem', textTransform: 'uppercase', fontWeight: '600', color: 'var(--primary)' }}>
                                             {run.comparison_mode?.toLowerCase().includes('scd') ? 'SCD' : run.comparison_mode?.replace('_', ' ')}
                                         </td>
                                         <td style={{ padding: '0.75rem 1rem' }}>
-                                            {!run.comparison_mode?.toLowerCase().includes('scd') && (
+                                            {!run.comparison_mode?.toLowerCase().includes('scd') && run.source !== 'SCD Validation' && (
                                                 <div style={{ fontSize: '0.75rem', color: 'var(--secondary-foreground)' }}>Src: <span style={{ color: 'var(--foreground)' }}>{run.source}</span></div>
                                             )}
-                                            <div style={{ fontSize: '0.75rem', color: 'var(--secondary-foreground)' }}>
-                                                {run.comparison_mode?.toLowerCase().includes('scd') ? '' : 'Tgt: '}
-                                                <span style={{ color: 'var(--foreground)' }}>{run.target}</span>
-                                            </div>
+                                            <div style={{ fontSize: '0.75rem', color: 'var(--secondary-foreground)' }}>Tgt: <span style={{ color: 'var(--foreground)' }}>{run.target}</span></div>
                                         </td>
                                         <td style={{ padding: '0.75rem 1rem' }}>
                                             {getStatusBadge(run.status)}
@@ -265,7 +249,7 @@ export default function HistoryList({ projectId, onViewResult }: HistoryListProp
                                                         e.stopPropagation();
                                                         if (confirm('Are you sure you want to delete this execution history?')) {
                                                             try {
-                                                                const res = await fetch(`/api/history/${run.execution_id}?project_id=${projectId}`, {
+                                                                const res = await fetch(`/api/history/${run.execution_id}`, {
                                                                     method: 'DELETE',
                                                                 });
                                                                 if (res.ok) {
