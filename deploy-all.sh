@@ -181,7 +181,8 @@ if [ "$FIRST_TIME_DEPLOYMENT" = true ]; then
         bigquery.googleapis.com \
         aiplatform.googleapis.com \
         storage.googleapis.com \
-        --project "$PROJECT_ID"
+        --project "$PROJECT_ID" \
+        --quiet
     echo -e "${GREEN}✓ APIs enabled${NC}"
 
 
@@ -203,7 +204,8 @@ if [ "$DEPLOY_BACKEND" = true ]; then
         --region $REGION \
         --allow-unauthenticated \
         --project $PROJECT_ID \
-        --set-env-vars "GOOGLE_CLOUD_PROJECT=$PROJECT_ID,GOOGLE_CLOUD_REGION=$REGION"
+        --set-env-vars "GOOGLE_CLOUD_PROJECT=$PROJECT_ID,GOOGLE_CLOUD_REGION=$REGION" \
+        --quiet
 
     BACKEND_URL=$(gcloud run services describe $BACKEND_SERVICE \
         --platform managed \
@@ -247,7 +249,8 @@ if [ "$DEPLOY_FRONTEND" = true ]; then
         --region $REGION \
         --allow-unauthenticated \
         --project $PROJECT_ID \
-        --set-env-vars "BACKEND_URL=$BACKEND_URL,NEXT_PUBLIC_BACKEND_URL=$BACKEND_URL,NEXT_PUBLIC_GOOGLE_CLOUD_PROJECT=$PROJECT_ID,NEXT_PUBLIC_GOOGLE_CLOUD_REGION=$REGION"
+        --set-env-vars "BACKEND_URL=$BACKEND_URL,NEXT_PUBLIC_BACKEND_URL=$BACKEND_URL,NEXT_PUBLIC_GOOGLE_CLOUD_PROJECT=$PROJECT_ID,NEXT_PUBLIC_GOOGLE_CLOUD_REGION=$REGION" \
+        --quiet
 
     FRONTEND_URL=$(gcloud run services describe $FRONTEND_SERVICE \
         --platform managed \
@@ -300,7 +303,8 @@ if [ "$DEPLOY_FRONTEND" = true ]; then
                 --platform managed \
                 --region $REGION \
                 --project $PROJECT_ID \
-                --set-env-vars "GOOGLE_CLIENT_ID=$GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET=$GOOGLE_CLIENT_SECRET,NEXTAUTH_SECRET=$NEXTAUTH_SECRET,NEXTAUTH_URL=$FRONTEND_URL"
+                --set-env-vars "GOOGLE_CLIENT_ID=$GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET=$GOOGLE_CLIENT_SECRET,NEXTAUTH_SECRET=$NEXTAUTH_SECRET,NEXTAUTH_URL=$FRONTEND_URL" \
+                --quiet
 
             echo -e "${GREEN}✓ OAuth configured successfully${NC}"
         else
