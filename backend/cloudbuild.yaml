@@ -1,0 +1,37 @@
+steps:
+  # 1. Build and Push the container image using a shell step to read deploy.config
+  - name: 'gcr.io/cloud-builders/docker'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        if [ ! -f "deploy.config" ]; then echo "Error: deploy.config not found"; exit 1; fi
+        source deploy.config
+        echo "Building image for project: $$PROJECT_ID, service: $$BACKEND_SERVICE"
+        docker build -t "$$REGISTRY/$$PROJECT_ID/$$BACKEND_SERVICE:latest" -f backend/Dockerfile backend/
+        docker push "$$REGISTRY/$$PROJECT_ID/$$BACKEND_SERVICE:latest"
+
+  # 2. Deploy to Cloud Run using dynamic URL lookup
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        source deploy.config
+        
+        # Deploy initially
+        echo "Deploying $$BACKEND_SERVICE to $$REGION..."
+        gcloud run deploy $$BACKEND_SERVICE \
+          --image "$$REGISTRY/$$PROJECT_ID/$$BACKEND_SERVICE:latest" \
+          --region $$REGION \
+          --platform managed \
+          --allow-unauthenticated \
+          --set-env-vars "GOOGLE_CLOUD_PROJECT=$$PROJECT_ID,GOOGLE_CLOUD_REGION=$$REGION,VERTEX_AI_LOCATION=$$REGION,SCHEDULER_LOCATION=$$REGION"
+        
+        # Fetch the actual URL and update environment variable
+        URL=$(gcloud run services describe $$BACKEND_SERVICE --region=$$REGION --format='value(status.url)')
+        echo "Updating $$BACKEND_SERVICE with CLOUD_RUN_URL=$$URL"
+        gcloud run services update $$BACKEND_SERVICE --region=$$REGION --set-env-vars "CLOUD_RUN_URL=$$URL"
+
+options:
+  logging: CLOUD_LOGGING_ONLY

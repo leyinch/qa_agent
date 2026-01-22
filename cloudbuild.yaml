@@ -1,0 +1,40 @@
+steps:
+  # 1. Build and Push the container image using a shell step to read deploy.config
+  - name: 'gcr.io/cloud-builders/docker'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        if [ ! -f "deploy.config" ]; then echo "Error: deploy.config not found"; exit 1; fi
+        source deploy.config
+        echo "Building image for project: $$PROJECT_ID, service: $$FRONTEND_SERVICE"
+        docker build -t "$$REGISTRY/$$PROJECT_ID/$$FRONTEND_SERVICE:latest" .
+        docker push "$$REGISTRY/$$PROJECT_ID/$$FRONTEND_SERVICE:latest"
+
+  # 2. Deploy to Cloud Run using dynamic URL lookup
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        source deploy.config
+        
+        # Lookup Backend and Frontend URLs dynamically
+        echo "Looking up URLs for $$BACKEND_SERVICE and $$FRONTEND_SERVICE in $$REGION..."
+        BACKEND_URL=$(gcloud run services describe $$BACKEND_SERVICE --region=$$REGION --format='value(status.url)' 2>/dev/null || echo "")
+        FRONTEND_URL=$(gcloud run services describe $$FRONTEND_SERVICE --region=$$REGION --format='value(status.url)' 2>/dev/null || echo "")
+        
+        echo "Found Backend URL: $$BACKEND_URL"
+        echo "Found Frontend URL: $$FRONTEND_URL"
+        
+        # Deploy Frontend
+        echo "Deploying $$FRONTEND_SERVICE to $$REGION..."
+        gcloud run deploy $$FRONTEND_SERVICE \
+          --image "$$REGISTRY/$$PROJECT_ID/$$FRONTEND_SERVICE:latest" \
+          --region $$REGION \
+          --platform managed \
+          --allow-unauthenticated \
+          --set-env-vars "NEXT_PUBLIC_BACKEND_URL=$$BACKEND_URL,BACKEND_URL=$$BACKEND_URL,NEXTAUTH_URL=$$FRONTEND_URL,GOOGLE_CLOUD_PROJECT=$$PROJECT_ID,GOOGLE_CLOUD_REGION=$$REGION"
+
+options:
+  logging: CLOUD_LOGGING_ONLY
