@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { PieChart, Pie, Cell, Tooltip as RechartsTooltip } from "recharts";
 
 interface HistoryItem {
@@ -50,8 +50,22 @@ export default function HistoryList({ projectId, onViewResult }: HistoryListProp
     }, []);
 
     const handleViewClick = (run: HistoryItem) => {
-        // run.details is already the list of test objects
-        onViewResult(run.details);
+        // Enrich details with timestamp so ResultsView can display it
+        let details = run.details;
+
+        if (Array.isArray(details)) {
+            // If it's a raw array, wrap it
+            details = {
+                results: details,
+                execution_timestamp: run.timestamp,
+                comparison_mode: run.comparison_mode
+            };
+        } else if (details && typeof details === 'object') {
+            // If it's already an object, inject timestamp
+            details = { ...details, execution_timestamp: run.timestamp };
+        }
+
+        onViewResult(details);
     };
 
     const getStatusColor = (status: string) => {
@@ -112,15 +126,46 @@ export default function HistoryList({ projectId, onViewResult }: HistoryListProp
     return (
         <div style={{ width: '100%' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                <h3 style={{ fontSize: '1.25rem', fontWeight: '600', margin: 0 }}>Execution History</h3>
-                <button
-                    onClick={fetchHistory}
-                    className="btn btn-outline"
-                    style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}
-                    disabled={loading}
-                >
-                    {loading ? 'Refreshing...' : '🔄 Refresh'}
-                </button>
+                <div></div> {/* Empty div to keep Refresh button on the right */}
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button
+                        onClick={async () => {
+                            if (confirm('Are you sure you want to delete ALL history records? This cannot be undone.')) {
+                                try {
+                                    const res = await fetch(`/api/history?project_id=${projectId}`, { method: 'DELETE' });
+                                    if (res.ok) {
+                                        await fetchHistory();
+                                        alert('All history cleared successfully');
+                                    } else {
+                                        alert('Failed to clear history');
+                                    }
+                                } catch (err) {
+                                    console.error('Delete all failed:', err);
+                                    alert('Error clearing history');
+                                }
+                            }
+                        }}
+                        className="btn btn-outline"
+                        style={{
+                            padding: '0.5rem 1rem',
+                            fontSize: '0.875rem',
+                            backgroundColor: '#fee2e2',
+                            color: '#991b1b',
+                            border: '1px solid #fecaca'
+                        }}
+                        disabled={loading}
+                    >
+                        🗑️ Delete All
+                    </button>
+                    <button
+                        onClick={fetchHistory}
+                        className="btn btn-outline"
+                        style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}
+                        disabled={loading}
+                    >
+                        {loading ? 'Refreshing...' : '🔄 Refresh'}
+                    </button>
+                </div>
             </div>
 
             {history.length === 0 ? (
@@ -128,16 +173,16 @@ export default function HistoryList({ projectId, onViewResult }: HistoryListProp
                     No execution history found.
                 </div>
             ) : (
-                <div style={{ overflowX: 'auto', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+                <div style={{ width: '100%', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem', tableLayout: 'fixed' }}>
                         <thead>
                             <tr style={{ background: 'var(--secondary)', borderBottom: '1px solid var(--border)', textAlign: 'left' }}>
-                                <th style={{ padding: '0.75rem 1rem' }}>Time</th>
-                                <th style={{ padding: '0.75rem 1rem' }}>Mode</th>
-                                <th style={{ padding: '0.75rem 1rem' }}>Source / Target</th>
-                                <th style={{ padding: '0.75rem 1rem' }}>Status</th>
-                                <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Distribution</th>
-                                <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Action</th>
+                                <th style={{ padding: '0.75rem 1rem', width: '20%' }}>Time</th>
+                                <th style={{ padding: '0.75rem 1rem', width: '10%' }}>Mode</th>
+                                <th style={{ padding: '0.75rem 1rem', width: '35%' }}>Source / Target</th>
+                                <th style={{ padding: '0.75rem 1rem', width: '10%' }}>Status</th>
+                                <th style={{ padding: '0.75rem 1rem', textAlign: 'center', width: '15%' }}>Distribution</th>
+                                <th style={{ padding: '0.75rem 1rem', textAlign: 'center', width: '10%' }}>Action</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -153,15 +198,23 @@ export default function HistoryList({ projectId, onViewResult }: HistoryListProp
 
                                 return (
                                     <tr key={run.execution_id} style={{ borderBottom: '1px solid var(--border)' }}>
-                                        <td style={{ padding: '0.75rem 1rem' }}>
-                                            {new Date(run.timestamp).toLocaleString()}
+                                        <td style={{ padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}>
+                                            <div style={{ fontWeight: '500' }}>{new Date(run.timestamp).toLocaleString()}</div>
+                                            <div style={{ fontSize: '0.65rem', color: '#94a3b8', marginTop: '0.25rem', fontFamily: 'monospace' }}>
+                                                ID: {run.execution_id.substring(0, 8)}...
+                                            </div>
                                         </td>
                                         <td style={{ padding: '0.75rem 1rem', textTransform: 'capitalize' }}>
-                                            {run.comparison_mode?.replace('_', ' ')}
+                                            {run.comparison_mode?.toLowerCase().includes('scd') ? 'SCD' : run.comparison_mode?.replace('_', ' ')}
                                         </td>
                                         <td style={{ padding: '0.75rem 1rem' }}>
-                                            <div style={{ fontSize: '0.75rem', color: 'var(--secondary-foreground)' }}>Src: <span style={{ color: 'var(--foreground)' }}>{run.source}</span></div>
-                                            <div style={{ fontSize: '0.75rem', color: 'var(--secondary-foreground)' }}>Tgt: <span style={{ color: 'var(--foreground)' }}>{run.target}</span></div>
+                                            {!run.comparison_mode?.toLowerCase().includes('scd') && (
+                                                <div style={{ fontSize: '0.75rem', color: 'var(--secondary-foreground)' }}>Src: <span style={{ color: 'var(--foreground)' }}>{run.source}</span></div>
+                                            )}
+                                            <div style={{ fontSize: '0.75rem', color: 'var(--secondary-foreground)' }}>
+                                                {run.comparison_mode?.toLowerCase().includes('scd') ? '' : 'Tgt: '}
+                                                <span style={{ color: 'var(--foreground)' }}>{run.target}</span>
+                                            </div>
                                         </td>
                                         <td style={{ padding: '0.75rem 1rem' }}>
                                             {getStatusBadge(run.status)}
@@ -179,7 +232,7 @@ export default function HistoryList({ projectId, onViewResult }: HistoryListProp
                                                         dataKey="value"
                                                         stroke="none"
                                                     >
-                                                        {chartData.map((entry, index) => (
+                                                        {chartData.map((entry: any, index: number) => (
                                                             <Cell key={`cell-${index}`} fill={entry.color} />
                                                         ))}
                                                     </Pie>
@@ -192,20 +245,51 @@ export default function HistoryList({ projectId, onViewResult }: HistoryListProp
                                             </div>
                                         </td>
                                         <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
-                                            <button
-                                                onClick={() => handleViewClick(run)}
-                                                style={{
-                                                    background: 'none',
-                                                    border: 'none',
-                                                    color: 'var(--primary)',
-                                                    cursor: 'pointer',
-                                                    textDecoration: 'underline',
-                                                    fontWeight: '600',
-                                                    fontSize: '0.875rem'
-                                                }}
-                                            >
-                                                View Result
-                                            </button>
+                                            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', alignItems: 'center' }}>
+                                                <button
+                                                    onClick={() => handleViewClick(run)}
+                                                    style={{
+                                                        background: 'none',
+                                                        border: 'none',
+                                                        color: 'var(--primary)',
+                                                        cursor: 'pointer',
+                                                        textDecoration: 'underline',
+                                                        fontWeight: '600',
+                                                        fontSize: '0.875rem'
+                                                    }}
+                                                >
+                                                    View Result
+                                                </button>
+                                                <button
+                                                    onClick={async (e: React.MouseEvent) => {
+                                                        e.stopPropagation();
+                                                        if (confirm('Are you sure you want to delete this execution history?')) {
+                                                            try {
+                                                                const res = await fetch(`/api/history/${run.execution_id}?project_id=${projectId}`, {
+                                                                    method: 'DELETE',
+                                                                });
+                                                                if (res.ok) {
+                                                                    fetchHistory();
+                                                                } else {
+                                                                    alert('Failed to delete history');
+                                                                }
+                                                            } catch (err) {
+                                                                console.error("Delete failed", err);
+                                                                alert('Error deleting history');
+                                                            }
+                                                        }
+                                                    }}
+                                                    style={{
+                                                        background: 'none',
+                                                        border: 'none',
+                                                        cursor: 'pointer',
+                                                        fontSize: '1rem'
+                                                    }}
+                                                    title="Delete Execution"
+                                                >
+                                                    🗑️
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 );

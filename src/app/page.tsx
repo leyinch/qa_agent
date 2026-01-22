@@ -37,7 +37,7 @@ export default function Home() {
                 {/* Main Content Area */}
                 <div className="main-content">
                     <div style={{
-                        maxWidth: '1000px',
+                        maxWidth: comparisonMode === 'history' ? '1250px' : '1000px',
                         margin: '0 auto',
                     }} className="fade-in">
                         {/* Header */}

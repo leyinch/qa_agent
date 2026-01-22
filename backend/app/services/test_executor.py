@@ -119,20 +119,23 @@ class TestExecutor:
                 error_message=f"Row count mismatch: {abs(file_row_count - bq_row_count)} rows difference" if file_row_count != bq_row_count else None
             ))
             
-            # Run other enabled tests
-            for test in enabled_tests:
+            # --- PARALLEL TEST EXECUTION START ---
+            async def run_predefined_test(test):
                 if test.id == 'row_count_match':
-                    continue  # Already done
+                    return None
                 
                 sql = test.generate_sql(test_config)
                 if not sql:
-                    continue  # Skip if no SQL (test not applicable)
+                    return None
                 
                 try:
                     rows = await bigquery_service.execute_query(sql)
                     row_count = len(rows)
                     
-                    predefined_results.append(TestResult(
+                    # Convert rows to serializable dicts
+                    sample_data = rows[:10] if row_count > 0 else None
+                    
+                    return TestResult(
                         test_id=test.id,
                         test_name=test.name,
                         category=test.category,
@@ -141,59 +144,74 @@ class TestExecutor:
                         severity=test.severity,
                         sql_query=sql,
                         rows_affected=row_count,
+                        sample_data=sample_data,
                         error_message=None
-                    ))
+                    )
                 except Exception as e:
-                    predefined_results.append(TestResult(
+                    return TestResult(
                         test_id=test.id,
                         test_name=test.name,
                         category=test.category,
                         description=test.description,
                         status='ERROR',
                         severity=test.severity,
-                        sql_query=sql,
+                        sql_query=sql or "",
                         rows_affected=0,
                         error_message=str(e)
-                    ))
-            
-            # Execute custom tests
+                    )
+
+            async def run_custom_test(ct):
+                try:
+                    sql = ct['sql_query']
+                    rows = await bigquery_service.execute_query(sql)
+                    row_count = len(rows)
+                    
+                    status = 'PASS' if row_count == 0 else 'FAIL'
+                    
+                    return TestResult(
+                        test_id=f"custom_{ct.get('test_name', 'unknown')}",
+                        test_name=f"[Custom] {ct.get('test_name', 'Custom Test')}",
+                        category=ct.get('test_category', 'custom'),
+                        description=ct.get('description', ''),
+                        status=status,
+                        severity=ct.get('severity', 'HIGH'),
+                        sql_query=sql,
+                        rows_affected=row_count,
+                        sample_data=rows[:10] if row_count > 0 else None
+                    )
+                except Exception as e:
+                    return TestResult(
+                        test_id=f"custom_error_{ct.get('test_name', 'unknown')}",
+                        test_name=f"[Custom] {ct.get('test_name', 'Custom Test')}",
+                        category='custom',
+                        description=f"Error executing custom test: {str(e)}",
+                        status='ERROR',
+                        severity='HIGH',
+                        sql_query=ct.get('sql_query', ''),
+                        rows_affected=0,
+                        error_message=str(e)
+                    )
+
+            # Row count test (already done, but keeping structure)
+            predefined_results = [predefined_results[0]] # Keep row_count_match
+
+            # Fetch active custom tests
             try:
                 active_custom_tests = await bigquery_service.get_active_custom_tests(
                     project_id, target_dataset, target_table
                 )
-                
-                for custom_test in active_custom_tests:
-                    try:
-                        sql = custom_test['sql_query']
-                        rows = await bigquery_service.execute_query(sql)
-                        row_count = len(rows)
-                        
-                        status = 'PASS' if row_count == 0 else 'FAIL'
-                        
-                        predefined_results.append(TestResult(
-                            test_id=f"custom_{custom_test.get('test_name', 'unknown')}",
-                            test_name=f"[Custom] {custom_test.get('test_name', 'Custom Test')}",
-                            category=custom_test.get('test_category', 'custom'),
-                            description=custom_test.get('description', ''),
-                            status=status,
-                            severity=custom_test.get('severity', 'HIGH'),
-                            sql_query=sql,
-                            rows_affected=row_count
-                        ))
-                    except Exception as e:
-                        predefined_results.append(TestResult(
-                            test_id=f"custom_error_{custom_test.get('test_name', 'unknown')}",
-                            test_name=f"[Custom] {custom_test.get('test_name', 'Custom Test')}",
-                            category='custom',
-                            description=f"Error executing custom test: {str(e)}",
-                            status='ERROR',
-                            severity='HIGH',
-                            sql_query=custom_test.get('sql_query', ''),
-                            rows_affected=0,
-                            error_message=str(e)
-                        ))
             except Exception as e:
-                logger.error(f"Failed to fetch/run custom tests: {e}")
+                logger.error(f"Failed to fetch custom tests: {e}")
+                active_custom_tests = []
+
+            # Prepare all tasks
+            test_tasks = [run_predefined_test(t) for t in enabled_tests]
+            custom_tasks = [run_custom_test(ct) for ct in active_custom_tests]
+
+            # Execute all
+            all_raw_results = await asyncio.gather(*test_tasks, *custom_tasks)
+            predefined_results.extend([r for r in all_raw_results if r is not None])
+            # --- PARALLEL TEST EXECUTION END ---
 
             # Generate AI suggestions if enabled
             ai_suggestions = []
@@ -303,42 +321,80 @@ class TestExecutor:
             
             enabled_tests = get_enabled_tests(enabled_test_ids)
             
-            predefined_results = []
-            for test in enabled_tests:
+            # --- PARALLEL TEST EXECUTION START ---
+            async def run_predefined_test(test):
                 sql = test.generate_sql(test_config)
                 if not sql:
-                    continue
+                    return None
                 
                 try:
                     rows = await bigquery_service.execute_query(sql)
                     row_count = len(rows)
                     
-                    predefined_results.append(TestResult(
+                    is_smoke = test.category == 'smoke'
+                    status = 'PASS' if (row_count > 0 if is_smoke else row_count == 0) else 'FAIL'
+                    
+                    return TestResult(
                         test_id=test.id,
                         test_name=test.name,
                         category=test.category,
                         description=test.description,
-                        status=('PASS' if row_count > 0 else 'FAIL') if test.category == 'smoke' else ('PASS' if row_count == 0 else 'FAIL'),
+                        status=status,
                         severity=test.severity,
                         sql_query=sql,
-                        rows_affected=row_count,
-                        sample_data=rows[:10] if row_count > 0 else None,
+                        rows_affected=0 if status == 'PASS' else row_count,
+                        sample_data=rows[:10] if status == 'FAIL' and not is_smoke else None,
                         error_message=None
-                    ))
+                    )
                 except Exception as e:
-                    predefined_results.append(TestResult(
+                    return TestResult(
                         test_id=test.id,
                         test_name=test.name,
                         category=test.category,
                         description=test.description,
                         status='ERROR',
                         severity=test.severity,
-                        sql_query=sql,
+                        sql_query=sql or "",
                         rows_affected=0,
                         error_message=str(e)
-                    ))
-            
-            # 6. Custom Business Rules
+                    )
+
+            # Define run_custom_test inside to capture variables
+            async def run_custom_test(inner_ct):
+                name = inner_ct.get('name') or inner_ct.get('test_name', 'Unnamed Business Rule')
+                raw_sql = inner_ct.get('sql') or inner_ct.get('sql_query')
+                if not raw_sql: return None
+                
+                sql = raw_sql.replace('{{target}}', f"`{full_table_name}`")
+                try:
+                    rows = await bigquery_service.execute_query(sql)
+                    row_count = len(rows)
+                    return TestResult(
+                        test_id=f"custom_{name.lower().replace(' ', '_')}",
+                        test_name=name,
+                        category='business_rule',
+                        description=inner_ct.get('description', f"Custom business rule: {name}"),
+                        status='PASS' if row_count == 0 else 'FAIL',
+                        severity=inner_ct.get('severity', 'HIGH'),
+                        sql_query=sql,
+                        rows_affected=row_count,
+                        sample_data=rows[:10] if row_count > 0 else None,
+                        error_message=None
+                    )
+                except Exception as e:
+                    return TestResult(
+                        test_id=f"custom_{name.lower().replace(' ', '_')}",
+                        test_name=name,
+                        category='business_rule',
+                        description=f"Error executing custom rule: {name}",
+                        status='ERROR',
+                        severity=inner_ct.get('severity', 'HIGH'),
+                        sql_query=sql or "",
+                        rows_affected=0,
+                        error_message=str(e)
+                    )
+
+            # Prepare tasks
             custom_tests = mapping.get('custom_tests', [])
             if isinstance(custom_tests, str):
                 try:
@@ -346,44 +402,13 @@ class TestExecutor:
                 except:
                     custom_tests = []
             
-            for custom_test in (custom_tests or []):
-                test_name = custom_test.get('name') or custom_test.get('test_name', 'Unnamed Business Rule')
-                raw_sql = custom_test.get('sql') or custom_test.get('sql_query')
-                
-                if not raw_sql:
-                    continue
-                
-                # Replace template variables
-                sql = raw_sql.replace('{{target}}', f"`{full_table_name}`")
-                
-                try:
-                    rows = await bigquery_service.execute_query(sql)
-                    row_count = len(rows)
-                    
-                    predefined_results.append(TestResult(
-                        test_id=f"custom_{test_name.lower().replace(' ', '_')}",
-                        test_name=test_name,
-                        category='business_rule',
-                        description=custom_test.get('description', f"Custom business rule: {test_name}"),
-                        status='PASS' if row_count == 0 else 'FAIL',
-                        severity=custom_test.get('severity', 'HIGH'),
-                        sql_query=sql,
-                        rows_affected=row_count,
-                        sample_data=rows[:10] if row_count > 0 else None,
-                        error_message=None
-                    ))
-                except Exception as e:
-                    predefined_results.append(TestResult(
-                        test_id=f"custom_{test_name.lower().replace(' ', '_')}",
-                        test_name=test_name,
-                        category='business_rule',
-                        description=f"Error executing custom rule: {test_name}",
-                        status='ERROR',
-                        severity=custom_test.get('severity', 'HIGH'),
-                        sql_query=sql,
-                        rows_affected=0,
-                        error_message=str(e)
-                    ))
+            test_tasks = [run_predefined_test(t) for t in enabled_tests]
+            custom_tasks = [run_custom_test(ct) for ct in (custom_tests or [])]
+            
+            # Combine and execute all in parallel
+            all_raw_results = await asyncio.gather(*test_tasks, *custom_tasks)
+            predefined_results = [r for r in all_raw_results if r is not None]
+            # --- PARALLEL TEST EXECUTION END ---
             
             # Get row count for info
             try:
@@ -449,7 +474,9 @@ class TestExecutor:
             
             # Process SCD validations in parallel
             tasks = [self.process_scd(project_id, mapping) for mapping in mappings]
+            logger.info(f"Gathering results for {len(tasks)} SCD mappings...")
             results = await asyncio.gather(*tasks)
+            logger.info(f"Successfully gathered {len(results)} results")
             
             # Calculate summary
             total_tests = sum(len(r.predefined_results) for r in results)
@@ -466,7 +493,7 @@ class TestExecutor:
                 for r in results
             )
             
-            return {
+            result_payload = {
                 'summary': {
                     'total_mappings': len(results),
                     'total_tests': total_tests,
@@ -477,6 +504,8 @@ class TestExecutor:
                 },
                 'results_by_mapping': results
             }
+            logger.info(f"Returning SCD config results: {result_payload['summary']}")
+            return result_payload
             
         except Exception as e:
             logger.error(f"Error processing SCD config table: {str(e)}")

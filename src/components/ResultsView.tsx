@@ -12,6 +12,8 @@ interface TestResult {
     status: "PASS" | "FAIL" | "ERROR";
     rows_affected?: number;
     error_message?: string;
+    target_dataset?: string;
+    target_table?: string;
 }
 
 interface MappingResult {
@@ -41,6 +43,8 @@ export default function ResultsView() {
     const [loading, setLoading] = useState(true);
     const [savedTests, setSavedTests] = useState<Set<string>>(new Set());
     const [projectId, setProjectId] = useState<string>("");
+    const [mode, setMode] = useState<string>("");
+    const [executionTimestamp, setExecutionTimestamp] = useState<string>("");
 
     useEffect(() => {
         const data = localStorage.getItem("testResults");
@@ -58,6 +62,10 @@ export default function ResultsView() {
                     setIsConfigMode(true);
                     setMappingResults(parsed.results_by_mapping);
                     setSummary(parsed.summary);
+                    setMode(parsed.comparison_mode || "");
+                    if (parsed.execution_timestamp) {
+                        setExecutionTimestamp(parsed.execution_timestamp);
+                    }
                 } else if (Array.isArray(parsed)) {
                     // Handle raw array from history (granular logs)
                     // Check if we can group them by mapping_id
@@ -113,12 +121,22 @@ export default function ResultsView() {
                             total_suggestions: 0
                         });
 
+
+                        if (parsed.execution_timestamp) {
+                            setExecutionTimestamp(parsed.execution_timestamp);
+                        } else if (parsed.length > 0 && (parsed[0] as any).execution_timestamp) {
+                            setExecutionTimestamp((parsed[0] as any).execution_timestamp);
+                        }
+
                     } else {
                         setResults(parsed);
                     }
                 } else if (parsed.results) {
                     // Single file or schema mode
                     setResults(parsed.results);
+                    if (parsed.execution_timestamp) {
+                        setExecutionTimestamp(parsed.execution_timestamp);
+                    }
                 } else if (parsed.predefined_results) {
                     // Single GCS file mode
                     setResults(parsed.predefined_results);
@@ -194,8 +212,13 @@ export default function ResultsView() {
     if (isConfigMode) {
         return (
             <div style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
-                <h2 style={{ fontSize: '2rem', fontWeight: '700', marginBottom: '1rem' }}>
-                    Test Results - Config Table Mode
+                <h2 style={{ fontSize: '2rem', fontWeight: '700', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                    <span>Test Results</span>
+                    {executionTimestamp && (
+                        <span style={{ fontSize: '1rem', fontWeight: '500', color: '#64748b' }}>
+                            Prior Execution: {new Date(executionTimestamp).toLocaleString()}
+                        </span>
+                    )}
                 </h2>
 
                 {/* Overall Summary */}
@@ -262,9 +285,11 @@ export default function ResultsView() {
                                 <h3 style={{ fontSize: '1.25rem', fontWeight: '600', margin: 0 }}>
                                     Mapping ID: <span style={{ color: 'var(--primary)', fontFamily: 'monospace' }}>{mapping.mapping_id}</span>
                                 </h3>
-                                <span style={{ fontSize: '0.875rem', color: 'var(--secondary-foreground)' }}>
-                                    Target: {mapping.mapping_info?.target || 'Unknown'}
-                                </span>
+                                <div style={{ fontSize: '0.875rem', color: 'var(--secondary-foreground)' }}>
+                                    Target: <span style={{ fontFamily: 'monospace', fontWeight: '600', color: 'var(--foreground)' }}>
+                                        {mapping.mapping_info?.target || 'Unknown'}
+                                    </span>
+                                </div>
                             </div>
 
                             {mapping.mapping_info && (
@@ -275,13 +300,19 @@ export default function ResultsView() {
                                     marginBottom: '1rem',
                                     fontSize: '0.875rem',
                                     display: 'grid',
-                                    gridTemplateColumns: '1fr 1fr',
+                                    gridTemplateColumns: mode?.toLowerCase().includes('scd') ? '1fr' : '1fr 1fr',
                                     gap: '0.5rem'
                                 }}>
-                                    <div><strong>Source:</strong> <code style={{ wordBreak: 'break-all' }}>{mapping.mapping_info.source}</code></div>
+                                    {!mode?.toLowerCase().includes('scd') && (
+                                        <div><strong>Source:</strong> <code style={{ wordBreak: 'break-all' }}>{mapping.mapping_info.source}</code></div>
+                                    )}
                                     <div><strong>Target Table:</strong> <code>{mapping.mapping_info.target}</code></div>
-                                    <div><strong>GCS Rows:</strong> {mapping.mapping_info.file_row_count}</div>
-                                    <div><strong>BigQuery Rows:</strong> {mapping.mapping_info.table_row_count}</div>
+                                    {!mode?.toLowerCase().includes('scd') && (
+                                        <>
+                                            <div><strong>GCS Rows:</strong> {mapping.mapping_info.file_row_count}</div>
+                                            <div><strong>BigQuery Rows:</strong> {mapping.mapping_info.table_row_count}</div>
+                                        </>
+                                    )}
                                 </div>
                             )}
 
@@ -477,6 +508,7 @@ export default function ResultsView() {
                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                         <thead>
                             <tr style={{ borderBottom: '2px solid var(--border)' }}>
+                                <th style={{ padding: '0.75rem', textAlign: 'left' }}>Target Table</th>
                                 <th style={{ padding: '0.75rem', textAlign: 'left' }}>Test Name</th>
                                 <th style={{ padding: '0.75rem', textAlign: 'left' }}>Status</th>
                                 <th style={{ padding: '0.75rem', textAlign: 'left' }}>Severity</th>
@@ -486,6 +518,9 @@ export default function ResultsView() {
                         <tbody>
                             {results.map((test, index) => (
                                 <tr key={index} style={{ borderBottom: '1px solid var(--border)' }}>
+                                    <td style={{ padding: '0.75rem', fontFamily: 'monospace', fontSize: '0.85rem' }}>
+                                        {test.target_table ? `${test.target_dataset ? test.target_dataset + '.' : ''}${test.target_table}` : 'N/A'}
+                                    </td>
                                     <td style={{ padding: '0.75rem' }}>{test.test_name}</td>
                                     <td style={{ padding: '0.75rem' }}>
                                         <span style={{

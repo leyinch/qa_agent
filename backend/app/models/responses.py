@@ -25,6 +25,7 @@ class ConfigTableSummary(BaseModel):
 class GenerateTestsResponse(BaseModel):
     """Response model for test generation."""
     execution_id: Optional[str] = None
+    comparison_mode: Optional[str] = None
     summary: TestSummary
     results: List[TestResult] = []
 
@@ -32,6 +33,7 @@ class GenerateTestsResponse(BaseModel):
 class ConfigTableResponse(BaseModel):
     """Response model for config table mode."""
     execution_id: Optional[str] = None
+    comparison_mode: Optional[str] = None
     summary: ConfigTableSummary
     results_by_mapping: List[MappingResult]
 

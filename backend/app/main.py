@@ -67,14 +67,11 @@ async def health_check():
 async def generate_tests(request: GenerateTestsRequest):
     """
     Generate and execute data quality tests.
-    
-    Supports modes:
-    - schema: Validate BigQuery schema against ERD
-    - gcs: Compare single GCS file to BigQuery table
-    - gcs-config: Process multiple mappings from config table
-    - scd: Validate Slowly Changing Dimension (Type 1 or Type 2) (Test3 Feature)
-    - scd-config: Batch SCD validation from config table (Test3 Feature)
     """
+    # Normalize project ID (Test1/Test3 Fix)
+    if not request.project_id or not request.project_id.strip():
+        request.project_id = settings.google_cloud_project
+
     try:
         logger.info(f"Received request: mode={request.comparison_mode}, project={request.project_id}")
         
@@ -208,6 +205,7 @@ async def generate_tests(request: GenerateTestsRequest):
             
             return GenerateTestsResponse(
                 execution_id=exec_id,
+                comparison_mode=request.comparison_mode,
                 summary=summary,
                 results=result.predefined_results
             )
@@ -250,6 +248,7 @@ async def generate_tests(request: GenerateTestsRequest):
                 exec_id = request.execution_id or "unknown"
 
             result_data['execution_id'] = exec_id
+            result_data['comparison_mode'] = request.comparison_mode
             return result_data
 
         # 4. SCD Config Mode (Test3 Feature)
@@ -264,50 +263,55 @@ async def generate_tests(request: GenerateTestsRequest):
                 config_table=request.config_table
             )
             
-            # Log execution (Summary - Test3 Style)
+            # Log execution (SCD Granular - Test4 Style)
             try:
                 from app.services.bigquery_service import bigquery_service
                 exec_id = request.execution_id or str(uuid.uuid4())
                 
+                rows_to_log = []
                 for mapping_result in result['results_by_mapping']:
-                    table_results = mapping_result.predefined_results
-                    table_summary = {
-                        "total": len(table_results),
-                        "passed": len([t for t in table_results if t.status == 'PASS']),
-                        "failed": len([t for t in table_results if t.status == 'FAIL']),
-                        "errors": len([t for t in table_results if t.status == 'ERROR'])
-                    }
-                    
-                    target_info = mapping_result.mapping_id
+                    # Extract dataset/table from mapping info if possible, or fallback
+                    t_dataset = "unknown"
+                    t_table = "unknown"
                     if mapping_result.mapping_info and mapping_result.mapping_info.target:
-                        target_info = mapping_result.mapping_info.target
+                        parts = mapping_result.mapping_info.target.split('.')
+                        if len(parts) >= 2:
+                             t_table = parts[-1]
+                             t_dataset = parts[-2]
 
-                    # Log summary
-                    execution_data = {
-                         "execution_id": exec_id,
-                         "comparison_mode": "scd",
-                         "source": f"Batch SCD: {target_info}",
-                         "target": target_info,
-                         "status": "FAIL" if table_summary['failed'] > 0 or table_summary['errors'] > 0 else "PASS",
-                         "total_tests": table_summary['total'],
-                         "passed_tests": table_summary['passed'],
-                         "failed_tests": table_summary['failed'],
-                         "details": {
-                             "summary": table_summary,
-                             "test_results": [r.dict() for r in table_results] 
-                         }
-                    }
-                    await bigquery_service.log_execution_summary(
-                        project_id=request.project_id,
-                        execution_data=execution_data
-                    )
+                    for test in mapping_result.predefined_results:
+                        rows_to_log.append({
+                            "execution_id": exec_id,
+                            "project_id": request.project_id,
+                            "comparison_mode": "scd-config",
+                            "mapping_id": mapping_result.mapping_id,
+                            "target_dataset": t_dataset,
+                            "target_table": t_table,
+                            "test_id": test.test_id,
+                            "test_name": test.test_name,
+                            "category": test.category,
+                            "status": test.status,
+                            "severity": test.severity,
+                            "description": test.description,
+                            "error_message": test.error_message,
+                            "rows_affected": test.rows_affected,
+                            "sql_query": test.sql_query,
+                            "executed_by": "Manual Run"
+                        })
+
+                logger.info(f"SCD Config: Collected {len(rows_to_log)} tests for logging from {len(result['results_by_mapping'])} mappings")
+                await bigquery_service.log_scd_execution(
+                    project_id=request.project_id,
+                    execution_data=rows_to_log
+                )
 
             except Exception as e:
-                logger.error(f"SCD Config logging failed: {e}")
+                logger.error(f"SCD Config logging failed: {e}", exc_info=True)
                 exec_id = request.execution_id or "unknown"
 
             return ConfigTableResponse(
                 execution_id=exec_id,
+                comparison_mode=request.comparison_mode,
                 summary=ConfigTableSummary(**result['summary']),
                 results_by_mapping=result['results_by_mapping']
             )
@@ -332,36 +336,35 @@ async def generate_tests(request: GenerateTestsRequest):
             
             result = await test_executor.process_scd(request.project_id, mapping)
             
-            # Log execution (Summary - Test3 Style)
+            # Log execution (SCD Granular - Test4 Feature)
             try:
                 from app.services.bigquery_service import bigquery_service
                 exec_id = request.execution_id or str(uuid.uuid4())
                 
-                table_results = result.predefined_results
-                table_summary = {
-                    "total": len(table_results),
-                    "passed": len([t for t in table_results if t.status == 'PASS']),
-                    "failed": len([t for t in table_results if t.status == 'FAIL']),
-                    "errors": len([t for t in table_results if t.status == 'ERROR'])
-                }
-                
-                execution_data = {
-                    "execution_id": exec_id,
-                    "comparison_mode": "scd",
-                    "source": f"SCD: {request.target_table}",
-                    "target": f"{request.target_dataset}.{request.target_table}",
-                    "status": "FAIL" if table_summary['failed'] > 0 or table_summary['errors'] > 0 else "PASS",
-                    "total_tests": table_summary['total'],
-                    "passed_tests": table_summary['passed'],
-                    "failed_tests": table_summary['failed'],
-                    "details": {
-                            "summary": table_summary,
-                            "test_results": [r.dict() for r in table_results]
-                    }
-                }
-                await bigquery_service.log_execution_summary(
+                rows_to_log = []
+                for test in result.predefined_results:
+                    rows_to_log.append({
+                        "execution_id": exec_id,
+                        "project_id": request.project_id,
+                        "comparison_mode": "scd",
+                        "mapping_id": result.mapping_id,  # Important for correlating back later
+                        "target_dataset": request.target_dataset,
+                        "target_table": request.target_table,
+                        "test_id": test.test_id,
+                        "test_name": test.test_name,
+                        "category": test.category,
+                        "status": test.status,
+                        "severity": test.severity,
+                        "description": test.description,
+                        "error_message": test.error_message,
+                        "rows_affected": test.rows_affected,
+                        "sql_query": test.sql_query,
+                        "executed_by": "Manual Run"
+                    })
+
+                await bigquery_service.log_scd_execution(
                     project_id=request.project_id,
-                    execution_data=execution_data
+                    execution_data=rows_to_log
                 )
             except Exception as e:
                 logger.error(f"SCD logging failed: {e}")
@@ -369,6 +372,7 @@ async def generate_tests(request: GenerateTestsRequest):
 
             response_data = {
                 'execution_id': exec_id,
+                'comparison_mode': request.comparison_mode,
                 'summary': table_summary,
                 'results_by_mapping': [result.dict()]
             }
@@ -387,16 +391,52 @@ async def generate_tests(request: GenerateTestsRequest):
 @app.get("/api/history")
 async def get_test_history(project_id: str = settings.google_cloud_project, limit: int = 50):
     """Get previous test runs from BigQuery."""
+    # Handle empty string from frontend
+    active_project = project_id if project_id and project_id.strip() else settings.google_cloud_project
     try:
         from app.services.bigquery_service import bigquery_service
-        # Use existing granular history fetch (Test1)
-        # Note: This will fetch 'test_execution_history' table.
-        # SCD results are in 'execution_history' (summary table).
-        # We might need to fetch BOTH and combine, or just one.
-        # For now, keeping Test1 behavior.
-        return await bigquery_service.get_execution_history(project_id=project_id, limit=limit)
+        return await bigquery_service.get_execution_history(project_id=active_project, limit=limit)
     except Exception as e:
         logger.error(f"History fetch failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/api/history/{execution_id}")
+async def delete_history(
+    execution_id: str,
+    project_id: str = settings.google_cloud_project
+):
+    """Delete a specific test execution history."""
+    # Handle empty string from frontend
+    active_project = project_id if project_id and project_id.strip() else settings.google_cloud_project
+    try:
+        logger.info(f"Delete request for execution_id: {execution_id}, project_id: {active_project}")
+        from app.services.bigquery_service import bigquery_service
+        success = await bigquery_service.delete_execution_history(active_project, execution_id)
+        logger.info(f"Delete result: {success}")
+        if success:
+            return {"status": "success"}
+        raise HTTPException(status_code=500, detail="Failed to delete history")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Delete failed with exception: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/api/history")
+async def delete_all_history(
+    project_id: str = settings.google_cloud_project
+):
+    """Delete ALL test execution history."""
+    try:
+        # Handle empty string from frontend
+        active_project = project_id if project_id and project_id.strip() else settings.google_cloud_project
+        from app.services.bigquery_service import bigquery_service
+        success = await bigquery_service.delete_all_execution_history(active_project)
+        if success:
+            return {"status": "success"}
+        raise HTTPException(status_code=500, detail="Failed to clear history")
+    except Exception as e:
+        logger.error(f"Clear all failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/predefined-tests")
@@ -557,9 +597,11 @@ async def get_table_metadata(
     table_id: str = ...
 ):
     """Get metadata for a specific BigQuery table."""
+    # Handle empty string from frontend
+    active_project = project_id if project_id and project_id.strip() else settings.google_cloud_project
     try:
         from app.services.bigquery_service import bigquery_service
-        metadata = await bigquery_service.get_table_metadata(project_id, dataset_id, table_id)
+        metadata = await bigquery_service.get_table_metadata(active_project, dataset_id, table_id)
         columns = [field['name'] for field in metadata.get('schema', {}).get('fields', [])]
         return TableMetadataResponse(
             full_table_name=metadata['full_table_name'],
