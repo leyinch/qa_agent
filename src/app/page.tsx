@@ -84,7 +84,7 @@ function HomeContent() {
                             color: 'var(--secondary-foreground)',
                             opacity: 0.7
                         }}>
-                            Powered by Google Cloud Vertex AI & BigQuery
+                            Powered by Google Cloud Vertex AI &amp; BigQuery
                         </p>
                     </div>
                 </div>

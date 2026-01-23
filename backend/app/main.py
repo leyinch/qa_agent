@@ -31,6 +31,12 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def generate_short_id() -> str:
+    """Generate a short 8-character execution ID."""
+    return str(uuid.uuid4())[:8]
+
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan context manager for startup/shutdown events."""
@@ -92,7 +98,7 @@ async def generate_tests(request: GenerateTestsRequest):
             try:
                 from app.services.bigquery_service import bigquery_service
                 rows_to_log: List[Dict[str, Any]] = []
-                exec_id = request.execution_id or str(uuid.uuid4())
+                exec_id = request.execution_id or generate_short_id()
                 
                 for mapping_result in result['results_by_mapping']:
                     if mapping_result.error:
@@ -129,12 +135,16 @@ async def generate_tests(request: GenerateTestsRequest):
                             "sql_query": test.sql_query
                         })
 
+                logger.info(f"GCS Config: Prepared {len(rows_to_log)} rows for logging with execution_id={exec_id}")
                 await bigquery_service.log_execution(
                     project_id=request.project_id,
                     execution_data=rows_to_log
                 )
+                logger.info(f"GCS Config: Successfully called log_execution for {len(rows_to_log)} rows")
             except Exception as e:
                 logger.error(f"Background logging failed: {e}")
+                import traceback
+                logger.error(f"Traceback: {traceback.format_exc()}")
                 exec_id = request.execution_id or "unknown"
 
             return ConfigTableResponse(
@@ -175,7 +185,7 @@ async def generate_tests(request: GenerateTestsRequest):
             try:
                 from app.services.bigquery_service import bigquery_service
                 rows_to_log = []
-                exec_id = request.execution_id or str(uuid.uuid4())
+                exec_id = request.execution_id or generate_short_id()
                 
                 for test in result.predefined_results:
                     rows_to_log.append({
@@ -222,7 +232,7 @@ async def generate_tests(request: GenerateTestsRequest):
             try:
                 from app.services.bigquery_service import bigquery_service
                 rows_to_log = []
-                exec_id = request.execution_id or str(uuid.uuid4())
+                exec_id = request.execution_id or generate_short_id()
 
                 for test in result_data.get('predefined_results', []):
                         rows_to_log.append({
@@ -256,58 +266,92 @@ async def generate_tests(request: GenerateTestsRequest):
             if not request.config_dataset or not request.config_table:
                 raise HTTPException(status_code=400, detail="Missing required fields for scd-config mode")
             
-            logger.info(f"Starting Batch SCD validation from config: {request.config_dataset}.{request.config_table}")
+            # Generate a single execution ID for the entire batch
+            exec_id = request.execution_id or generate_short_id()
+            logger.info(f"Starting Batch SCD validation from config: {request.config_dataset}.{request.config_table} with Execution ID: {exec_id}")
+            
             result = await test_executor.process_scd_config_table(
                 project_id=request.project_id,
                 config_dataset=request.config_dataset,
                 config_table=request.config_table
             )
             
-            # Log execution (SCD Granular - Test4 Style)
+            # Log execution (SCD Table-Level - One row per table)
             try:
                 from app.services.bigquery_service import bigquery_service
-                exec_id = request.execution_id or str(uuid.uuid4())
                 
                 rows_to_log = []
-                for mapping_result in result['results_by_mapping']:
-                    # Extract dataset/table from mapping info if possible, or fallback
+                all_mappings = result.get('results_by_mapping', [])
+                
+                # Aggregate at table level - one row per mapping/table
+                for mapping_result in all_mappings:
                     t_dataset = "unknown"
                     t_table = "unknown"
-                    if mapping_result.mapping_info and mapping_result.mapping_info.target:
-                        parts = mapping_result.mapping_info.target.split('.')
+                    
+                    m_info = mapping_result.mapping_info
+                    if m_info and m_info.target:
+                        parts = m_info.target.split('.')
                         if len(parts) >= 2:
                              t_table = parts[-1]
                              t_dataset = parts[-2]
+                        else:
+                            t_table = m_info.target
 
-                    for test in mapping_result.predefined_results:
-                        rows_to_log.append({
-                            "execution_id": exec_id,
-                            "project_id": request.project_id,
-                            "comparison_mode": "scd-config",
-                            "mapping_id": mapping_result.mapping_id,
-                            "target_dataset": t_dataset,
-                            "target_table": t_table,
-                            "test_id": test.test_id,
-                            "test_name": test.test_name,
-                            "category": test.category,
-                            "status": test.status,
-                            "severity": test.severity,
-                            "description": test.description,
-                            "error_message": test.error_message,
-                            "rows_affected": test.rows_affected,
-                            "sql_query": test.sql_query,
-                            "executed_by": "Manual Run"
-                        })
+                    # Calculate aggregated counts for this table
+                    total_tests = len(mapping_result.predefined_results)
+                    passed_tests = sum(1 for test in mapping_result.predefined_results if test.status == 'PASS')
+                    failed_tests = sum(1 for test in mapping_result.predefined_results if test.status == 'FAIL')
+                    error_tests = sum(1 for test in mapping_result.predefined_results if test.status == 'ERROR')
+                    
+                    # Determine overall status for this table
+                    if error_tests > 0:
+                        overall_status = 'ERROR'
+                    elif failed_tests > 0:
+                        overall_status = 'FAIL'
+                    else:
+                        overall_status = 'PASS'
+                    
+                    # Create one row per table with aggregated data
+                    rows_to_log.append({
+                        "execution_id": exec_id,
+                        "project_id": request.project_id,
+                        "comparison_mode": "scd-config",
+                        "mapping_id": mapping_result.mapping_id,
+                        "target_dataset": t_dataset,
+                        "target_table": t_table,
+                        "status": overall_status,
+                        "total_tests": total_tests,
+                        "passed_tests": passed_tests,
+                        "failed_tests": failed_tests,
+                        "error_message": None,  # Populated if there's a table-level error
+                        "test_results": [t.dict() for t in mapping_result.predefined_results],  # Store detailed results
+                        "executed_by": "Manual Run",
+                        "metadata": {
+                            "source": f"Batch SCD: {t_table}",
+                            "status": overall_status,
+                            "summary": {
+                                "total": total_tests,
+                                "passed": passed_tests,
+                                "failed": failed_tests,
+                                "errors": error_tests
+                            }
+                        }
+                    })
 
-                logger.info(f"SCD Config: Collected {len(rows_to_log)} tests for logging from {len(result['results_by_mapping'])} mappings")
-                await bigquery_service.log_scd_execution(
-                    project_id=request.project_id,
-                    execution_data=rows_to_log
-                )
+                logger.info(f"SCD Config: Prepared {len(rows_to_log)} table-level rows for logging from {len(all_mappings)} mappings")
+                
+                if rows_to_log:
+                    await bigquery_service.log_scd_execution(
+                        project_id=request.project_id,
+                        execution_data=rows_to_log
+                    )
 
             except Exception as e:
                 logger.error(f"SCD Config logging failed: {e}", exc_info=True)
-                exec_id = request.execution_id or "unknown"
+                # Keep the exec_id even if logging fails
+            
+            # Inject the common execution ID into the response structure
+            result['execution_id'] = exec_id
 
             return ConfigTableResponse(
                 execution_id=exec_id,
@@ -339,7 +383,7 @@ async def generate_tests(request: GenerateTestsRequest):
             # Log execution (SCD Granular - Test4 Feature)
             try:
                 from app.services.bigquery_service import bigquery_service
-                exec_id = request.execution_id or str(uuid.uuid4())
+                exec_id = request.execution_id or generate_short_id()
                 
                 rows_to_log = []
                 for test in result.predefined_results:

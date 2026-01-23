@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from "recharts";
 
 interface TestResult {
     test_id?: string;
@@ -14,6 +13,15 @@ interface TestResult {
     error_message?: string;
     target_dataset?: string;
     target_table?: string;
+    mapping_id?: string;
+}
+
+interface AiSuggestion {
+    test_name: string;
+    test_category?: string;
+    reasoning: string;
+    severity: string;
+    sql_query: string;
 }
 
 interface MappingResult {
@@ -25,27 +33,28 @@ interface MappingResult {
         table_row_count: number;
     };
     predefined_results: TestResult[];
-    ai_suggestions?: any[];
+    ai_suggestions?: AiSuggestion[];
     error?: string;
 }
 
-const COLORS = {
-    PASS: "#10b981", // Green
-    FAIL: "#ef4444", // Red
-    ERROR: "#f59e0b", // Amber
-};
+interface Summary {
+    total_mappings: number;
+    total_tests: number;
+    passed: number;
+    failed: number;
+    errors: number;
+    total_suggestions: number;
+}
 
 export default function ResultsView() {
     const [results, setResults] = useState<TestResult[]>([]);
     const [mappingResults, setMappingResults] = useState<MappingResult[]>([]);
-    const [summary, setSummary] = useState<any>(null);
+    const [summary, setSummary] = useState<Summary | null>(null);
     const [isConfigMode, setIsConfigMode] = useState(false);
     const [loading, setLoading] = useState(true);
     const [savedTests, setSavedTests] = useState<Set<string>>(new Set());
     const [projectId, setProjectId] = useState<string>("");
     const [mode, setMode] = useState<string>("");
-    const [executionTimestamp, setExecutionTimestamp] = useState<string>("");
-    const [executionId, setExecutionId] = useState<string>("");
 
     useEffect(() => {
         const data = localStorage.getItem("testResults");
@@ -53,48 +62,29 @@ export default function ResultsView() {
             try {
                 const parsed = JSON.parse(data);
 
-                // Try to extract project_id from mapping info or summary if available
                 if (parsed.project_id) {
                     setProjectId(parsed.project_id);
                 }
 
-                // Check if it's config table mode (has results_by_mapping)
-                if (parsed.results_by_mapping) {
-                    setIsConfigMode(true);
-                    setMappingResults(parsed.results_by_mapping);
-                    setSummary(parsed.summary);
-                    if (parsed.execution_timestamp) {
-                        setExecutionTimestamp(parsed.execution_timestamp);
-                    }
-                    if (parsed.execution_id) {
-                        setExecutionId(parsed.execution_id);
-                    }
-                } else if (Array.isArray(parsed)) {
-                    // Handle raw array from history (granular logs)
-                    // Check if we can group them by mapping_id
-                    const hasMappingInfo = parsed.some(r => r.mapping_id);
-
+                const handleParsing = (resultsToParse: any[], originalObj: any) => {
+                    const hasMappingInfo = resultsToParse.some(r => r.mapping_id);
                     if (hasMappingInfo) {
-                        // Group by mapping_id
                         const grouped: Record<string, MappingResult> = {};
-
-                        parsed.forEach((row: any) => {
+                        resultsToParse.forEach((row: any) => {
                             const mId = row.mapping_id || 'unknown';
                             if (!grouped[mId]) {
                                 grouped[mId] = {
                                     mapping_id: mId,
                                     mapping_info: {
-                                        source: row.source_file || row.source || 'unknown',
-                                        target: row.target_table || row.target || 'unknown',
-                                        file_row_count: 0, // Info might be lost in flattening
+                                        source: row.source || 'unknown',
+                                        target: row.target || 'unknown',
+                                        file_row_count: 0,
                                         table_row_count: 0
                                     },
                                     predefined_results: [],
-                                    ai_suggestions: []
+                                    ai_suggestions: row.ai_suggestions || []
                                 };
                             }
-
-                            // transform flat row back to TestResult
                             grouped[mId].predefined_results.push({
                                 test_id: row.test_id,
                                 test_name: row.test_name,
@@ -103,62 +93,56 @@ export default function ResultsView() {
                                 severity: row.severity,
                                 status: row.status,
                                 rows_affected: row.rows_affected,
-                                error_message: row.error_message
+                                error_message: row.error_message,
+                                target_dataset: row.target_dataset,
+                                target_table: row.target_table || (row.target ? row.target.split('.').pop() : null)
                             });
                         });
 
                         setMappingResults(Object.values(grouped));
                         setIsConfigMode(true);
-                        // Recalculate summary if missing
-                        const totalTests = parsed.length;
-                        const passed = parsed.filter((r: any) => r.status === 'PASS').length;
-                        const failed = parsed.filter((r: any) => r.status === 'FAIL').length;
-                        const errors = parsed.filter((r: any) => r.status === 'ERROR').length;
+
+                        const passed = resultsToParse.filter((r: TestResult) => r.status === 'PASS').length;
+                        const failed = resultsToParse.filter((r: TestResult) => r.status === 'FAIL').length;
+                        const errors = resultsToParse.filter((r: TestResult) => r.status === 'ERROR').length;
 
                         setSummary({
                             total_mappings: Object.keys(grouped).length,
-                            total_tests: totalTests,
+                            total_tests: resultsToParse.length,
                             passed,
                             failed,
                             errors,
                             total_suggestions: 0
                         });
-
-
-                        if ((parsed as any).execution_timestamp) {
-                            setExecutionTimestamp((parsed as any).execution_timestamp);
-                        } else if (parsed.length > 0 && (parsed[0] as any).execution_timestamp) {
-                            setExecutionTimestamp((parsed[0] as any).execution_timestamp);
-                        }
-
                     } else {
-                        setResults(parsed);
+                        setResults(resultsToParse);
+                        if (originalObj.summary) setSummary(originalObj.summary);
                     }
+                };
+
+                if (parsed.results_by_mapping) {
+                    setIsConfigMode(true);
+                    setMappingResults(parsed.results_by_mapping);
+                    setSummary(parsed.summary);
+                } else if (Array.isArray(parsed)) {
+                    handleParsing(parsed, { summary: null });
+                } else if (parsed.results && Array.isArray(parsed.results)) {
+                    handleParsing(parsed.results, parsed);
                 } else if (parsed.predefined_results) {
-                    // Single GCS file mode
                     setResults(parsed.predefined_results);
                     setSummary(parsed.summary);
-                }
-
-                if (parsed.execution_id) {
-                    setExecutionId(parsed.execution_id);
-                } else if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].execution_id) {
-                    setExecutionId(parsed[0].execution_id);
-                } else if (parsed.results && Array.isArray(parsed.results) && parsed.results.length > 0 && parsed.results[0].execution_id) {
-                    setExecutionId(parsed.results[0].execution_id);
+                } else if (parsed.details && Array.isArray(parsed.details)) {
+                    handleParsing(parsed.details, parsed);
                 }
 
                 if (parsed.comparison_mode) {
                     setMode(parsed.comparison_mode);
-                } else if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].comparison_mode) {
-                    setMode(parsed[0].comparison_mode);
                 }
             } catch (e) {
                 console.error("Failed to parse results", e);
             }
         }
 
-        // Also try to get projectId from separate storage if not in results
         const storedProjectId = localStorage.getItem("projectId");
         if (storedProjectId) {
             setProjectId(storedProjectId);
@@ -167,14 +151,13 @@ export default function ResultsView() {
         setLoading(false);
     }, []);
 
-    const handleSaveCustomTest = async (suggestion: any, mappingId: string, targetDataset: string | null = null, targetTable: string | null = null) => {
+    const handleSaveCustomTest = async (suggestion: AiSuggestion, mappingId: string, targetDataset: string | null = null, targetTable: string | null = null) => {
         if (!projectId) {
             alert("Project ID not found. Cannot save custom test.");
             return;
         }
 
         try {
-            const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://data-qa-agent-backend-750147355601.us-central1.run.app';
             const payload = {
                 project_id: projectId,
                 test_name: suggestion.test_name,
@@ -186,7 +169,7 @@ export default function ResultsView() {
                 target_table: targetTable
             };
 
-            const response = await fetch(`${backendUrl}/api/custom-tests`, {
+            const response = await fetch(`/api/custom-tests`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -198,9 +181,12 @@ export default function ResultsView() {
                 throw new Error("Failed to save custom test");
             }
 
-            // Mark as saved
             const key = `${mappingId}-${suggestion.test_name}`;
-            setSavedTests(prev => new Set(prev).add(key));
+            setSavedTests(prev => {
+                const next = new Set(prev);
+                next.add(key);
+                return next;
+            });
             alert("Test case saved to Custom Tests successfully!");
 
         } catch (error) {
@@ -219,29 +205,9 @@ export default function ResultsView() {
         return <div style={{ padding: '2rem', textAlign: 'center' }}>No results found. Please run a test first.</div>;
     }
 
-    // Config table mode - show results grouped by mapping
     if (isConfigMode) {
         return (
-            <div style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
-                <div style={{ marginBottom: '2rem', borderBottom: '1px solid var(--border)', paddingBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                        <div style={{ fontSize: '0.9rem', color: '#64748b' }}>
-                            Project: <span style={{ fontFamily: 'monospace', fontWeight: '700', color: 'var(--primary)' }}>{projectId}</span>
-                        </div>
-                        {executionId && (
-                            <div style={{ fontSize: '0.9rem', color: '#64748b' }}>
-                                Execution ID: <span style={{ fontFamily: 'monospace', fontWeight: '600' }}>{executionId.substring(0, 8)}</span>
-                            </div>
-                        )}
-                    </div>
-                    {executionTimestamp && (
-                        <span style={{ fontSize: '0.9rem', fontWeight: '500', color: '#64748b', textAlign: 'right' }}>
-                            Ran on: {new Date(executionTimestamp).toLocaleString()}
-                        </span>
-                    )}
-                </div>
-
-                {/* Overall Summary */}
+            <div style={{ padding: '0 1rem', maxWidth: '1200px', margin: '0 auto' }}>
                 {summary && (
                     <div style={{
                         display: 'grid',
@@ -273,18 +239,9 @@ export default function ResultsView() {
                             </div>
                             <div style={{ color: 'var(--secondary-foreground)' }}>Errors</div>
                         </div>
-                        {summary.total_suggestions > 0 && (
-                            <div className="card" style={{ textAlign: 'center' }}>
-                                <div style={{ fontSize: '2rem', fontWeight: '700', color: 'var(--primary)' }}>
-                                    {summary.total_suggestions}
-                                </div>
-                                <div style={{ color: 'var(--secondary-foreground)' }}>AI Suggestions</div>
-                            </div>
-                        )}
                     </div>
                 )}
 
-                {/* Results by Mapping */}
                 {mappingResults.map((mapping, idx) => {
                     const mappingStats = {
                         PASS: mapping.predefined_results.filter(r => r.status === 'PASS').length,
@@ -303,46 +260,55 @@ export default function ResultsView() {
                                 marginBottom: '1rem'
                             }}>
                                 <h3 style={{ fontSize: '1.25rem', fontWeight: '600', margin: 0 }}>
-                                    Mapping ID: <span style={{ color: 'var(--primary)', fontFamily: 'monospace' }}>{mapping.mapping_id}</span>
+                                    Mapping ID: <span style={{ color: '#0f172a', fontFamily: 'monospace' }}>{mapping.mapping_id}</span>
                                 </h3>
-                                <div style={{ fontSize: '0.875rem', color: 'var(--secondary-foreground)' }}>
-                                    Target: <span style={{ fontFamily: 'monospace', fontWeight: '600', color: 'var(--foreground)' }}>
-                                        {mapping.mapping_info?.target || 'Unknown'}
-                                    </span>
-                                </div>
                             </div>
 
-                            {mapping.mapping_info && (
-                                <div style={{
-                                    padding: '1rem',
-                                    background: 'var(--secondary)',
-                                    borderRadius: 'var(--radius)',
-                                    marginBottom: '1rem',
-                                    fontSize: '0.875rem',
-                                    display: 'grid',
-                                    gridTemplateColumns: mode?.toLowerCase().includes('scd') ? '1fr' : '1fr 1fr',
-                                    gap: '0.5rem'
-                                }}>
-                                    {!mode?.toLowerCase().includes('scd') && mapping.mapping_info.source !== 'SCD Validation' && (
-                                        <div><strong>Source:</strong> <code style={{ wordBreak: 'break-all' }}>{mapping.mapping_info.source}</code></div>
-                                    )}
-                                    <div><strong>Target Table:</strong> <code>{mapping.mapping_info.target}</code></div>
-                                    {!mode?.toLowerCase().includes('scd') && mapping.mapping_info.source !== 'SCD Validation' && (
-                                        <>
-                                            <div><strong>GCS Rows:</strong> {mapping.mapping_info.file_row_count}</div>
-                                            <div><strong>BigQuery Rows:</strong> {mapping.mapping_info.table_row_count}</div>
-                                        </>
-                                    )}
-                                </div>
-                            )}
+                            {
+                                mapping.mapping_info && (
+                                    <div style={{
+                                        padding: '1.25rem',
+                                        background: '#f8fafc',
+                                        borderRadius: 'var(--radius)',
+                                        marginBottom: '1.25rem',
+                                        fontSize: '0.925rem',
+                                        display: 'grid',
+                                        gridTemplateColumns: mode?.toLowerCase().includes('scd') ? '1fr' : '1fr 1fr',
+                                        gap: '1rem',
+                                        border: '1px solid var(--border)'
+                                    }}>
+                                        {!mode?.toLowerCase().includes('scd') && mapping.mapping_info.source && (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                                                <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase' }}>Source</span>
+                                                <code style={{ wordBreak: 'break-all', color: '#0f172a', fontWeight: '600' }}>{mapping.mapping_info.source}</code>
+                                            </div>
+                                        )}
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                                            <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase' }}>Target Table</span>
+                                            <code style={{ color: '#0f172a', fontWeight: '600' }}>{mapping.mapping_info.target}</code>
+                                        </div>
 
-                            {mapping.error && (
-                                <div style={{ padding: '1rem', background: '#fef2f2', color: '#991b1b', borderRadius: 'var(--radius)', marginBottom: '1rem' }}>
-                                    <strong>Error:</strong> {mapping.error}
-                                </div>
-                            )}
+                                        {/* Show counts if available from Row Count test */}
+                                        {mapping.predefined_results.find(r => r.test_id === 'row_count_match' || r.test_name === 'Row Count Match') && (
+                                            <div style={{ gridColumn: '1 / -1', marginTop: '0.5rem', paddingTop: '0.75rem', borderTop: '1px solid #e2e8f0', display: 'flex', gap: '2rem' }}>
+                                                <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
+                                                    <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Row Count Info:</span>
+                                                    <span style={{ fontWeight: '600', color: '#0f172a' }}>{mapping.predefined_results.find(r => r.test_name === 'Row Count Match')?.description || 'Available in test details'}</span>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )
+                            }
 
-                            {/* Mapping Stats */}
+                            {
+                                mapping.error && (
+                                    <div style={{ padding: '1rem', background: '#fef2f2', color: '#991b1b', borderRadius: 'var(--radius)', marginBottom: '1rem' }}>
+                                        <strong>Error:</strong> {mapping.error}
+                                    </div>
+                                )
+                            }
+
                             <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
                                 <div style={{ padding: '0.5rem 1rem', background: '#d1fae5', color: '#065f46', borderRadius: 'var(--radius)', fontWeight: '600' }}>
                                     ✓ {mappingStats.PASS} Passed
@@ -357,7 +323,6 @@ export default function ResultsView() {
                                 )}
                             </div>
 
-                            {/* Test Results Table */}
                             <div style={{ overflowX: 'auto' }}>
                                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                                     <thead>
@@ -396,116 +361,89 @@ export default function ResultsView() {
                                 </table>
                             </div>
 
-                            {/* AI Suggestions */}
-                            {mapping.ai_suggestions && mapping.ai_suggestions.length > 0 && (
-                                <div style={{ marginTop: '1.5rem' }}>
-                                    <h4 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>
-                                        🤖 AI Suggested Tests ({mapping.ai_suggestions.length})
-                                    </h4>
-                                    {mapping.ai_suggestions.map((suggestion, sugIdx) => {
-                                        const isSaved = savedTests.has(`${mapping.mapping_id}-${suggestion.test_name}`);
-                                        return (
-                                            <div key={sugIdx} style={{
-                                                padding: '1rem',
-                                                background: 'var(--secondary)',
-                                                borderRadius: 'var(--radius)',
-                                                marginBottom: '0.75rem',
-                                                border: '2px dashed var(--primary)',
-                                                display: 'flex',
-                                                justifyContent: 'space-between',
-                                                alignItems: 'flex-start'
-                                            }}>
-                                                <div>
-                                                    <div style={{ fontWeight: '600', marginBottom: '0.5rem' }}>{suggestion.test_name}</div>
-                                                    <div style={{ fontSize: '0.875rem', color: 'var(--secondary-foreground)', marginBottom: '0.5rem' }}>
-                                                        {suggestion.reasoning}
+                            {
+                                mapping.ai_suggestions && mapping.ai_suggestions.length > 0 && (
+                                    <div style={{ marginTop: '1.5rem' }}>
+                                        <h4 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>
+                                            🤖 AI Suggested Tests ({mapping.ai_suggestions.length})
+                                        </h4>
+                                        {mapping.ai_suggestions.map((suggestion, sugIdx) => {
+                                            const isSaved = savedTests.has(`${mapping.mapping_id}-${suggestion.test_name}`);
+                                            return (
+                                                <div key={sugIdx} style={{
+                                                    padding: '1rem',
+                                                    background: 'var(--secondary)',
+                                                    borderRadius: 'var(--radius)',
+                                                    marginBottom: '0.75rem',
+                                                    border: '2px dashed var(--primary)',
+                                                    display: 'flex',
+                                                    justifyContent: 'space-between',
+                                                    alignItems: 'flex-start'
+                                                }}>
+                                                    <div>
+                                                        <div style={{ fontWeight: '600', marginBottom: '0.5rem' }}>{suggestion.test_name}</div>
+                                                        <div style={{ fontSize: '0.875rem', color: 'var(--secondary-foreground)', marginBottom: '0.5rem' }}>
+                                                            {suggestion.reasoning}
+                                                        </div>
+                                                        <div style={{ fontSize: '0.75rem', color: 'var(--secondary-foreground)' }}>
+                                                            Severity: {suggestion.severity}
+                                                        </div>
                                                     </div>
-                                                    <div style={{ fontSize: '0.75rem', color: 'var(--secondary-foreground)' }}>
-                                                        Severity: {suggestion.severity}
-                                                    </div>
-                                                </div>
-                                                <button
-                                                    onClick={() => {
-                                                        // Extract target dataset/table from mapping info if possible
-                                                        // mapping.mapping_info.target usually has "dataset.table" WITHOUT project or "project.dataset.table"
-                                                        let targetDataset = null;
-                                                        let targetTable = null;
-                                                        if (mapping.mapping_info && mapping.mapping_info.target) {
-                                                            const parts = mapping.mapping_info.target.split('.');
-                                                            if (parts.length === 2) {
-                                                                targetDataset = parts[0];
-                                                                targetTable = parts[1];
-                                                            } else if (parts.length === 3) {
-                                                                // project.dataset.table
-                                                                targetDataset = parts[1];
-                                                                targetTable = parts[2];
+                                                    <button
+                                                        onClick={() => {
+                                                            let targetDataset = null;
+                                                            let targetTable = null;
+                                                            if (mapping.mapping_info && mapping.mapping_info.target) {
+                                                                const parts = mapping.mapping_info.target.split('.');
+                                                                if (parts.length === 2) {
+                                                                    targetDataset = parts[0];
+                                                                    targetTable = parts[1];
+                                                                } else if (parts.length === 3) {
+                                                                    targetDataset = parts[1];
+                                                                    targetTable = parts[2];
+                                                                }
                                                             }
-                                                        }
-                                                        handleSaveCustomTest(suggestion, mapping.mapping_id, targetDataset, targetTable);
-                                                    }}
-                                                    disabled={isSaved}
-                                                    style={{
-                                                        padding: '0.5rem 1rem',
-                                                        backgroundColor: isSaved ? '#10b981' : 'var(--primary)',
-                                                        color: 'white',
-                                                        border: 'none',
-                                                        borderRadius: 'var(--radius)',
-                                                        cursor: isSaved ? 'default' : 'pointer',
-                                                        fontSize: '0.875rem',
-                                                        fontWeight: '600',
-                                                        whiteSpace: 'nowrap',
-                                                        marginLeft: '1rem',
-                                                        opacity: isSaved ? 0.7 : 1
-                                                    }}
-                                                >
-                                                    {isSaved ? '✓ Added' : '+ Add to Custom'}
-                                                </button>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            )}
+                                                            handleSaveCustomTest(suggestion, mapping.mapping_id, targetDataset, targetTable);
+                                                        }}
+                                                        disabled={isSaved}
+                                                        style={{
+                                                            padding: '0.5rem 1rem',
+                                                            backgroundColor: isSaved ? '#10b981' : 'var(--primary)',
+                                                            color: 'white',
+                                                            border: 'none',
+                                                            borderRadius: 'var(--radius)',
+                                                            cursor: isSaved ? 'default' : 'pointer',
+                                                            fontSize: '0.875rem',
+                                                            fontWeight: '600',
+                                                            whiteSpace: 'nowrap',
+                                                            marginLeft: '1rem',
+                                                            opacity: isSaved ? 0.7 : 1
+                                                        }}
+                                                    >
+                                                        {isSaved ? '✓ Added' : '+ Add to Custom'}
+                                                    </button>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )
+                            }
                         </div>
                     );
-                })}
-            </div>
+                })
+                }
+            </div >
         );
     }
 
-    // Single file/schema mode - original display
     const stats = {
         PASS: results.filter((r) => r.status === "PASS").length,
         FAIL: results.filter((r) => r.status === "FAIL").length,
         ERROR: results.filter((r) => r.status === "ERROR").length,
     };
 
-    const chartData = [
-        { name: "Pass", value: stats.PASS },
-        { name: "Fail", value: stats.FAIL },
-        { name: "Error", value: stats.ERROR },
-    ];
-
     return (
-        <div style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
-            <div style={{ marginBottom: '2rem', borderBottom: '1px solid var(--border)', paddingBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                    <div style={{ fontSize: '0.9rem', color: '#64748b' }}>
-                        Project: <span style={{ fontFamily: 'monospace', fontWeight: '700', color: 'var(--primary)' }}>{projectId}</span>
-                    </div>
-                    {executionId && (
-                        <div style={{ fontSize: '0.9rem', color: '#64748b' }}>
-                            Execution ID: <span style={{ fontFamily: 'monospace', fontWeight: '600' }}>{executionId.substring(0, 8)}</span>
-                        </div>
-                    )}
-                </div>
-                {executionTimestamp && (
-                    <span style={{ fontSize: '0.9rem', fontWeight: '500', color: '#64748b', textAlign: 'right' }}>
-                        Ran on: {new Date(executionTimestamp).toLocaleString()}
-                    </span>
-                )}
-            </div>
-
-            {/* Summary Cards */}
+        <div style={{ padding: '0 1rem', maxWidth: '1200px', margin: '0 auto' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
                 <div className="card" style={{ textAlign: 'center' }}>
                     <div style={{ fontSize: '2rem', fontWeight: '700', color: '#10b981' }}>{stats.PASS}</div>
@@ -521,23 +459,6 @@ export default function ResultsView() {
                 </div>
             </div>
 
-            {/* Pie Chart */}
-            <div className="card" style={{ marginBottom: '2rem' }}>
-                <h3 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>Test Distribution</h3>
-                <ResponsiveContainer width="100%" height={300}>
-                    <PieChart>
-                        <Pie data={chartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} label>
-                            {chartData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={COLORS[entry.name.toUpperCase() as keyof typeof COLORS]} />
-                            ))}
-                        </Pie>
-                        <Tooltip />
-                        <Legend />
-                    </PieChart>
-                </ResponsiveContainer>
-            </div>
-
-            {/* Detailed Results Table */}
             <div className="card">
                 <h3 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>Detailed Results</h3>
                 <div style={{ overflowX: 'auto' }}>
@@ -555,7 +476,7 @@ export default function ResultsView() {
                             {results.map((test, index) => (
                                 <tr key={index} style={{ borderBottom: '1px solid var(--border)' }}>
                                     <td style={{ padding: '0.75rem', fontFamily: 'monospace', fontSize: '0.85rem' }}>
-                                        {test.target_table ? `${test.target_dataset ? test.target_dataset + '.' : ''}${test.target_table}` : 'N/A'}
+                                        {test.target_table ? `${test.target_dataset ? test.target_dataset + '.' : ''}${test.target_table}` : (test.mapping_id || 'N/A')}
                                     </td>
                                     <td style={{ padding: '0.75rem' }}>{test.test_name}</td>
                                     <td style={{ padding: '0.75rem' }}>
@@ -580,61 +501,6 @@ export default function ResultsView() {
                     </table>
                 </div>
             </div>
-
-            {/* AI Suggestions (Single File Mode) */}
-            {summary && summary.ai_suggestions && summary.ai_suggestions.length > 0 && (
-                <div className="card" style={{ marginTop: '2rem' }}>
-                    <h3 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>
-                        🤖 AI Suggested Tests ({summary.ai_suggestions.length})
-                    </h3>
-                    {summary.ai_suggestions.map((suggestion: any, idx: number) => {
-                        const isSaved = savedTests.has(`single-${suggestion.test_name}`);
-                        return (
-                            <div key={idx} style={{
-                                padding: '1rem',
-                                background: 'var(--secondary)',
-                                borderRadius: 'var(--radius)',
-                                marginBottom: '0.75rem',
-                                border: '2px dashed var(--primary)',
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'flex-start'
-                            }}>
-                                <div>
-                                    <div style={{ fontWeight: '600', marginBottom: '0.5rem' }}>{suggestion.test_name}</div>
-                                    <div style={{ fontSize: '0.875rem', color: 'var(--secondary-foreground)', marginBottom: '0.5rem' }}>
-                                        {suggestion.reasoning}
-                                    </div>
-                                    <div style={{ fontSize: '0.75rem', color: 'var(--secondary-foreground)' }}>
-                                        Severity: {suggestion.severity}
-                                    </div>
-                                </div>
-                                <button
-                                    onClick={() => {
-                                        handleSaveCustomTest(suggestion, 'single');
-                                    }}
-                                    disabled={isSaved}
-                                    style={{
-                                        padding: '0.5rem 1rem',
-                                        backgroundColor: isSaved ? '#10b981' : 'var(--primary)',
-                                        color: 'white',
-                                        border: 'none',
-                                        borderRadius: 'var(--radius)',
-                                        cursor: isSaved ? 'default' : 'pointer',
-                                        fontSize: '0.875rem',
-                                        fontWeight: '600',
-                                        whiteSpace: 'nowrap',
-                                        marginLeft: '1rem',
-                                        opacity: isSaved ? 0.7 : 1
-                                    }}
-                                >
-                                    {isSaved ? '✓ Added' : '+ Add to Custom'}
-                                </button>
-                            </div>
-                        );
-                    })}
-                </div>
-            )}
         </div>
     );
 }

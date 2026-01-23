@@ -14,12 +14,12 @@ interface HistoryItem {
     total_tests: number;
     passed_tests: number;
     failed_tests: number;
-    details: any;
+    details: Record<string, unknown> | unknown[];
 }
 
 interface HistoryListProps {
     projectId: string;
-    onViewResult: (details: any) => void;
+    onViewResult: (details: unknown, fromHistory?: boolean) => void;
 }
 
 export default function HistoryList({ projectId, onViewResult }: HistoryListProps) {
@@ -38,8 +38,9 @@ export default function HistoryList({ projectId, onViewResult }: HistoryListProp
             const data = await res.json();
             // Backend now returns pre-aggregated history items compatible with HistoryItem interface
             setHistory(data);
-        } catch (err: any) {
-            setError(err.message || "An error occurred");
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : "An error occurred";
+            setError(message);
         } finally {
             setLoading(false);
         }
@@ -50,8 +51,8 @@ export default function HistoryList({ projectId, onViewResult }: HistoryListProp
     }, []);
 
     const handleViewClick = (run: HistoryItem) => {
-        // run.details is already the list of test objects
-        onViewResult(run.details);
+        // Pass the whole run object so we can extract metadata like execution_id
+        onViewResult(run, true);
     };
 
     const getStatusColor = (status: string) => {
@@ -116,19 +117,24 @@ export default function HistoryList({ projectId, onViewResult }: HistoryListProp
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                     <button
                         onClick={async () => {
-                            if (confirm('Are you sure you want to delete ALL history records? This cannot be undone.')) {
-                                try {
-                                    const res = await fetch('/api/history', { method: 'DELETE' });
-                                    if (res.ok) {
-                                        await fetchHistory();
-                                        alert('All history cleared successfully');
-                                    } else {
-                                        alert('Failed to clear history');
-                                    }
-                                } catch (err) {
-                                    console.error('Delete all failed:', err);
-                                    alert('Error clearing history');
+                            setLoading(true);
+                            try {
+                                const res = await fetch(`/api/history?project_id=${projectId}`, { method: 'DELETE' });
+                                if (res.ok) {
+                                    // Clear the history state immediately
+                                    setHistory([]);
+                                    // Then fetch fresh data
+                                    await fetchHistory();
+                                } else {
+                                    const errorText = await res.text();
+                                    console.error('Failed to clear history:', errorText);
+                                    alert('Failed to clear history');
                                 }
+                            } catch (err) {
+                                console.error('Delete all failed:', err);
+                                alert('Error clearing history');
+                            } finally {
+                                setLoading(false);
                             }
                         }}
                         className="btn btn-outline"
@@ -141,7 +147,7 @@ export default function HistoryList({ projectId, onViewResult }: HistoryListProp
                         }}
                         disabled={loading}
                     >
-                        🗑️ Delete All
+                        Delete All
                     </button>
                     <button
                         onClick={fetchHistory}
@@ -149,139 +155,181 @@ export default function HistoryList({ projectId, onViewResult }: HistoryListProp
                         style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}
                         disabled={loading}
                     >
-                        {loading ? 'Refreshing...' : '🔄 Refresh'}
+                        {loading ? 'Refreshing...' : 'Refresh'}
                     </button>
                 </div>
             </div>
 
-            {history.length === 0 ? (
-                <div style={{ textAlign: 'center', color: 'var(--secondary-foreground)', padding: '2rem' }}>
-                    No execution history found.
-                </div>
-            ) : (
-                <div style={{ width: '100%', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem', tableLayout: 'fixed' }}>
-                        <thead>
-                            <tr style={{ background: 'var(--secondary)', borderBottom: '1px solid var(--border)', textAlign: 'left' }}>
-                                <th style={{ padding: '0.75rem 1rem', width: '90px' }}>ID</th>
-                                <th style={{ padding: '0.75rem 1rem', width: '180px' }}>Execution Time</th>
-                                <th style={{ padding: '0.75rem 1rem', width: '90px' }}>Mode</th>
-                                <th style={{ padding: '0.75rem 1.5rem 0.75rem 1rem' }}>Source / Target</th>
-                                <th style={{ padding: '0.75rem 1rem', width: '140px' }}>Status</th>
-                                <th style={{ padding: '0.75rem 1rem', textAlign: 'center', width: '120px' }}>Distribution</th>
-                                <th style={{ padding: '0.75rem 1rem', textAlign: 'center', width: '120px' }}>Action</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {history.map((run) => {
-                                const passed = run.passed_tests || 0;
-                                const failed = run.failed_tests || 0;
-                                const other = (run.total_tests || 0) - passed - failed; // e.g. errors or skipped
-                                const chartData = [
-                                    { name: 'Passed', value: passed, color: '#10b981' },
-                                    { name: 'Failed', value: failed, color: '#ef4444' },
-                                    ...(other > 0 ? [{ name: 'Other', value: other, color: '#94a3b8' }] : [])
-                                ];
+            {
+                history.length === 0 ? (
+                    <div style={{ textAlign: 'center', color: 'var(--secondary-foreground)', padding: '2rem' }}>
+                        No execution history found.
+                    </div>
+                ) : (
+                    <div style={{ width: '100%', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem', tableLayout: 'fixed' }}>
+                            <thead>
+                                <tr style={{ background: 'var(--secondary)', borderBottom: '1px solid var(--border)', textAlign: 'left' }}>
+                                    <th style={{ padding: '0.75rem 1rem', width: '90px' }}>ID</th>
+                                    <th style={{ padding: '0.75rem 1rem', width: '180px' }}>Execution Time</th>
+                                    <th style={{ padding: '0.75rem 1rem', width: '90px' }}>Mode</th>
+                                    <th style={{ padding: '0.75rem 1.5rem 0.75rem 1rem' }}>Source / Target</th>
+                                    <th style={{ padding: '0.75rem 1rem', width: '140px' }}>Status</th>
+                                    <th style={{ padding: '0.75rem 1rem', textAlign: 'center', width: '120px' }}>Distribution</th>
+                                    <th style={{ padding: '0.75rem 1rem', textAlign: 'center', width: '120px' }}>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {history.map((run) => {
+                                    const passed = run.passed_tests || 0;
+                                    const failed = run.failed_tests || 0;
+                                    const other = (run.total_tests || 0) - passed - failed; // e.g. errors or skipped
+                                    const chartData = [
+                                        { name: 'Passed', value: passed, color: '#10b981' },
+                                        { name: 'Failed', value: failed, color: '#ef4444' },
+                                        ...(other > 0 ? [{ name: 'Other', value: other, color: '#94a3b8' }] : [])
+                                    ];
 
-                                return (
-                                    <tr key={run.execution_id} style={{ borderBottom: '1px solid var(--border)' }}>
-                                        <td style={{ padding: '0.75rem 1rem', fontFamily: 'monospace', fontSize: '0.7rem' }} title={run.execution_id}>
-                                            {run.execution_id?.substring(0, 8)}
-                                        </td>
-                                        <td style={{ padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}>
-                                            {new Date(run.timestamp).toLocaleString([], { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                                        </td>
-                                        <td style={{ padding: '0.75rem 1rem', textTransform: 'uppercase', fontWeight: '600', color: 'var(--primary)' }}>
-                                            {run.comparison_mode?.toLowerCase().includes('scd') ? 'SCD' : run.comparison_mode?.replace('_', ' ')}
-                                        </td>
-                                        <td style={{ padding: '0.75rem 1rem' }}>
-                                            {!run.comparison_mode?.toLowerCase().includes('scd') && run.source !== 'SCD Validation' && (
-                                                <div style={{ fontSize: '0.75rem', color: 'var(--secondary-foreground)' }}>Src: <span style={{ color: 'var(--foreground)' }}>{run.source}</span></div>
-                                            )}
-                                            <div style={{ fontSize: '0.75rem', color: 'var(--secondary-foreground)' }}>Tgt: <span style={{ color: 'var(--foreground)' }}>{run.target}</span></div>
-                                        </td>
-                                        <td style={{ padding: '0.75rem 1rem' }}>
-                                            {getStatusBadge(run.status)}
-                                        </td>
-                                        <td style={{ padding: '0.75rem 1rem', textAlign: 'center', minWidth: '100px' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
-                                                <PieChart width={50} height={50}>
-                                                    <Pie
-                                                        data={chartData}
-                                                        cx={25}
-                                                        cy={25}
-                                                        innerRadius={10}
-                                                        outerRadius={25}
-                                                        paddingAngle={2}
-                                                        dataKey="value"
-                                                        stroke="none"
-                                                    >
-                                                        {chartData.map((entry: any, index: number) => (
-                                                            <Cell key={`cell-${index}`} fill={entry.color} />
-                                                        ))}
-                                                    </Pie>
-                                                    <RechartsTooltip />
-                                                </PieChart>
-                                                <div style={{ fontSize: '0.75rem', color: 'var(--secondary-foreground)', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                                                    <span style={{ color: '#10b981' }}>Pass: {passed}</span>
-                                                    {(failed > 0) && <span style={{ color: '#ef4444' }}>Fail: {failed}</span>}
+                                    return (
+                                        <tr key={run.execution_id} style={{ borderBottom: '1px solid var(--border)' }}>
+                                            <td style={{ padding: '0.75rem 1rem', fontFamily: 'monospace', fontSize: '0.7rem' }} title={run.execution_id}>
+                                                {run.execution_id?.substring(0, 8)}
+                                            </td>
+                                            <td style={{ padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}>
+                                                {(() => {
+                                                    const cleanTimestamp = run.timestamp
+                                                        .replace(' UTC', '')
+                                                        .replace('Z', '')
+                                                        .replace(' ', 'T');
+                                                    return new Date(cleanTimestamp).toLocaleString([], {
+                                                        year: 'numeric',
+                                                        month: 'numeric',
+                                                        day: 'numeric',
+                                                        hour: '2-digit',
+                                                        minute: '2-digit'
+                                                    });
+                                                })()}
+                                            </td>
+                                            <td style={{ padding: '0.75rem 1rem', textTransform: 'uppercase', fontWeight: '600', color: 'var(--primary)' }}>
+                                                {run.comparison_mode?.toLowerCase().includes('scd') ? 'SCD' : run.comparison_mode?.replace('_', ' ')}
+                                            </td>
+                                            <td style={{ padding: '0.75rem 1rem' }}>
+                                                {!run.comparison_mode?.toLowerCase().includes('scd') && run.source !== 'SCD Validation' && run.source !== 'SCD' && (
+                                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', marginBottom: '0.35rem' }}>
+                                                        <span style={{
+                                                            fontSize: '10px',
+                                                            fontWeight: '800',
+                                                            backgroundColor: '#dbeafe',
+                                                            color: '#1e40af',
+                                                            padding: '0.1rem 0.4rem',
+                                                            borderRadius: '4px',
+                                                            minWidth: '34px',
+                                                            textAlign: 'center',
+                                                            display: 'inline-block',
+                                                            lineHeight: '1.4'
+                                                        }}>SRC</span>
+                                                        <span style={{ color: 'var(--foreground)', fontSize: '0.75rem', wordBreak: 'break-word', lineHeight: '1.4' }}>{run.source}</span>
+                                                    </div>
+                                                )}
+                                                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
+                                                    <span style={{
+                                                        fontSize: '10px',
+                                                        fontWeight: '800',
+                                                        backgroundColor: '#f3e8ff',
+                                                        color: '#6b21a8',
+                                                        padding: '0.1rem 0.4rem',
+                                                        borderRadius: '4px',
+                                                        minWidth: '34px',
+                                                        textAlign: 'center',
+                                                        display: 'inline-block',
+                                                        lineHeight: '1.4'
+                                                    }}>TGT</span>
+                                                    <span style={{ color: 'var(--foreground)', fontSize: '0.75rem', wordBreak: 'break-word', lineHeight: '1.4' }}>{run.target}</span>
                                                 </div>
-                                            </div>
-                                        </td>
-                                        <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
-                                            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', alignItems: 'center' }}>
-                                                <button
-                                                    onClick={() => handleViewClick(run)}
-                                                    style={{
-                                                        background: 'none',
-                                                        border: 'none',
-                                                        color: 'var(--primary)',
-                                                        cursor: 'pointer',
-                                                        textDecoration: 'underline',
-                                                        fontWeight: '600',
-                                                        fontSize: '0.875rem'
-                                                    }}
-                                                >
-                                                    View Result
-                                                </button>
-                                                <button
-                                                    onClick={async (e: React.MouseEvent) => {
-                                                        e.stopPropagation();
-                                                        if (confirm('Are you sure you want to delete this execution history?')) {
-                                                            try {
-                                                                const res = await fetch(`/api/history/${run.execution_id}`, {
-                                                                    method: 'DELETE',
-                                                                });
-                                                                if (res.ok) {
-                                                                    fetchHistory();
-                                                                } else {
-                                                                    alert('Failed to delete history');
+                                            </td>
+                                            <td style={{ padding: '0.75rem 1rem' }}>
+                                                {getStatusBadge(run.status)}
+                                            </td>
+                                            <td style={{ padding: '0.75rem 1rem', textAlign: 'center', minWidth: '100px' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                                                    <PieChart width={50} height={50}>
+                                                        <Pie
+                                                            data={chartData}
+                                                            cx={25}
+                                                            cy={25}
+                                                            innerRadius={10}
+                                                            outerRadius={25}
+                                                            paddingAngle={2}
+                                                            dataKey="value"
+                                                            stroke="none"
+                                                        >
+                                                            {chartData.map((entry, index) => (
+                                                                <Cell key={`cell-${index}`} fill={entry.color} />
+                                                            ))}
+                                                        </Pie>
+                                                        <RechartsTooltip />
+                                                    </PieChart>
+                                                    <div style={{ fontSize: '0.75rem', color: 'var(--secondary-foreground)', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                                                        <span style={{ color: '#10b981' }}>Pass: {passed}</span>
+                                                        {(failed > 0) && <span style={{ color: '#ef4444' }}>Fail: {failed}</span>}
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
+                                                <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', alignItems: 'center' }}>
+                                                    <button
+                                                        onClick={() => handleViewClick(run)}
+                                                        style={{
+                                                            background: 'none',
+                                                            border: 'none',
+                                                            color: 'var(--primary)',
+                                                            cursor: 'pointer',
+                                                            textDecoration: 'underline',
+                                                            fontWeight: '600',
+                                                            fontSize: '0.875rem'
+                                                        }}
+                                                    >
+                                                        View Result
+                                                    </button>
+                                                    <button
+                                                        onClick={async (e: React.MouseEvent) => {
+                                                            e.stopPropagation();
+                                                            if (confirm('Are you sure you want to delete this execution history?')) {
+                                                                try {
+                                                                    const res = await fetch(`/api/history/${run.execution_id}?project_id=${projectId}`, {
+                                                                        method: 'DELETE',
+                                                                    });
+                                                                    if (res.ok) {
+                                                                        fetchHistory();
+                                                                    } else {
+                                                                        alert('Failed to delete history');
+                                                                    }
+                                                                } catch (err) {
+                                                                    console.error("Delete failed", err);
+                                                                    alert('Error deleting history');
                                                                 }
-                                                            } catch (err) {
-                                                                console.error("Delete failed", err);
-                                                                alert('Error deleting history');
                                                             }
-                                                        }
-                                                    }}
-                                                    style={{
-                                                        background: 'none',
-                                                        border: 'none',
-                                                        cursor: 'pointer',
-                                                        fontSize: '1rem'
-                                                    }}
-                                                    title="Delete Execution"
-                                                >
-                                                    🗑️
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                </div>
-            )}
-        </div>
+                                                        }}
+                                                        style={{
+                                                            background: 'none',
+                                                            border: 'none',
+                                                            cursor: 'pointer',
+                                                            fontSize: '1rem'
+                                                        }}
+                                                        title="Delete Execution"
+                                                    >
+                                                        🗑️
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                )
+            }
+        </div >
     );
 }

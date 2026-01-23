@@ -3,6 +3,8 @@ from typing import List, Dict, Any, Optional
 import json
 import logging
 import asyncio
+import datetime
+import pytz
 from google.cloud import bigquery
 
 logger = logging.getLogger(__name__)
@@ -279,6 +281,10 @@ class BigQueryService:
         try:
             full_table_name = f"{project_id}.{config_dataset}.{config_table}"
             
+            # Prepare local timestamp (Melbourne time) for "wall clock" storage in UTC field
+            melbourne_tz = pytz.timezone('Australia/Melbourne')
+            current_ts_str = datetime.datetime.now(melbourne_tz).strftime('%Y-%m-%d %H:%M:%S')
+
             # Use MERGE to update if table exists, insert if not
             query = f"""
                 MERGE `{full_table_name}` T
@@ -299,16 +305,7 @@ class BigQueryService:
                 ON T.target_dataset = S.target_dataset AND T.target_table = S.target_table
                 WHEN MATCHED THEN
                     UPDATE SET 
-                        config_id = S.config_id,
-                        scd_type = S.scd_type,
-                        primary_keys = S.primary_keys,
-                        surrogate_key = S.surrogate_key,
-                        begin_date_column = S.begin_date_column,
-                        end_date_column = S.end_date_column,
-                        active_flag_column = S.active_flag_column,
-                        description = S.description,
-                        custom_tests = S.custom_tests,
-                        updated_at = CURRENT_TIMESTAMP()
+                        updated_at = @current_timestamp
                 WHEN NOT MATCHED THEN
                     INSERT (
                         config_id, target_dataset, target_table, scd_type, 
@@ -320,7 +317,7 @@ class BigQueryService:
                         S.config_id, S.target_dataset, S.target_table, S.scd_type,
                         S.primary_keys, S.surrogate_key, S.begin_date_column,
                         S.end_date_column, S.active_flag_column, S.description,
-                        S.custom_tests, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()
+                        S.custom_tests, @current_timestamp, @current_timestamp
                     )
             """
             
@@ -337,6 +334,7 @@ class BigQueryService:
                     bigquery.ScalarQueryParameter("active_flag_column", "STRING", config_data.get("active_flag_column")),
                     bigquery.ScalarQueryParameter("description", "STRING", config_data.get("description", "")),
                     bigquery.ScalarQueryParameter("custom_tests", "STRING", json.dumps(config_data.get("custom_tests")) if config_data.get("custom_tests") else None),
+                    bigquery.ScalarQueryParameter("current_timestamp", "TIMESTAMP", current_ts_str),
                 ]
             )
             
@@ -415,12 +413,14 @@ class BigQueryService:
         try:
             full_table_name = await self.ensure_test_history_table(project_id, dataset_id, table_id)
             
-            import datetime
-            current_time = datetime.datetime.now().isoformat()
+            # Use Melbourne timezone
+            melbourne_tz = pytz.timezone('Australia/Melbourne')
+            current_time = datetime.datetime.now(melbourne_tz)
             
             rows_to_insert = []
             for item in execution_data:
-                item['timestamp'] = current_time
+                # Convert datetime to ISO format string for JSON serialization
+                item['timestamp'] = current_time.isoformat()
                 rows_to_insert.append(item)
             
             if not rows_to_insert:
@@ -428,10 +428,12 @@ class BigQueryService:
 
             errors = self.client.insert_rows_json(full_table_name, rows_to_insert)
             if errors:
-                print(f"Failed to insert history rows: {errors}")
+                logger.error(f"Failed to insert history rows: {errors}")
+            else:
+                logger.info(f"✓ Successfully logged {len(rows_to_insert)} rows to {full_table_name}")
                 
         except Exception as e:
-            print(f"Failed to log execution: {str(e)}")
+            logger.error(f"Failed to log execution: {str(e)}")
 
     # --- Test3 Summary Logging (Support) ---
 
@@ -485,12 +487,12 @@ class BigQueryService:
         try:
             full_table_name = await self.ensure_summary_history_table(project_id, dataset_id, table_id)
             
-            import datetime
             import uuid
+            melbourne_tz = pytz.timezone('Australia/Melbourne')
             
             row = {
                 "execution_id": execution_data.get("execution_id") or str(uuid.uuid4()),
-                "timestamp": datetime.datetime.now().isoformat(),
+                "timestamp": datetime.datetime.now(melbourne_tz).strftime('%Y-%m-%d %H:%M:%S'),
                 "project_id": project_id,
                 "comparison_mode": execution_data.get("comparison_mode", "unknown"),
                 "source": execution_data.get("source", ""),
@@ -558,12 +560,12 @@ class BigQueryService:
             dataset_id = test_data.get('dataset_id', 'config')
             full_table_name = await self.ensure_custom_tests_table(project_id, dataset_id)
             
-            import datetime
             import uuid
+            melbourne_tz = pytz.timezone('Australia/Melbourne')
             
             row = {
                 "test_id": str(uuid.uuid4()),
-                "created_at": datetime.datetime.now().isoformat(),
+                "created_at": datetime.datetime.now(melbourne_tz).strftime('%Y-%m-%d %H:%M:%S'),
                 "test_name": test_data.get('test_name'),
                 "test_category": test_data.get('test_category'),
                 "severity": test_data.get('severity'),
@@ -670,9 +672,9 @@ class BigQueryService:
             project_id = settings.get('project_id')
             full_table_name = await self.ensure_settings_table(project_id, dataset_id, table_id)
             
-            import datetime
+            melbourne_tz = pytz.timezone('Australia/Melbourne')
             row = settings.copy()
-            row['updated_at'] = datetime.datetime.now().isoformat()
+            row['updated_at'] = datetime.datetime.now(melbourne_tz).strftime('%Y-%m-%d %H:%M:%S')
             
             errors = self.client.insert_rows_json(full_table_name, [row])
             if errors:
@@ -718,17 +720,15 @@ class BigQueryService:
                 required_cols = [
                     ("execution_timestamp", "TIMESTAMP"),
                     ("executed_by", "STRING"),
-                    ("rows_affected", "INTEGER"),
-                    ("sql_query", "STRING"),
-                    ("mapping_id", "STRING"),
-                    ("test_id", "STRING"),
-                    ("test_name", "STRING"),
-                    ("category", "STRING"),
-                    ("severity", "STRING"),
-                    ("description", "STRING"),
+                    ("executed_by", "STRING"),
                     ("error_message", "STRING"),
                     ("target_dataset", "STRING"),
-                    ("target_table", "STRING")
+                    ("target_table", "STRING"),
+                    ("total_tests", "INTEGER"),
+                    ("passed_tests", "INTEGER"),
+                    ("failed_tests", "INTEGER"),
+                    ("test_results", "JSON"),
+                    ("metadata", "JSON")
                 ]
                 
                 for col_name, col_type in required_cols:
@@ -753,18 +753,16 @@ class BigQueryService:
                 bigquery.SchemaField("execution_timestamp", "TIMESTAMP", mode="REQUIRED"),
                 bigquery.SchemaField("project_id", "STRING", mode="REQUIRED"),
                 bigquery.SchemaField("comparison_mode", "STRING", mode="REQUIRED"), 
-                bigquery.SchemaField("mapping_id", "STRING", mode="NULLABLE"),
-                bigquery.SchemaField("test_name", "STRING", mode="NULLABLE"),
-                bigquery.SchemaField("category", "STRING", mode="NULLABLE"),
                 bigquery.SchemaField("status", "STRING", mode="REQUIRED"),
-                bigquery.SchemaField("severity", "STRING", mode="NULLABLE"),
-                bigquery.SchemaField("description", "STRING", mode="NULLABLE"),
                 bigquery.SchemaField("error_message", "STRING", mode="NULLABLE"),
                 bigquery.SchemaField("target_dataset", "STRING", mode="NULLABLE"),
                 bigquery.SchemaField("target_table", "STRING", mode="NULLABLE"),
-                bigquery.SchemaField("rows_affected", "INTEGER", mode="NULLABLE"),
-                bigquery.SchemaField("sql_query", "STRING", mode="NULLABLE"),
                 bigquery.SchemaField("executed_by", "STRING", mode="NULLABLE"),
+                bigquery.SchemaField("total_tests", "INTEGER", mode="NULLABLE"),
+                bigquery.SchemaField("passed_tests", "INTEGER", mode="NULLABLE"),
+                bigquery.SchemaField("failed_tests", "INTEGER", mode="NULLABLE"),
+                bigquery.SchemaField("test_results", "JSON", mode="NULLABLE"),
+                bigquery.SchemaField("metadata", "JSON", mode="NULLABLE"),
             ]
             
             table = bigquery.Table(full_table_name, schema=schema)
@@ -790,9 +788,8 @@ class BigQueryService:
         try:
             full_table_name = await self.ensure_scd_history_table(project_id, dataset_id, table_id)
             
-            import datetime
-            # Use Melbourne local time (UTC+11) for wall-clock representation as requested
-            melbourne_tz = datetime.timezone(datetime.timedelta(hours=11))
+            # Use Melbourne local time for wall-clock representation as requested
+            melbourne_tz = pytz.timezone('Australia/Melbourne')
             current_time = datetime.datetime.now(melbourne_tz).strftime('%Y-%m-%d %H:%M:%S')
             
             rows_to_insert = []
@@ -805,13 +802,49 @@ class BigQueryService:
                 if 'config_id' in row and 'mapping_id' not in row:
                     row['mapping_id'] = row['config_id']
                 
+                # IMPORTANT: For BigQuery JSON type columns, verify we aren't sending a raw list 
+                # which might be interpreted as a REPEATED field. 
+                # Newer client versions usually handle dict/list -> JSON column fine, but if it fails,
+                # we can explicitly leave them as objects. However, seeing the error "Array specified for non-repeated field",
+                # it means we MUST serialize lists to strings or use a specific wrapper.
+                # Let's try explicit serialization for safety if they are complex types.
+                # Actually, insert_rows_json expects native Python types (dicts/lists) for JSON columns
+                # BUT if it fails, it might be due to schema caching or ambiguity.
+                # Let's simple check: if it is a list, wrapping it might fail if we don't.
+                # Workaround: We will rely on the fact that for a JSON column, passing a list *should* work 
+                # but if the table was created recently, schema might be lagging.
+                # However, the robust fix for 'Array specified...' on a JSON column is often just to ensure it matches.
+                # We'll leave them as is first, but if it fails, we used json.dumps.
+                # Given the error observed: "Array specified for non-repeated field: test_results",
+                # WE MUST serialise. But 'insert_rows_json' typically handles serialization.
+                # If we serialize to string: BigQuery accepts string for JSON column.
+                if 'test_results' in row and isinstance(row['test_results'], (list, dict)):
+                   # row['test_results'] = json.dumps(row['test_results']) # This would make it a STRING.
+                   # But wait, insert_rows_json should handle it. 
+                   # The error implies the table schema might still think it's a STRING (not JSON) 
+                   # OR the library is confused.
+                   # To fail safe against "Array specified...", we serialize.
+                   pass
+                
+                # Re-reading the error: "Array specified for non-repeated field: test_results".
+                # This happens when you try to insert a Python LIST into a BigQuery column that is NOT REPEATED.
+                # Even for JSON type, the client might map List -> Repeated.
+                # FIX: Serialize to string. BigQuery parses strings into JSON type on insert.
+                if 'test_results' in row and not isinstance(row['test_results'], str):
+                     row['test_results'] = json.dumps(row['test_results'], default=str)
+                
+                if 'metadata' in row and not isinstance(row['metadata'], str):
+                     row['metadata'] = json.dumps(row['metadata'], default=str)
+
+                
                 # Filter out keys not in schema to avoid errors
                 valid_keys = {
-                    "execution_id", "test_id", "execution_timestamp", "project_id", 
-                    "comparison_mode", "mapping_id", "test_name", "category",
-                    "status", "severity", "description", "error_message",
-                    "target_dataset", "target_table", "rows_affected", "sql_query",
-                    "executed_by"
+                    "execution_id", "execution_timestamp", "project_id", 
+                    "comparison_mode", "mapping_id", 
+                    "status", "error_message",
+                    "target_dataset", "target_table",
+                    "executed_by", "total_tests", "passed_tests", "failed_tests",
+                    "test_results", "metadata"
                 }
                 filtered_row = {k: v for k, v in row.items() if k in valid_keys}
                 rows_to_insert.append(filtered_row)
@@ -874,18 +907,21 @@ class BigQueryService:
                 f"{project_id}.qa_results.scd_test_history"
             ]
             
+            success_count = 0
             for table in tables_to_clean:
                 try:
-                    # Use WHERE true to delete all rows which is standard BigQuery DELETE syntax
-                    query = f"DELETE FROM `{table}` WHERE true"
+                    # Use TRUNCATE TABLE for better performance
+                    query = f"TRUNCATE TABLE `{table}`"
                     query_job = self.client.query(query)
                     query_job.result()
-                    logger.info(f"Cleared all history from {table}")
+                    logger.info(f"✓ Successfully truncated {table}")
+                    success_count += 1
                 except Exception as table_err:
-                    # Log but continue if table doesn't exist
-                    logger.warning(f"Could not clear {table}: {table_err}")
+                    # Log the specific error for debugging
+                    logger.error(f"✗ Failed to truncate {table}: {str(table_err)}")
             
-            return True
+            logger.info(f"Delete all completed: {success_count}/{len(tables_to_clean)} tables cleared")
+            return success_count > 0  # Return True if at least one table was cleared
         except Exception as e:
             logger.error(f"Error clearing all execution history: {e}")
             return False
@@ -912,7 +948,7 @@ class BigQueryService:
             query_summary = f"""
                 SELECT 
                     execution_id,
-                    timestamp,
+                    FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', timestamp) as timestamp,
                     project_id,
                     comparison_mode,
                     source,
@@ -950,38 +986,34 @@ class BigQueryService:
             logger.info(f"Summary history table not found or query failed: {e}")
             pass
 
-        # 2. Fetch from SCD History Table (New Method - SCD Tests)
+        # 2. Fetch from Granular History Table (Standard Tests)
         try:
-            # Heal schema if needed
-            await self.ensure_scd_history_table(project_id)
-            
-            scd_table = f"{project_id}.qa_results.scd_test_history"
-            # Schema: execution_id, execution_timestamp, project_id, comparison_mode, target_dataset, target_table, ... test_results(JSON)
-            query_scd = f"""
+            granular_table = f"{project_id}.config.test_execution_history"
+            # Schema: execution_id, timestamp, project_id, comparison_mode, mapping_id, test_name, category, status, severity, description, error_message, source, target, rows_affected, sql_query
+            query_granular = f"""
                 SELECT
                     execution_id,
-                    MAX(execution_timestamp) as timestamp,
+                    FORMAT_DATETIME('%Y-%m-%d %H:%M:%S', DATETIME(MAX(timestamp), 'Australia/Melbourne')) as timestamp,
                     MAX(project_id) as project_id,
                     MAX(comparison_mode) as comparison_mode,
-                    'SCD Validation' as source,
-                    STRING_AGG(DISTINCT CONCAT(target_dataset, '.', target_table), ', ') as target,
+                    IF(COUNT(DISTINCT source) > 1, 'Multiple Sources', MAX(source)) as source,
+                    IF(COUNT(DISTINCT target) > 1, 'Multiple Targets', MAX(target)) as target,
                     IF(COUNTIF(status = 'FAIL') > 0, 'FAIL', IF(COUNTIF(status = 'ERROR') > 0, 'ERROR', 'PASS')) as status,
                     COUNT(*) as total_tests,
                     COUNTIF(status = 'PASS') as passed_tests,
                     COUNTIF(status = 'FAIL') as failed_tests,
                     TO_JSON_STRING(ARRAY_AGG(STRUCT(
                         test_id, test_name, category, status, severity, 
-                        description, error_message, target_dataset, target_table, 
+                        description, error_message, source, target, 
                         rows_affected, sql_query, mapping_id
-                    ))) as details_json,
-                    MAX(IFNULL(executed_by, 'Manual Run')) as executed_by
-                FROM `{scd_table}`
+                    ))) as details_json
+                FROM `{granular_table}`
                 GROUP BY execution_id
                 ORDER BY timestamp DESC
                 LIMIT {limit}
             """
-            scd_rows = await self.execute_query(query_scd)
-            for row in scd_rows:
+            granular_rows = await self.execute_query(query_granular)
+            for row in granular_rows:
                  # Parse details JSON
                 if row.get('details_json'):
                     try:
@@ -992,9 +1024,111 @@ class BigQueryService:
                     row['details'] = []
                 if 'details_json' in row: del row['details_json']
                 
+                row['executed_by'] = 'Manual Run'
                 all_rows.append(row)
         except Exception as e:
-            logger.error(f"SCD history retrieval failed: {e}", exc_info=True)
+            logger.info(f"Granular history table not found or query failed: {e}")
+            pass
+
+        # 3. Fetch from SCD History Table (Table-Level Schema)
+        try:
+            # Heal schema if needed
+            await self.ensure_scd_history_table(project_id)
+            
+            scd_table = f"{project_id}.qa_results.scd_test_history"
+            # User's Schema: execution_id, execution_timestamp, project_id, comparison_mode, mapping_id, target_dataset, target_table, status, total_tests, passed_tests, failed_tests, error_message, test_results, executed_by, metadata
+            query_scd = f"""
+                SELECT
+                    execution_id,
+                    FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', MAX(execution_timestamp)) as timestamp,
+                    MAX(project_id) as project_id,
+                    MAX(comparison_mode) as comparison_mode,
+                    'SCD Validation' as source,
+                    IF(COUNT(DISTINCT CONCAT(target_dataset, '.', target_table)) > 1, 'Multiple Targets', MAX(CONCAT(target_dataset, '.', target_table))) as target,
+                    IF(COUNTIF(status = 'FAIL') > 0, 'FAIL', 'PASS') as status,
+                    SUM(total_tests) as total_tests,
+                    SUM(passed_tests) as passed_tests,
+                    SUM(failed_tests) as failed_tests,
+                    TO_JSON_STRING(ARRAY_AGG(STRUCT(
+                        mapping_id, target_dataset, target_table, status,
+                        total_tests, passed_tests, failed_tests,
+                        test_results as predefined_results
+                    ))) as details_json,
+                    MAX(IFNULL(executed_by, 'Manual Run')) as executed_by
+                FROM `{scd_table}`
+                GROUP BY execution_id
+                ORDER BY timestamp DESC
+                LIMIT {limit}
+            """
+            
+            # Additional logging to debug query results
+            # logger.info(f"Executing SCD history query: {query_scd}")
+            
+            scd_rows = await self.execute_query(query_scd)
+            
+            # logger.info(f"SCD Query returned {len(scd_rows)} rows")
+            
+            for row in scd_rows:
+                 # Parse details JSON
+                if row.get('details_json'):
+                    try:
+                        # BigQuery ARRAY_AGG(STRUCT) returns a list of dictionaries directly in the JSON string
+                        # We need to ensure we parse it correctly
+                        details_list = json.loads(row['details_json'])
+                        
+                        # Fix: Ensure the structure matches what the frontend expects
+                        # The frontend expects 'results_by_mapping' or a flat list of results with metadata
+                        # We'll construct a 'results_by_mapping' structure here
+                        formatted_mappings = []
+                        
+                        for mapping in details_list:
+                            # Test results might be nested as a string JSON if they were stored that way
+                            predefined_results = mapping.get('predefined_results')
+                            if isinstance(predefined_results, str):
+                                try:
+                                    predefined_results = json.loads(predefined_results)
+                                except:
+                                    predefined_results = []
+                            elif not isinstance(predefined_results, list):
+                                predefined_results = []
+                                
+                            formatted_mappings.append({
+                                "mapping_id": mapping.get('mapping_id') or mapping.get('target_table'),
+                                "mapping_info": {
+                                    "target": f"{mapping.get('target_dataset')}.{mapping.get('target_table')}",
+                                    "source": "SCD Logic"
+                                },
+                                "predefined_results": predefined_results,
+                                "summary": {
+                                    "total_tests": mapping.get('total_tests', 0),
+                                    "passed": mapping.get('passed_tests', 0),
+                                    "failed": mapping.get('failed_tests', 0),
+                                    "errors": 0 
+                                }
+                            })
+
+                        row['details'] = {
+                            "execution_id": row['execution_id'],
+                            "comparison_mode": "scd",
+                            "summary": {
+                                "total_tests": row['total_tests'],
+                                "passed": row['passed_tests'],
+                                "failed": row['failed_tests'],
+                                "errors": 0,
+                                "total_mappings": len(formatted_mappings)
+                            },
+                            "results_by_mapping": formatted_mappings
+                        }
+                    except Exception as e:
+                        logger.error(f"Error parsing detailed JSON for execution {row['execution_id']}: {e}")
+                        row['details'] = []
+                else:
+                    row['details'] = []
+                if 'details_json' in row: del row['details_json']
+                
+                all_rows.append(row)
+        except Exception as e:
+            logger.error(f"SCD history retrieval failed: {e}")
             pass
 
         # 3. Deduplicate and Sort
