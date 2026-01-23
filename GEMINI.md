@@ -91,7 +91,8 @@ The project uses a unified deployment script that handles both services:
     - The Frontend uses `next.config.js` rewrites to proxy `/api/:path*` to the Backend.
     - Locally, the destination is `http://127.0.0.1:8000` or `http://backend:8080` (inside network).
 4.  **BigQuery Config**:
-    - The app expects a dataset (default: `config`) containing configuration tables like `scd_validation_config`.
+    - The app expects a dataset (default: `config`) containing configuration tables like `data_load_config` (Standard) and `scd_validation_config` (SCD).
+    - Results and history are stored in a `qa_results` dataset (tables: `scd_test_history`, etc.).
     - See `config_tables_setup.sql` for the required schema.
 
 ---

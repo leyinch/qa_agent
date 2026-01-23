@@ -1,8 +1,12 @@
 # Viewing Logs for Test Case Generator
 
-## Error Messages in the UI
+## Debugging in the UI
 
-The updated Results page now shows error messages directly in the table under the "Error/Details" column. For tests with ERROR status, you'll see the specific error message that caused the test to fail.
+The Results page provides several tools to debug validation failures:
+- **Error/Details Column**: Shows the specific error message for tests with `ERROR` status.
+- **View Bad Data**: For `FAIL` status, click this button to see the actual rows in BigQuery that failed the validation.
+- **Show SQL**: View the exact BigQuery SQL statement executed for each test. This can be copied directly into the BigQuery console for further analysis.
+- **Sample Data Grid**: See the specific values that triggered the failure directly in the results table.
 
 ## Viewing Cloud Run Logs
 

@@ -1,50 +1,64 @@
-# Data QA Agent
+# Data QA Agent (Combined)
 
-This is a Next.js application for testing data quality using AI. It uses Google Cloud Vertex AI to generate test cases from an ER diagram and BigQuery schema, and executes them against BigQuery.
+This is a powerful Data Quality Assurance Platform that uses Generative AI (Vertex AI) to analyze BigQuery schemas and ER diagrams to generate and execute quality tests.
+
+## 🚀 Key Features
+
+- **GCS to BigQuery Comparison**: Validate data integrity between files and tables.
+- **Schema Validation**: Verify BigQuery schemas against ERD descriptions.
+- **SCD Validation (Types 1 & 2)**: Comprehensive integrity checks for dimension tables (overlaps, gaps, current flags, etc.).
+- **AI-Powered Test Suggestions**: Vertex AI suggests context-aware custom tests.
+- **Advanced Results Dashboard**:
+  - **Tabbed UI**: Batch results organized by mapping.
+  - **Bad Data Preview**: View the actual problematic rows directly in the UI.
+  - **SQL Transparency**: View the underlying BigQuery SQL for every test.
+  - **Sample Data**: Inline visualization of validation failures.
+- **Execution History**: Track all runs with status distributions and historical performance.
 
 ## Prerequisites
 
 - Google Cloud Project
-- BigQuery Dataset
+- BigQuery Dataset (default: `config` for metadata, `qa_results` for history)
 - Vertex AI API enabled
 - BigQuery API enabled
 
+## Documentation Links
+- [SCD Validation Guide](./SCD_VALIDATION_README.md) - Deep dive into dimension testing.
+- [Config Tables Setup](./CONFIG_TABLES_README.md) - How to set up the BigQuery backend.
+- [Deployment Guide](./DEPLOYMENT_GUIDE.md) - How to deploy to Cloud Run.
+- [Logging Guide](./LOGGING_GUIDE.md) - How to debug and view logs.
+
 ## Local Development
 
-Note: Node.js is required for local development.
+### 1. Prerequisite Environment Variables
+Create a `.env.local` in the root directory:
+```bash
+GOOGLE_CLIENT_ID=xxx.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=xxx
+NEXTAUTH_SECRET=a-random-long-string
+NEXTAUTH_URL=http://localhost:3000
+GOOGLE_CLOUD_PROJECT=your-project-id
+```
 
-1. Install dependencies:
-   ```bash
-   npm install
-   ```
+### 2. Running with Docker Compose (Recommended)
+```bash
+docker-compose up --build -d
+```
+- **Frontend**: [http://localhost:3000](http://localhost:3000)
+- **Backend API**: [http://localhost:8000](http://localhost:8000)
+- **API Docs (Swagger)**: [http://localhost:8000/docs](http://localhost:8000/docs)
 
-2. Run the development server:
-   ```bash
-   npm run dev
-   ```
+### 3. Running Manually
+#### Frontend (Next.js):
+```bash
+npm install
+npm run dev
+```
 
-3. Open [http://localhost:3000](http://localhost:3000) with your browser.
+#### Backend (FastAPI):
+```bash
+cd backend
+pip install -r requirements.txt
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
 
-## Deployment to Google Cloud Run
-
-1. Build the container image:
-   ```bash
-   gcloud builds submit --tag gcr.io/PROJECT_ID/test-case-generator
-   ```
-
-2. Deploy to Cloud Run:
-   ```bash
-   gcloud run deploy test-case-generator \
-     --image gcr.io/PROJECT_ID/test-case-generator \
-     --platform managed \
-     --region us-central1 \
-     --allow-unauthenticated \
-     --set-env-vars GOOGLE_CLIENT_ID=your-client-id,GOOGLE_CLIENT_SECRET=your-client-secret,NEXTAUTH_SECRET=your-secret,NEXTAUTH_URL=https://your-service-url
-   ```
-
-## Environment Variables
-
-- `GOOGLE_CLIENT_ID`: Google OAuth Client ID
-- `GOOGLE_CLIENT_SECRET`: Google OAuth Client Secret
-- `NEXTAUTH_SECRET`: Random string for session encryption
-- `NEXTAUTH_URL`: The canonical URL of your site

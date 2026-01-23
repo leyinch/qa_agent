@@ -6,7 +6,8 @@ AI-powered data quality testing backend built with FastAPI.
 
 - GCS file processing with wildcard support
 - BigQuery query execution and metadata retrieval
-- Predefined test suite (8 standard tests)
+- Predefined test suite (20+ tests including SCD1 & SCD2)
+- SCD (Slowly Changing Dimension) validation engine
 - AI-powered test suggestions using Vertex AI
 - Config table support for batch processing
 - RESTful API with automatic documentation
@@ -60,8 +61,15 @@ Generate and execute data quality tests.
 
 **Modes:**
 - `gcs`: Single file comparison
-- `gcs-config`: Config table batch processing
-- `schema`: Schema validation (coming soon)
+- `gcs-config`: Config table batch processing (data_load_config)
+- `schema`: Schema validation
+- `scd`: SCD Validation (Direct Input or Config Table)
+
+### POST /api/scd-config
+Add a new SCD configuration to BigQuery.
+
+### GET /api/history
+Fetch execution history.
 
 ### GET /health
 Health check endpoint.

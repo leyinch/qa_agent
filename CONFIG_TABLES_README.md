@@ -7,12 +7,9 @@ This guide explains how to set up the configuration tables for the Data QA Agent
 ## Quick Start
 
 1. **Run the setup script** in BigQuery:
-   ```bash
-   # Open BigQuery Console
-   # Copy and paste the contents of config_tables_setup.sql
-   # Update the project ID in the script from 'miruna-sandpit' to your project ID
-   # Execute the script
-   ```
+    - For **Standard/GCS Mappings**: Use [`config_tables_setup.sql`](./config_tables_setup.sql).
+    - For **SCD Validation & History**: Use [`setup_scd_test_resources.sql`](./setup_scd_test_resources.sql) (Consolidated Setup).
+    - *Note: Update project IDs and placeholders in the scripts before running.*
 
 2. **Verify tables were created**:
    ```sql
@@ -63,8 +60,21 @@ Stores AI-suggested tests pending user approval.
 
 Tracks all test executions for monitoring and debugging.
 
+### 5. `scd_validation_config` - SCD Specific Configuration
+
+Stores configurations for Slowly Changing Dimension (SCD) Type 1 and Type 2 validation.
+
+**Key columns:**
+- `mapping_id`: Unique identifier for the SCD validation.
+- `target_dataset`, `target_table`: The dimension table to validate.
+- `scd_type`: `SCD1` or `SCD2`.
+- `primary_keys`: Array of columns forming the natural key.
+- `surrogate_key`: The unique identifier for the specific version of a record.
+- `begin_date_column`, `end_date_column`, `active_flag_column`: (SCD2 only) Temporal tracking columns.
+
 ## Adding a New Mapping
 
+### GCS/Standard Mapping:
 ```sql
 INSERT INTO `YOUR_PROJECT_ID.config.data_load_config`
 (mapping_id, mapping_name, source_bucket, source_file_path, source_file_format,
@@ -74,6 +84,16 @@ VALUES
 ('my_data_load', 'My Data Load', 'my-bucket', 'raw/data.csv', 'csv',
  'analytics', 'my_table', ['id'], ['id', 'name'],
  ['row_count_match', 'no_nulls_required', 'no_duplicates_pk'], true);
+```
+
+### SCD Mapping:
+```sql
+INSERT INTO `YOUR_PROJECT_ID.config.scd_validation_config`
+(mapping_id, target_dataset, target_table, scd_type, primary_keys, surrogate_key, 
+ begin_date_column, end_date_column, active_flag_column, is_active)
+VALUES
+('employee_dim_v1', 'crown_scd_mock', 'D_Employee_WD', 'SCD2', ['UserId'], 'DWEmployeeID',
+ 'DWBeginEffDateTime', 'DWEndEffDateTime', 'DWCurrentRowFlag', true);
 ```
 
 ## Test Configuration Examples
@@ -115,10 +135,8 @@ outlier_columns: ['transaction_amount', 'processing_time_ms']
 
 ## Using in the App
 
-1. **Select "GCS File Comparison" mode**
-2. **Choose "Config Table" option**
-3. **Enter**: `config` (dataset) and `data_load_config` (table)
-4. **Click "Run Tests"**
+1. **GCS/Standard Mapping**: Select "GCS File Comparison" mode -> Choose "Config Table" -> Enter the config table coordinates.
+2. **SCD Validation**: Select "SCD Validation" mode -> Choose "Config Table" -> Enter the SCD config table coordinates.
 
 ## Maintenance
 
