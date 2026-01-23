@@ -84,16 +84,16 @@ The results page now provides deep insight into test failures:
 ### Step 1: Create Mock Data in BigQuery
 
 1. **Open BigQuery Console**:  
-   https://console.cloud.google.com/bigquery?project=leyin-sandpit
+   https://console.cloud.google.com/bigquery?project={{your-project-id}}
 
 2. **Run the Setup SQL**:  
    Copy and paste the entire contents of [`setup_scd_test_resources.sql`](./setup_scd_test_resources.sql) into the query editor and click **Run**. (Note: Replace `{{PROJECT_ID}}` with your actual GCP Project ID).
 
 3. **Verify Tables Created**:
-   - `leyin-sandpit.crown_scd_mock.D_Seat_WD` (4 rows)
-   - `leyin-sandpit.crown_scd_mock.D_Employee_WD` (9 rows)
-   - `leyin-sandpit.crown_scd_mock.D_Player_WD` (11 rows)
-   - `leyin-sandpit.config.scd_validation_config` (3 rows)
+   - `{{your-project-id}}.crown_scd_mock.D_Seat_WD` (4 rows)
+   - `{{your-project-id}}.crown_scd_mock.D_Employee_WD` (9 rows)
+   - `{{your-project-id}}.crown_scd_mock.D_Player_WD` (11 rows)
+   - `{{your-project-id}}.config.scd_validation_config` (3 rows)
 
 ### Step 2: Test SCD Type 1 Validation
 
@@ -104,7 +104,7 @@ The results page now provides deep insight into test failures:
    Click "SCD Validation" in the sidebar (🔄 icon)
 
 3. **Fill in the Form**:
-   - **Project ID**: `leyin-sandpit`
+   - **Project ID**: `{{your-project-id}}`
    - **Target Dataset**: `crown_scd_mock`
    - **Target Table**: `D_Seat_WD`
    - **SCD Type**: Select **Type 1**
@@ -124,7 +124,7 @@ The results page now provides deep insight into test failures:
 ### Step 3: Test SCD Type 2 Validation
 
 1. **Fill in the Form**:
-   - **Project ID**: `leyin-sandpit`
+   - **Project ID**: `{{your-project-id}}`
    - **Target Dataset**: `crown_scd_mock`
    - **Target Table**: `D_Employee_WD`
    - **SCD Type**: Select **Type 2**
@@ -142,7 +142,7 @@ The results page now provides deep insight into test failures:
 ### Step 4: Test SCD Type 2 with Business Rules (`D_Player_WD`)
 
 1. **Fill in the Form**:
-   - **Project ID**: `leyin-sandpit`
+   - **Project ID**: `{{your-project-id}}`
    - **Target Dataset**: `crown_scd_mock`
    - **Target Table**: `D_Player_WD`
    - **SCD Type**: Select **Type 2**
