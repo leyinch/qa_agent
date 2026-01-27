@@ -11,9 +11,10 @@ class Settings(BaseSettings):
     debug: bool = False
     
     # Google Cloud
-    google_cloud_project: str = "default-project"
-    vertex_ai_location: str = "us-central1"
-    vertex_ai_model: str = "gemini-1.5-flash-001"
+    google_cloud_project: str = "leyin-sandpit"
+    google_cloud_region: str = "australia-southeast2"
+    vertex_ai_location: str = "australia-southeast2"
+    vertex_ai_model: str = "gemini-1.5-flash-002"
     
     # CORS
     cors_origins: list[str] = [
