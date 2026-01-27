@@ -1,35 +1,24 @@
 steps:
-  # 1. Build the container image
+  # Build the frontend image with build arguments
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', '$LOCATION-docker.pkg.dev/$PROJECT_ID/agent-repo/$_SERVICE_NAME:latest', '.']
-    # Frontend Dockerfile is in root, so default dir is fine
-  
-  # 2. Push the container image to Artifact Registry
-  - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', '$LOCATION-docker.pkg.dev/$PROJECT_ID/agent-repo/$_SERVICE_NAME:latest']
-  
-  # 3. Deploy to Cloud Run
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    entrypoint: gcloud
     args:
-      - 'run'
-      - 'deploy'
-      - '$_SERVICE_NAME'
-      - '--image'
-      - '$LOCATION-docker.pkg.dev/$PROJECT_ID/agent-repo/$_SERVICE_NAME:latest'
-      - '--region'
-      - '$LOCATION'
-      - '--platform'
-      - 'managed'
-      - '--allow-unauthenticated'
-      - '--set-env-vars'
-      - 'NEXT_PUBLIC_BACKEND_URL=$_BACKEND_URL'
-
-substitutions:
-    _SERVICE_NAME: qa-agent-frontend
+      - 'build'
+      - '-t'
+      - '${_REGISTRY}/${PROJECT_ID}/${_SERVICE_NAME}:latest'
+      - '--build-arg'
+      - 'BACKEND_URL=${_BACKEND_URL}'
+      - '--build-arg'
+      - 'NEXT_PUBLIC_BACKEND_URL=${_NEXT_PUBLIC_BACKEND_URL}'
+      - '.'
 
 images:
-  - '$LOCATION-docker.pkg.dev/$PROJECT_ID/agent-repo/$_SERVICE_NAME:latest'
+  - '${_REGISTRY}/${PROJECT_ID}/${_SERVICE_NAME}:latest'
+
+substitutions:
+  _REGISTRY: 'gcr.io'
+  _SERVICE_NAME: 'data-qa-agent-frontend-combined'
+  _BACKEND_URL: ''
+  _NEXT_PUBLIC_BACKEND_URL: ''
 
 options:
   logging: CLOUD_LOGGING_ONLY

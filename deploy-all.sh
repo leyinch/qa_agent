@@ -235,22 +235,33 @@ if [ "$DEPLOY_FRONTEND" = true ]; then
             --format 'value(status.url)' 2>/dev/null || echo "")
 
         if [ -z "$BACKEND_URL" ]; then
-            echo -e "${RED}Warning: Could not find Backend URL for service: $BACKEND_SERVICE${NC}"
-            echo "Frontend will default to localhost:8000"
+            echo -e "${RED}Error: Could not find Backend URL for service: $BACKEND_SERVICE in region $REGION${NC}"
+            echo "Please ensure the backend is deployed first and the service name is correct in deploy.config."
+            exit 1
         else
-            echo "Found Backend URL: $BACKEND_URL"
+            echo -e "${GREEN}✓ Found Backend URL: $BACKEND_URL${NC}"
         fi
     fi
 
-    echo "Building and deploying frontend..."
+    echo "Building frontend with backend URL: $BACKEND_URL"
+    
+    # Build the image with Cloud Build, passing the backend URL as a build arg
+    echo "Step 1: Building container image..."
+    gcloud builds submit \
+        --config cloudbuild.frontend.yaml \
+        --project $PROJECT_ID \
+        --substitutions="_REGISTRY=$REGISTRY,_SERVICE_NAME=$FRONTEND_SERVICE,_BACKEND_URL=$BACKEND_URL,_NEXT_PUBLIC_BACKEND_URL=$BACKEND_URL" \
+        --quiet
+    
+    # Deploy the pre-built image
+    echo "Step 2: Deploying to Cloud Run..."
     gcloud run deploy $FRONTEND_SERVICE \
-        --source . \
+        --image "$REGISTRY/$PROJECT_ID/$FRONTEND_SERVICE:latest" \
         --platform managed \
         --region $REGION \
         --allow-unauthenticated \
         --project $PROJECT_ID \
         --set-env-vars "BACKEND_URL=$BACKEND_URL,NEXT_PUBLIC_BACKEND_URL=$BACKEND_URL,NEXT_PUBLIC_GOOGLE_CLOUD_PROJECT=$PROJECT_ID,NEXT_PUBLIC_GOOGLE_CLOUD_REGION=$REGION" \
-        --set-build-env-vars "BACKEND_URL=$BACKEND_URL,NEXT_PUBLIC_BACKEND_URL=$BACKEND_URL,NEXT_PUBLIC_GOOGLE_CLOUD_PROJECT=$PROJECT_ID,NEXT_PUBLIC_GOOGLE_CLOUD_REGION=$REGION" \
         --quiet
 
     FRONTEND_URL=$(gcloud run services describe $FRONTEND_SERVICE \
