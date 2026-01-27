@@ -30,3 +30,4 @@ Thumbs.db
 backend/service-account.json
 service-account.json
 *.json.local
+CLAUDE.md
