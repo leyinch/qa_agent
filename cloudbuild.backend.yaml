@@ -1,0 +1,27 @@
+steps:
+  # Build the backend image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - '${_REGISTRY}/${PROJECT_ID}/${_SERVICE_NAME}:latest'
+      - '-f'
+      - 'backend/Dockerfile'
+      - 'backend'
+
+  # Push the image to the registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - '${_REGISTRY}/${PROJECT_ID}/${_SERVICE_NAME}:latest'
+
+images:
+  - '${_REGISTRY}/${PROJECT_ID}/${_SERVICE_NAME}:latest'
+
+substitutions:
+  _REGISTRY: 'gcr.io'
+  _SERVICE_NAME: 'data-qa-agent-backend-combined'
+  _REGION: 'australia-southeast2'
+
+options:
+  logging: CLOUD_LOGGING_ONLY

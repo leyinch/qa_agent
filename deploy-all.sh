@@ -34,23 +34,23 @@ sync_yaml_files() {
     echo -e "${BLUE}Syncing cloudbuild.yaml files with deploy.config...${NC}"
 
     # Update frontend cloudbuild.yaml
-    if [ -f "${SCRIPT_DIR}/cloudbuild.yaml" ]; then
+    if [ -f "${SCRIPT_DIR}/cloudbuild.frontend.yaml" ]; then
         sed -i.bak \
             -e "s/_SERVICE_NAME:.*/_SERVICE_NAME: $FRONTEND_SERVICE/" \
             -e "s/_REGION:.*/_REGION: $REGION/" \
-            -e "s/_PROJECT_ID:.*/_PROJECT_ID: $PROJECT_ID/" \
-            "${SCRIPT_DIR}/cloudbuild.yaml"
-        echo -e "${GREEN}✓ Synced cloudbuild.yaml${NC}"
+            -e "s/_REGISTRY:.*/_REGISTRY: $REGISTRY/" \
+            "${SCRIPT_DIR}/cloudbuild.frontend.yaml"
+        echo -e "${GREEN}✓ Synced cloudbuild.frontend.yaml${NC}"
     fi
 
     # Update backend cloudbuild.yaml
-    if [ -f "${SCRIPT_DIR}/backend/cloudbuild.yaml" ]; then
+    if [ -f "${SCRIPT_DIR}/cloudbuild.backend.yaml" ]; then
         sed -i.bak \
             -e "s/_SERVICE_NAME:.*/_SERVICE_NAME: $BACKEND_SERVICE/" \
             -e "s/_REGION:.*/_REGION: $REGION/" \
-            -e "s/_PROJECT_ID:.*/_PROJECT_ID: $PROJECT_ID/" \
-            "${SCRIPT_DIR}/backend/cloudbuild.yaml"
-        echo -e "${GREEN}✓ Synced backend/cloudbuild.yaml${NC}"
+            -e "s/_REGISTRY:.*/_REGISTRY: $REGISTRY/" \
+            "${SCRIPT_DIR}/cloudbuild.backend.yaml"
+        echo -e "${GREEN}✓ Synced cloudbuild.backend.yaml${NC}"
     fi
 }
 
@@ -195,11 +195,20 @@ if [ "$DEPLOY_BACKEND" = true ]; then
     echo -e "${YELLOW}Deploying Backend Service${NC}"
     echo -e "${YELLOW}========================================${NC}"
 
-    cd backend
-
-    echo "Building and deploying backend..."
+    echo "Building backend with Cloud Build..."
+    
+    # Build the image with Cloud Build
+    echo "Step 1: Building container image..."
+    gcloud builds submit \
+        --config cloudbuild.backend.yaml \
+        --project $PROJECT_ID \
+        --substitutions="_REGISTRY=$REGISTRY,_SERVICE_NAME=$BACKEND_SERVICE,_REGION=$REGION" \
+        --quiet
+    
+    # Deploy the pre-built image
+    echo "Step 2: Deploying to Cloud Run..."
     gcloud run deploy $BACKEND_SERVICE \
-        --source . \
+        --image "$REGISTRY/$PROJECT_ID/$BACKEND_SERVICE:latest" \
         --platform managed \
         --region $REGION \
         --allow-unauthenticated \
@@ -215,8 +224,6 @@ if [ "$DEPLOY_BACKEND" = true ]; then
 
     echo -e "${GREEN}✓ Backend deployed successfully${NC}"
     echo "Backend URL: $BACKEND_URL"
-
-    cd ..
 fi
 
 if [ "$DEPLOY_FRONTEND" = true ]; then
