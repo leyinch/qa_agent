@@ -37,7 +37,6 @@ sync_yaml_files() {
     if [ -f "${SCRIPT_DIR}/cloudbuild.frontend.yaml" ]; then
         sed -i.bak \
             -e "s/_SERVICE_NAME:.*/_SERVICE_NAME: $FRONTEND_SERVICE/" \
-            -e "s/_REGION:.*/_REGION: $REGION/" \
             -e "s/_REGISTRY:.*/_REGISTRY: $REGISTRY/" \
             "${SCRIPT_DIR}/cloudbuild.frontend.yaml"
         echo -e "${GREEN}✓ Synced cloudbuild.frontend.yaml${NC}"
@@ -48,7 +47,6 @@ sync_yaml_files() {
         sed -i.bak \
             -e "s/_SERVICE_NAME:.*/_SERVICE_NAME: $BACKEND_SERVICE/" \
             -e "s/_REGION:.*/_REGION: $REGION/" \
-            -e "s/_REGISTRY:.*/_REGISTRY: $REGISTRY/" \
             "${SCRIPT_DIR}/cloudbuild.backend.yaml"
         echo -e "${GREEN}✓ Synced cloudbuild.backend.yaml${NC}"
     fi
@@ -195,25 +193,13 @@ if [ "$DEPLOY_BACKEND" = true ]; then
     echo -e "${YELLOW}Deploying Backend Service${NC}"
     echo -e "${YELLOW}========================================${NC}"
 
-    echo "Building backend with Cloud Build..."
+    echo "Building and deploying backend with Cloud Build..."
     
-    # Build the image with Cloud Build
-    echo "Step 1: Building container image..."
+    # Cloud Build handles: build image → push to Artifact Registry → deploy to Cloud Run
     gcloud builds submit \
         --config cloudbuild.backend.yaml \
         --project $PROJECT_ID \
-        --substitutions="_REGISTRY=$REGISTRY,_SERVICE_NAME=$BACKEND_SERVICE,_REGION=$REGION" \
-        --quiet
-    
-    # Deploy the pre-built image
-    echo "Step 2: Deploying to Cloud Run..."
-    gcloud run deploy $BACKEND_SERVICE \
-        --image "$REGISTRY/$PROJECT_ID/$BACKEND_SERVICE:latest" \
-        --platform managed \
-        --region $REGION \
-        --allow-unauthenticated \
-        --project $PROJECT_ID \
-        --set-env-vars "GOOGLE_CLOUD_PROJECT=$PROJECT_ID,GOOGLE_CLOUD_REGION=$REGION" \
+        --substitutions="_SERVICE_NAME=$BACKEND_SERVICE,_REGION=$REGION" \
         --quiet
 
     BACKEND_URL=$(gcloud run services describe $BACKEND_SERVICE \

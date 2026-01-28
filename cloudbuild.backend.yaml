@@ -4,22 +4,38 @@ steps:
     args:
       - 'build'
       - '-t'
-      - '${_REGISTRY}/${PROJECT_ID}/${_SERVICE_NAME}:latest'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/agent-repo/${_SERVICE_NAME}:latest'
       - '-f'
       - 'backend/Dockerfile'
       - 'backend'
 
-  # Push the image to the registry
+  # Push the image to Artifact Registry
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'push'
-      - '${_REGISTRY}/${PROJECT_ID}/${_SERVICE_NAME}:latest'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/agent-repo/${_SERVICE_NAME}:latest'
+
+  # Deploy to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - '${_SERVICE_NAME}'
+      - '--image'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/agent-repo/${_SERVICE_NAME}:latest'
+      - '--region'
+      - '${_REGION}'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--set-env-vars'
+      - 'GOOGLE_CLOUD_PROJECT=${PROJECT_ID},GOOGLE_CLOUD_REGION=${_REGION}'
 
 images:
-  - '${_REGISTRY}/${PROJECT_ID}/${_SERVICE_NAME}:latest'
+  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/agent-repo/${_SERVICE_NAME}:latest'
 
 substitutions:
-  _REGISTRY: 'gcr.io'
   _SERVICE_NAME: 'data-qa-agent-backend-combined'
   _REGION: 'australia-southeast2'
 
